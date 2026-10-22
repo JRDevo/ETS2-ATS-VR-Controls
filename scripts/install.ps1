@@ -17,6 +17,11 @@ $dllName = 'ets2_ats_vr_controls.dll'
 $regPath = 'HKLM:\SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit'
 $repo = (Split-Path $PSScriptRoot -Leaf) -ieq 'scripts' -and (Test-Path (Join-Path (Split-Path -Parent $PSScriptRoot) 'CMakeLists.txt'))
 $root = if ($repo) { Split-Path -Parent $PSScriptRoot } else { $PSScriptRoot }
+# a package that keeps its scripts\ folder: the DLL + json are one folder up
+if (-not $repo -and -not (Test-Path (Join-Path $root $jsonName)) -and (Test-Path (Join-Path (Split-Path -Parent $root) $jsonName))) {
+    $root = Split-Path -Parent $root
+}
+function LeafOf($p) { try { return [System.IO.Path]::GetFileName($p) } catch { return '' } }   # (odd foreign value names)
 
 function Fail($m) { Write-Host "ERROR: $m" -ForegroundColor Red; if ($Elevated) { Read-Host 'Press Enter' | Out-Null }; exit 1 }
 
@@ -34,7 +39,7 @@ if (-not $Elevated) {
     }
     $mine = 'HKCU:\SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit'
     if (Test-Path $mine) {
-        foreach ($n in ((Get-Item $mine).GetValueNames() | Where-Object { [System.IO.Path]::GetFileName($_) -ieq $jsonName })) {
+        foreach ($n in ((Get-Item $mine).GetValueNames() | Where-Object { (LeafOf $_) -ieq $jsonName })) {
             Remove-ItemProperty -Path $mine -Name $n
             Write-Host "removed per-user registration: $n"
         }
@@ -55,7 +60,7 @@ if (-not (Test-Path $json)) { Fail "missing $json" }
 if (-not (Test-Path (Join-Path $root $dllName))) { Fail "missing $dllName next to $json" }
 if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
 foreach ($n in (Get-Item $regPath).GetValueNames()) {
-    if ([System.IO.Path]::GetFileName($n) -ieq $jsonName -and $n -ne $json) {
+    if ((LeafOf $n) -ieq $jsonName -and $n -ne $json) {
         Remove-ItemProperty -Path $regPath -Name $n
         Write-Host "removed older registration: $n"
     }

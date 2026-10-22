@@ -6,10 +6,11 @@
 param([switch]$Elevated)
 $ErrorActionPreference = 'Stop'
 $jsonName = 'XR_APILAYER_JRDEVO_ets2_ats_vr_controls.json'
+function LeafOf($p) { try { return [System.IO.Path]::GetFileName($p) } catch { return '' } }   # (odd foreign value names)
 function RemoveFrom($hive) {
     $k = "$hive\SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit"
     if (-not (Test-Path $k)) { return }
-    foreach ($n in ((Get-Item $k).GetValueNames() | Where-Object { [System.IO.Path]::GetFileName($_) -ieq $jsonName })) {
+    foreach ($n in ((Get-Item $k).GetValueNames() | Where-Object { (LeafOf $_) -ieq $jsonName })) {
         Remove-ItemProperty -Path $k -Name $n
         Write-Host "removed: $hive $n"
     }

@@ -10,6 +10,10 @@
       nosync     the game attaches but never syncs: the layer syncs its own set
       noinput    the game has no input at all: the layer attaches its own set after VRC_TEST_SELF_ATTACH_S
       notallowed the exe is not in 'apps': no events, no log file
+      stall      the game stops syncing for 1.2 s: the layer syncs itself WITH the game's set; the game's input never goes inactive
+      slowsync   the game syncs every 4th frame: read from its syncs, no own sync, same mouse distance
+      nodestroy  the game ends with xrDestroyInstance only while the trigger is held: released
+      vive       Vive wands: the game's right menu = our B, left to the game with a warning
       unfocus    the session leaves FOCUSED while the trigger is held: released at once, pressed again after
       restore    the runtime refuses our bindings merged into the game's Touch suggestion: the game's own is put back
     Also checked: the layer never syncs alone while the game syncs (mock "solo" syncs = 0); own sync only after 2 s of FOCUSED.
@@ -126,6 +130,47 @@ if (-not $Only -or $Only -eq 'ats') {
     $downs = @($r.events | Where-Object { $_ -match ' down$' }).Count; $ups = @($r.events | Where-Object { $_ -match ' up$' }).Count
     Check 'ats' ($downs -eq $ups) "every down has its up ($downs / $ups)"
     Check 'ats' ($r.mock -match 'syncs [1-9]\d* solo 0') 'the layer never syncs alone while the game syncs (the game''s set never goes inactive)'
+    Check 'ats' ($r.game -match 'game input inactive reads: 0') 'the game''s input never went inactive'
+}
+# ---- stall: the game stops syncing 2.3-3.5 s (loading / hitch); the left stick (2.4-2.9) must still move the mouse, through the
+# layer's own sync WITH the game's set, so the game's input never goes inactive
+if (-not $Only -or $Only -eq 'stall') {
+    $r = RunCase 'stall' 'fake_game.exe' @('--stall', '2.3-3.5') 4
+    $m = SumMoves $r.events
+    Write-Host "  moves total: $($m[0]), $($m[1])"
+    Check 'stall' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
+    Check 'stall' ($r.log -match 'the layer syncs itself \(the game''s last sync is older than 0\.25 s; 1 of the game''s sets kept active\)') 'log: own sync with the game''s set'
+    # stick 0.5 s (~450 px, all inside the stall) + the air mouse turn up to the end at 4 s (~150-250 px)
+    Check 'stall' (($m[0] -gt 450) -and ($m[0] -lt 800)) 'the stick moved the mouse during the stall (total ~550-700 px)'
+    Check 'stall' ($r.game -match 'game input inactive reads: 0') 'the game''s input never went inactive'
+    Check 'stall' ($r.mock -match 'syncs [1-9]\d* solo 0') 'no sync without the game''s set'
+}
+# ---- slowsync: the game syncs every 4th frame (~44 ms): the layer reads from the game's syncs, no own sync, same mouse distance
+if (-not $Only -or $Only -eq 'slowsync') {
+    $r = RunCase 'slowsync' 'fake_game.exe' @('--sync-every', '4') 6
+    $m = SumMoves $r.events
+    Write-Host "  moves total: $($m[0]), $($m[1])"
+    Check 'slowsync' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
+    Check 'slowsync' ($r.log -notmatch 'the layer syncs itself') 'no own sync'
+    Check 'slowsync' (($m[0] -gt 550) -and ($m[0] -lt 850)) 'stick + air mouse distance as with a sync every frame'
+    Check 'slowsync' ((Buttons $r.events) -match 'mouse 0 down \| mouse 0 up \| key 01c down \| key 01c up') 'trigger + A'
+    Check 'slowsync' ($r.game -match 'game input inactive reads: 0') 'the game''s input never went inactive'
+}
+# ---- nodestroy: the trigger is held when the game ends with xrDestroyInstance only -> released at the instance destroy
+if (-not $Only -or $Only -eq 'nodestroy') {
+    $r = RunCase 'nodestroy' 'fake_game.exe' @('--no-destroy-session') 1.3
+    $b = Buttons $r.events
+    Write-Host "  events: $b"
+    Check 'nodestroy' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
+    Check 'nodestroy' ($b -eq 'mouse 0 down | mouse 0 up') 'the held click is released when the instance ends'
+}
+# ---- vive: Vive wands; the game's menu (right) = our B: left to the game, with a warning because config.ini maps b
+if (-not $Only -or $Only -eq 'vive') {
+    $r = RunCase 'vive' 'fake_game.exe' @() 5.5 @{ VRC_MOCK_PROFILE = '/interaction_profiles/htc/vive_controller' }
+    Check 'vive' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
+    Check 'vive' ($r.mock -match 'profile /interaction_profiles/htc/vive_controller') 'the runtime picked Vive'
+    Check 'vive' ($r.log -match ' W htc/vive_controller: config\.ini b will do nothing') 'log: warning for the lost B mapping'
+    Check 'vive' ((Buttons $r.events) -match '^mouse 0 down \| mouse 0 up$') 'trigger works, nothing else (no A on a Vive wand)'
 }
 # ---- unfocus: the right trigger held 1.0-1.5 s, the session not FOCUSED 1.2-1.35 s -> the click is released at once, pressed again
 if (-not $Only -or $Only -eq 'unfocus') {
@@ -172,7 +217,8 @@ if (-not $Only -or $Only -eq 'nosync') {
     $r = RunCase 'nosync' 'fake_game.exe' @('--no-sync') 5.5
     $b = Buttons $r.events
     Check 'nosync' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
-    Check 'nosync' ($r.log -match 'the layer syncs its action set itself \(the game attached its input but has not synced') 'log: own sync'
+    Check 'nosync' ($r.log -match 'the layer syncs itself \(the game attached its input but has not synced in 2 s of FOCUSED; 1 of the game''s sets kept active') 'log: own sync with the game''s set'
+    Check 'nosync' ($r.mock -match 'syncs [1-9]\d* solo 0') 'no sync without the game''s set'
     Check 'nosync' ($b -notmatch 'mouse 0') 'no own sync in the first 2 s (the trigger at 1.0 s not sent)'
     Check 'nosync' ($b -match 'key 02a down \| key 021 down \| key 021 up \| key 02a up') 'B -> Shift+F with our own sync'
 }

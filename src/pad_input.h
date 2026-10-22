@@ -16,15 +16,15 @@
 //     addition causes: the call is repeated exactly as the game made it and the controllers are off for that session (logged);
 //     the game always gets the result of its own call.
 //   * A game that never creates an action set gets ours attached by the layer after 20 s of frames, synced by the layer.
-//   * Every frame (the game's xrBeginFrame): the states (from the game's last xrSyncActions, which carried our set), the aim poses
-//     (in our own LOCAL space at the game's predicted display time), then the Mapper -> keys / mouse. The layer syncs on its own
-//     ONLY for a game that never syncs (no input of its own, or no game sync in the first 2 s of FOCUSED): a sync with only our
-//     set would make the game's own sets inactive until its next sync. A game sync older than 100 ms = the frame is skipped
-//     (nothing changes, held keys stay held); older than 0.5 s = everything held is released. Input is sent only while the
-//     session is FOCUSED and the game window is in front; otherwise (and when the session or instance ends) everything held is
-//     released.
-//   * On Index / Vive / WMR the game's translated menu lands on a button we also use (B / the right menu): ours is left out there,
-//     so one press never does two things. Shared triggers and poses are kept (both see them).
+//   * Every frame (the game's xrBeginFrame): the states, the aim poses (in our own LOCAL space at the game's predicted display
+//     time), then the Mapper -> keys / mouse. The states come from the game's own xrSyncActions (ours appended) when it synced
+//     within 0.25 s. Otherwise the layer syncs itself -- with the game's last active sets + ours, never ours alone while the game
+//     has input (a sync without the game's sets would make them inactive until its next sync). A game that has attached but not
+//     synced yet gets 2 s of FOCUSED before that. A game with no input at all: ours alone. Input is sent only while the session
+//     is FOCUSED and the game window is in front; otherwise (and when the session or instance ends) everything held is released.
+//   * A button the game itself uses on a profile is left to the game: ETS2 / ATS's menu = the left menu everywhere, B AND Y on
+//     Index (b/click), the right menu (= our B) on Vive / WMR. One press never does two things; a config.ini mapping that is lost
+//     this way is logged as a warning. Shared triggers and poses are kept (both see them).
 // The layer calls the next layer's functions directly; our hooks never see our own calls.
 #pragma once
 #include <cstdint>
@@ -91,6 +91,7 @@ private:
         XrTime   displayTime = 0;
         double   firstFrame = -1;
         double   lastGameSync = -1;   // a game sync that carried our set (seconds)
+        std::vector<XrActiveActionSet> gameActive;   // the game's active sets: its last sync (or its attach list before that)
         double   lastTick = -1;
         XrSpace  local = XR_NULL_HANDLE;
         XrSpace  aim[2] = {XR_NULL_HANDLE, XR_NULL_HANDLE};

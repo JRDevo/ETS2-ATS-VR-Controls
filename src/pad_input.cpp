@@ -205,7 +205,7 @@ bool PadInput::PrepareLocked(const std::vector<XrActionSet>& appSets) {
         // a button the game itself uses on this profile is left to the game (Index: its menu is b/click; Vive / WMR: the right
         // menu) -- one press must not do two things. The trigger and the aim pose are shared (both see them).
         std::vector<XrActionSuggestedBinding> ours;
-        std::string left;
+        std::string left, lost;                      // lost: config.ini buttons that do something and are dropped here
         for (int a = 0; a < kActCount; ++a)
             for (int h = 0; h < 2; ++h) {
                 std::string p;
@@ -213,10 +213,28 @@ bool PadInput::PrepareLocked(const std::vector<XrActionSet>& appSets) {
                 bool taken = false;
                 if (a != kActTrig && a != kActAim)
                     for (const XrActionSuggestedBinding& g : all) taken = taken || SameInput(PathString(g.binding), p);
-                if (taken) { left += (left.empty() ? "" : ", ") + p; continue; }
-                ours.push_back({acts_[a], Path(p)});
+                if (!taken) { ours.push_back({acts_[a], Path(p)}); continue; }
+                left += (left.empty() ? "" : ", ") + p;
+                std::vector<int> btns;               // the config.ini buttons this action + hand stands for
+                switch (a) {
+                case kActGrip:  btns = { h ? VrPad::kRGrip : VrPad::kLGrip }; break;
+                case kActPrim:  btns = { h ? VrPad::kA : VrPad::kX }; break;
+                case kActSec:   btns = { h ? VrPad::kB : VrPad::kY }; break;
+                case kActClick: btns = { h ? VrPad::kRStick : VrPad::kLStick }; break;
+                case kActMenu:  btns = { VrPad::kMenu }; break;
+                case kActStick: btns = h ? std::vector<int>{ VrPad::kRUp, VrPad::kRDown, VrPad::kRLeft, VrPad::kRRight }
+                                         : std::vector<int>{ VrPad::kLUp, VrPad::kLDown, VrPad::kLLeft, VrPad::kLRight };
+                                if (cfg_.pad.mouseStick == h + 1) lost += (lost.empty() ? "" : ", ") + std::string(h ? "right" : "left") + " stick mouse";
+                                break;
+                default: break;
+                }
+                for (int b : btns)
+                    if (b == cfg_.pad.airBtn || cfg_.pad.map[b].kind != VrPad::kNone)
+                        lost += (lost.empty() ? "" : ", ") + std::string(VrPad::BtnNames()[b]) + (b == cfg_.pad.airBtn ? " (air mouse)" : "");
             }
         if (!left.empty()) LOGI("%s: %s used by the game itself -- left to the game (no mod key there)", ShortProfile(prof).c_str(), left.c_str());
+        if (!lost.empty())
+            LOGW("%s: config.ini %s will do nothing on this controller -- the game uses that button itself", ShortProfile(prof).c_str(), lost.c_str());
         const XrPath pp = Path(prof);
         auto it = appSuggest_.find(pp);
         const size_t nApp = all.size();
@@ -292,6 +310,8 @@ XrResult PadInput::Attach(XrSession s, const XrSessionActionSetsAttachInfo* ai) 
     if (XR_SUCCEEDED(r)) {
         frozen_ = true;
         sd.ours = true;
+        sd.gameActive.clear();                       // until the game's first sync: all of its attached sets count as active
+        for (uint32_t k = 0; k < ai->countActionSets; ++k) sd.gameActive.push_back({ai->actionSets[k], XR_NULL_PATH});
         LOGI("attached with the game's %u action set(s) (profiles: %s) -- %s", ai->countActionSets, ownSummary_.c_str(),
              DescribePad(cfg_.pad).c_str());
         return r;
@@ -334,6 +354,7 @@ XrResult PadInput::Sync(XrSession s, const XrActionsSyncInfo* si) {
     }
     if (j != sessions_.end()) {
         j->second.lastGameSync = NowS();
+        j->second.gameActive.assign(act.begin(), act.end() - 1);   // the game's own list (our own syncs repeat it)
         if (!j->second.loggedFirstSync) {
             j->second.loggedFirstSync = true;
             LOGI("first game xrSyncActions with our action set appended (%d)", (int)r);
@@ -437,8 +458,6 @@ void PadInput::BeginFrame(XrSession s) {
     SessionData& sd = it->second;
     const double now = NowS();
     if (sd.firstFrame < 0) sd.firstFrame = now;
-    const double dt = sd.lastTick < 0 ? 0.0 : now - sd.lastTick;
-    sd.lastTick = now;
     // a game without any input of its own: ours alone after selfAttachS_ of frames
     if (!sd.ours && !sd.appAttach && !sd.off && !frozen_ && appSets_.empty() && appSuggest_.empty() && now - sd.firstFrame >= selfAttachS_) {
         if (!PrepareLocked({})) {
@@ -462,29 +481,31 @@ void PadInput::BeginFrame(XrSession s) {
     bool live = false;
     if (sd.ours && !sd.off && sd.focused) {
         const double age = sd.lastGameSync < 0 ? -1.0 : now - sd.lastGameSync;
-        // our own sync only for a game that never syncs (see pad_input.h): never while the game syncs, never on the first frames
-        const bool own = sd.self || (sd.lastGameSync < 0 && sd.focusedSince >= 0 && now - sd.focusedSince >= 2.0);
-        if (!own && (age < 0 || age > 0.1)) {
-            // the game has not synced yet / missed its sync (hitch, loading): keep everything as it is; release after 0.5 s
-            if (age > 0.5 || age < 0) sd.mapper.Step(VrPad::Frame(), false, 0.0, cfg_.pad, Sink());
-            return;
-        }
-        bool synced = !own;
-        if (own) {
-            XrActiveActionSet as{set_, XR_NULL_PATH};
+        // fresh = the game's own sync (with ours appended) within 0.25 s: just read. Our own sync otherwise, but never with only
+        // our set while the game has input: the game's active sets go into it too, so they stay active (see pad_input.h).
+        // The first 2 s of FOCUSED without any game sync: wait for it (nothing is held yet).
+        const bool fresh = !sd.self && age >= 0 && age <= 0.25;
+        if (!fresh && !sd.self && age < 0 && (sd.focusedSince < 0 || now - sd.focusedSince < 2.0)) return;
+        bool synced = fresh;
+        if (!fresh) {
+            std::vector<XrActiveActionSet> act;
+            if (!sd.self) act = sd.gameActive;
+            act.push_back({set_, XR_NULL_PATH});
             XrActionsSyncInfo si{XR_TYPE_ACTIONS_SYNC_INFO};
-            si.countActiveActionSets = 1;
-            si.activeActionSets = &as;
+            si.countActiveActionSets = (uint32_t)act.size();
+            si.activeActionSets = act.data();
             const XrResult r = d_.SyncActions(s, &si);
             if (XR_FAILED(r)) {
-                OffLocked(sd, "xrSyncActions of our own action set", r);
+                OffLocked(sd, "xrSyncActions of our action set", r);
             } else {
                 synced = true;
                 ++sd.ownSyncs;
                 if (!sd.loggedFirstOwn) {
                     sd.loggedFirstOwn = true;
-                    LOGI("the layer syncs its action set itself (%s) (%d)",
-                         sd.self ? "the game has no input" : "the game attached its input but has not synced in 2 s of FOCUSED", (int)r);
+                    LOGI("the layer syncs itself (%s; %zu of the game's sets kept active) (%d)",
+                         sd.self ? "the game has no input" : age < 0 ? "the game attached its input but has not synced in 2 s of FOCUSED"
+                                                                     : "the game's last sync is older than 0.25 s",
+                         act.size() - 1, (int)r);
                 }
             }
         }
@@ -495,6 +516,8 @@ void PadInput::BeginFrame(XrSession s) {
             live = !sd.off && cfg_.enabled && GameInFront();
         }
     }
+    const double dt = sd.lastTick < 0 ? 0.0 : now - sd.lastTick;   // since the last Step (frames that waited are not lost)
+    sd.lastTick = now;
     sd.mapper.Step(f, live, dt, cfg_.pad, Sink());   // (not live = everything held is released)
 }
 
