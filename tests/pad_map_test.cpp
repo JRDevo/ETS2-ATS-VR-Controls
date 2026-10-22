@@ -1,0 +1,165 @@
+// Unit test: VR CONTROLLERS -> keys / mouse (src/pad_map.h). (1) key names -> scan codes and the output parser
+// (combos, mouse, wheel, junk). (2) the Mapper: press / release edges, trigger hysteresis, combos released in reverse, stick
+// directions vs the mouse stick, stick mouse speed and dead zone, the air mouse (yaw right = +x, pitch up = -y, its hold button
+// sends nothing), everything released when inactive. No game, no Windows input. Build: the pad_map_test target.
+// Exit code 0 = every check passed.
+#include <cmath>
+#include <cstdio>
+#include <string>
+#include <vector>
+#include "pad_map.h"
+
+static int g_checks = 0, g_fails = 0;
+#define CHECK(c, ...) do { ++g_checks; if (!(c)) { ++g_fails; if (g_fails <= 40) { printf("   FAIL: "); printf(__VA_ARGS__); printf("\n"); } } } while (0)
+
+struct Rec : VrPad::Sink {
+    std::vector<std::string> ev;
+    int mx = 0, my = 0;
+    void Key(uint16_t c, bool d) override { char b[32]; snprintf(b, sizeof(b), "k%03x%s", c, d ? "v" : "^"); ev.push_back(b); }
+    void MouseButton(int w, bool d) override { char b[32]; snprintf(b, sizeof(b), "m%d%s", w, d ? "v" : "^"); ev.push_back(b); }
+    void Wheel(int n) override { char b[32]; snprintf(b, sizeof(b), "w%+d", n); ev.push_back(b); }
+    void Move(int dx, int dy) override { mx += dx; my += dy; }
+    std::string Take() { std::string s; for (auto& e : ev) { if (!s.empty()) s += ' '; s += e; } ev.clear(); return s; }
+};
+
+static void QuatYawPitch(double yawDeg, double pitchDeg, double q[4]) {   // yaw about +y (right = negative angle), then pitch about +x
+    const double ya = -yawDeg * 3.14159265358979 / 360.0, pa = pitchDeg * 3.14159265358979 / 360.0;
+    const double qy[4] = { 0, std::sin(ya), 0, std::cos(ya) }, qx[4] = { std::sin(pa), 0, 0, std::cos(pa) };
+    // q = qy * qx
+    q[0] = qy[3] * qx[0] + qy[0] * qx[3] + qy[1] * qx[2] - qy[2] * qx[1];
+    q[1] = qy[3] * qx[1] - qy[0] * qx[2] + qy[1] * qx[3] + qy[2] * qx[0];
+    q[2] = qy[3] * qx[2] + qy[0] * qx[1] - qy[1] * qx[0] + qy[2] * qx[3];
+    q[3] = qy[3] * qx[3] - qy[0] * qx[0] - qy[1] * qx[1] - qy[2] * qx[2];
+}
+
+int main() {
+    using namespace VrPad;
+    printf("(1) names and parser\n");
+    CHECK(ScanOfName("H") == 0x23 && ScanOfName("h") == 0x23, "H");
+    CHECK(ScanOfName("Q") == 0x10 && ScanOfName("A") == 0x1E && ScanOfName("Z") == 0x2C && ScanOfName("M") == 0x32, "letters");
+    CHECK(ScanOfName("1") == 0x02 && ScanOfName("0") == 0x0B, "digits");
+    CHECK(ScanOfName("[") == 0x1A && ScanOfName("]") == 0x1B, "brackets");
+    CHECK(ScanOfName("F1") == 0x3B && ScanOfName("F10") == 0x44 && ScanOfName("F11") == 0x57 && ScanOfName("f12") == 0x58, "F keys");
+    CHECK(ScanOfName("F13") == 0 && ScanOfName("F0") == 0, "bad F keys");
+    CHECK(ScanOfName("Delete") == (0x53 | kExt) && ScanOfName("UP") == (0x48 | kExt), "extended");
+    CHECK(ScanOfName("space") == 0x39 && ScanOfName("Esc") == 0x01 && ScanOfName("numenter") == (0x1C | kExt), "named");
+    CHECK(ScanOfName("bogus") == 0 && ScanOfName("") == 0, "unknown");
+    Out o;
+    CHECK(ParseOut(" none ", &o) && o.kind == kNone, "none");
+    CHECK(ParseOut("", &o) && o.kind == kNone, "empty");
+    CHECK(ParseOut("Shift + F", &o) && o.kind == kKeys && o.n == 2 && o.code[0] == 0x2A && o.code[1] == 0x21, "combo");
+    CHECK(ParseOut("ctrl+alt+delete", &o) && o.n == 3 && o.code[2] == (0x53 | kExt), "3 combo");
+    CHECK(!ParseOut("a+b+c+d", &o) && o.kind == kNone, "4 keys refused");
+    CHECK(!ParseOut("shift+", &o), "trailing +");
+    CHECK(!ParseOut("nokey", &o) && o.kind == kNone, "junk refused");
+    CHECK(ParseOut("mouse_left", &o) && o.kind == kMouseL, "mouse_left");
+    CHECK(ParseOut("\"wheel_down\"\r\n", &o) && o.kind == kWheelDown, "wheel_down quoted");
+    CHECK(BtnOfName("RGRIP") == kRGrip && BtnOfName("menu") == kMenu && BtnOfName("zz") == -1, "button names");
+
+    printf("(2) mapper\n");
+    {   // edges, hysteresis, the hold button, combos
+        Config c = DefaultConfig();
+        ParseOut("shift+f", &c.map[kX]);
+        ParseOut("delete", &c.map[kMenu]);
+        Mapper m; Rec r; Frame f;
+        f.hand[0] = f.hand[1] = true;
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take().empty(), "idle frame sends nothing");
+        f.trig[1] = 0.8f;
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "m0v", "right trigger -> left click down");
+        f.trig[1] = 0.6f;                              // inside the hysteresis: still down
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take().empty(), "hysteresis keeps it down");
+        f.trig[1] = 0.5f;
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "m0^", "release below 0.55");
+        f.trig[1] = 0.7f;                              // below the press point: not pressed again
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take().empty(), "0.7 does not press");
+        f.prim[0] = true;
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "k02av k021v", "combo down in order");
+        f.prim[0] = false;
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "k021^ k02a^", "combo up in reverse");
+        f.grip[1] = 1.0f;                              // the air mouse hold button: nothing sent
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take().empty() && m.Down(kRGrip), "hold button sends nothing");
+        f.menu[0] = true; f.sec[1] = true;
+        m.Step(f, true, 0.011, c, r);
+        const std::string t = r.Take();
+        CHECK(t == "k001v k153v", "B (esc) + menu (delete) -- got %s", t.c_str());
+        m.Step(f, false, 0.011, c, r);                 // inactive: all released
+        const std::string u = r.Take();
+        CHECK(u == "k001^ k153^", "inactive releases all -- got %s", u.c_str());
+        m.Step(f, false, 0.011, c, r);
+        CHECK(r.Take().empty(), "released only once");
+    }
+    {   // stick directions vs the mouse stick
+        Config c = DefaultConfig();                    // left stick = mouse, right stick = arrows
+        Mapper m; Rec r; Frame f;
+        f.hand[0] = f.hand[1] = true;
+        f.sx[1] = 0.9f;
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "k14dv", "right stick right -> Right arrow");
+        f.sx[1] = 0.0f; f.sy[1] = -0.9f;
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "k150v k14d^", "down pressed, right released");
+        f.sy[1] = 0.0f;
+        f.sx[0] = 1.0f;                                // left stick full right for 1 s at 100 Hz = mouseSpeed px
+        for (int i = 0; i < 100; ++i) m.Step(f, true, 0.01, c, r);
+        const std::string t = r.Take();
+        CHECK(t == "k150^", "only the down release (left stick sends no keys) -- got %s", t.c_str());
+        CHECK(std::abs(r.mx - (int)c.mouseSpeed) <= 2 && r.my == 0, "full stick 1 s = %d px (got %d, %d)", (int)c.mouseSpeed, r.mx, r.my);
+        r.mx = r.my = 0;
+        f.sx[0] = 0.1f;                                // inside the dead zone
+        for (int i = 0; i < 100; ++i) m.Step(f, true, 0.01, c, r);
+        CHECK(r.mx == 0 && r.my == 0, "dead zone");
+        f.sx[0] = 0.0f; f.sy[0] = 0.575f;              // half way after the dead zone: quarter speed, up = -y
+        for (int i = 0; i < 100; ++i) m.Step(f, true, 0.01, c, r);
+        CHECK(r.mx == 0 && std::abs(r.my + (int)(c.mouseSpeed * 0.25f)) <= 2, "half stick up = quarter speed (got %d)", r.my);
+        c.mouseStick = 0;                              // left stick = arrows? no: only the right has default keys -> left dirs send nothing
+        r.mx = r.my = 0;
+        f.sy[0] = 0.9f;
+        m.Step(f, true, 0.01, c, r);
+        CHECK(r.Take().empty() && r.mx == 0 && r.my == 0 && m.Down(kLUp), "mouse off: left up is a button (unmapped)");
+    }
+    {   // air mouse
+        Config c = DefaultConfig();
+        Mapper m; Rec r; Frame f;
+        f.hand[0] = f.hand[1] = true;
+        f.aim[1] = true;
+        QuatYawPitch(0, 0, f.q[1]);
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.mx == 0 && r.my == 0, "no move without the hold button");
+        f.grip[1] = 1.0f;
+        QuatYawPitch(0, 0, f.q[1]);
+        m.Step(f, true, 0.011, c, r);                  // start: no move
+        CHECK(r.mx == 0 && r.my == 0, "start frame does not move");
+        QuatYawPitch(2, 0, f.q[1]);                    // 2 degrees right
+        m.Step(f, true, 0.011, c, r);
+        CHECK(std::abs(r.mx - (int)(2 * c.airGain)) <= 1 && r.my == 0, "2 deg right = +%d px (got %d, %d)", (int)(2 * c.airGain), r.mx, r.my);
+        r.mx = r.my = 0;
+        QuatYawPitch(2, 1, f.q[1]);                    // 1 degree up
+        m.Step(f, true, 0.011, c, r);
+        CHECK(std::abs(r.my + (int)c.airGain) <= 1 && std::abs(r.mx) <= 1, "1 deg up = -%d px (got %d, %d)", (int)c.airGain, r.mx, r.my);
+        r.mx = r.my = 0;
+        f.grip[1] = 0.0f;                              // let go, turn, hold again: no jump
+        QuatYawPitch(30, 1, f.q[1]);
+        m.Step(f, true, 0.011, c, r);
+        f.grip[1] = 1.0f;
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.mx == 0 && r.my == 0, "no jump after re-grab");
+        double y, p;
+        QuatYawPitch(179, 0, f.q[1]); m.Step(f, true, 0.011, c, r);
+        r.mx = 0;
+        QuatYawPitch(-179, 0, f.q[1]); m.Step(f, true, 0.011, c, r);   // across +-180: +2 deg
+        CHECK(std::abs(r.mx - (int)(2 * c.airGain)) <= 2, "wrap at 180 (got %d)", r.mx);
+        QuatYawPitch(-40, 25, f.q[1]); YawPitch(f.q[1], &y, &p);
+        CHECK(std::abs(y * 57.2957795 + 40) < 0.01 && std::abs(p * 57.2957795 - 25) < 0.01, "YawPitch (%.3f, %.3f)", y * 57.29578, p * 57.29578);
+        CHECK(r.Take().empty(), "air mouse sends no buttons");
+    }
+    printf("%d checks, %d failed\n", g_checks, g_fails);
+    return g_fails ? 1 : 0;
+}

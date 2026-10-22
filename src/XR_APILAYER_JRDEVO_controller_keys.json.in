@@ -1,0 +1,11 @@
+{
+    "file_format_version": "1.0.0",
+    "api_layer": {
+        "name": "@CK_LAYER_NAME@",
+        "library_path": "./@CK_LAYER_DLL@",
+        "api_version": "1.0",
+        "implementation_version": "1",
+        "description": "VR controller buttons, sticks and pointing as keyboard keys and mouse for OpenXR games (ETS2 / ATS by default).",
+        "disable_environment": "DISABLE_@CK_LAYER_NAME@"
+    }
+}

@@ -1,0 +1,7 @@
+{
+    "file_format_version": "1.0.0",
+    "runtime": {
+        "name": "VR Controller Keys mock runtime",
+        "library_path": "./mock_runtime.dll"
+    }
+}
