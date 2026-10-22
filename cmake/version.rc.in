@@ -2,12 +2,12 @@
 #include <winver.h>
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION @CK_RC_VER_COMMA@
- PRODUCTVERSION @CK_RC_VER_COMMA@
+ FILEVERSION @VRC_RC_VER_COMMA@
+ PRODUCTVERSION @VRC_RC_VER_COMMA@
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0x0L
  FILEOS VOS_NT_WINDOWS32
- FILETYPE @CK_RC_FILETYPE@
+ FILETYPE @VRC_RC_FILETYPE@
  FILESUBTYPE VFT2_UNKNOWN
 BEGIN
     BLOCK "StringFileInfo"
@@ -15,13 +15,13 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "CompanyName", "JRDevo"
-            VALUE "FileDescription", "@CK_RC_DESC@"
-            VALUE "FileVersion", "@CK_RC_VER_DOT@"
-            VALUE "InternalName", "@CK_RC_INTERNAL@"
+            VALUE "FileDescription", "@VRC_RC_DESC@"
+            VALUE "FileVersion", "@VRC_RC_VER_DOT@"
+            VALUE "InternalName", "@VRC_RC_INTERNAL@"
             VALUE "LegalCopyright", "Copyright (c) 2026 JRDevo"
-            VALUE "OriginalFilename", "@CK_RC_ORIGINAL@"
-            VALUE "ProductName", "VR Controller Keys"
-            VALUE "ProductVersion", "@CK_RC_VER_DOT@"
+            VALUE "OriginalFilename", "@VRC_RC_ORIGINAL@"
+            VALUE "ProductName", "ETS2 ATS VR Controls"
+            VALUE "ProductVersion", "@VRC_RC_VER_DOT@"
         END
     END
     BLOCK "VarFileInfo"

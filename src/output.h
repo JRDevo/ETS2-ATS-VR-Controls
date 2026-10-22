@@ -2,7 +2,7 @@
 // the physical key, whatever the keyboard layout), mouse buttons, wheel and relative moves. Only while the GAME's window is in
 // front (GameInFront): the layer never types into another program. Key / button RELEASES are always sent, so nothing stays
 // held when the game loses focus.
-// Test mode (environment CK_TEST_EVENTS = a file path): every event is written to that file as one line instead
+// Test mode (environment VRC_TEST_EVENTS = a file path): every event is written to that file as one line instead
 // ("key 023 down", "mouse 0 up", "wheel +1", "move 12 -3"), and GameInFront is always true.
 #pragma once
 #include <cstdint>

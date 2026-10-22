@@ -73,7 +73,7 @@ inline uint16_t ScanOfName(const char* s) {
         { "num0", 0x52 }, { "num1", 0x4F }, { "num2", 0x50 }, { "num3", 0x51 }, { "num4", 0x4B }, { "num5", 0x4C },
         { "num6", 0x4D }, { "num7", 0x47 }, { "num8", 0x48 }, { "num9", 0x49 }, { "numdot", 0x53 }, { "numplus", 0x4E },
         { "numminus", 0x4A }, { "nummul", 0x37 }, { "numdiv", 0x35 | kExt }, { "numenter", 0x1C | kExt },
-        { "pause", 0x45 }, { "scrolllock", 0x46 },
+        { "scrolllock", 0x46 },   // (no "pause": its scan sequence is E1 1D 45; a plain 0x45 is NumLock)
     };
     for (const Named& k : kNamed) if (!_stricmp(s, k.name)) return k.code;
     return 0;
@@ -208,7 +208,8 @@ public:
             const double x = f.sx[h], y = f.sy[h];
             const double len = std::sqrt(x * x + y * y);
             if (len > c.deadzone) {
-                const double k = (len > 1.0 ? 1.0 : len - c.deadzone) / (1.0 - c.deadzone);   // 0 .. 1 after the dead zone
+                const double k = ((len > 1.0 ? 1.0 : len) - c.deadzone) / (1.0 - c.deadzone);   // 0 .. 1 after the dead zone
+                                                                                                 // (diagonals reach ~1.4: capped)
                 const double sp = c.mouseSpeed * k * k * dt / len;                             // squared curve: fine near the centre
                 accX_ += x * sp;
                 accY_ -= y * sp;

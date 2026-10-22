@@ -119,7 +119,13 @@ int main() {
         f.sx[0] = 0.0f; f.sy[0] = 0.575f;              // half way after the dead zone: quarter speed, up = -y
         for (int i = 0; i < 100; ++i) m.Step(f, true, 0.01, c, r);
         CHECK(r.mx == 0 && std::abs(r.my + (int)(c.mouseSpeed * 0.25f)) <= 2, "half stick up = quarter speed (got %d)", r.my);
-        c.mouseStick = 0;                              // left stick = arrows? no: only the right has default keys -> left dirs send nothing
+        r.mx = r.my = 0;
+        f.sx[0] = 1.0f; f.sy[0] = 1.0f;                // diagonal past unit length (Touch reaches ~1.4): capped at full speed
+        for (int i = 0; i < 100; ++i) m.Step(f, true, 0.01, c, r);
+        const double diag = std::sqrt((double)r.mx * r.mx + (double)r.my * r.my);
+        CHECK(std::abs(diag - c.mouseSpeed) <= 3 && r.mx > 0 && r.my < 0, "diagonal 1 s = %d px total (got %.1f: %d, %d)", (int)c.mouseSpeed, diag, r.mx, r.my);
+        f.sx[0] = 0.0f; f.sy[0] = 0.0f;
+        c.mouseStick = 0;                             // left stick = arrows? no: only the right has default keys -> left dirs send nothing
         r.mx = r.my = 0;
         f.sy[0] = 0.9f;
         m.Step(f, true, 0.01, c, r);

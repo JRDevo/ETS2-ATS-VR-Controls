@@ -7,9 +7,9 @@
 // accepted profile really has (a wrong path = XR_ERROR_PATH_UNSUPPORTED for the whole call); hp/mixed_reality_controller is NOT
 // accepted (a runtime without that extension); one attach per session, suggestions refused after the first attach; the profile
 // in use = oculus/touch_controller when it was suggested (the "controllers" are Quest Touch), else the first suggested one.
-// Pressed inputs come from CK_MOCK_INPUT = "<t0>-<t1>:<input path>=<value>;..." (seconds since xrCreateSession). Values:
+// Pressed inputs come from VRC_MOCK_INPUT = "<t0>-<t1>:<input path>=<value>;..." (seconds since xrCreateSession). Values:
 // "1" for a button, "0.9" for a trigger, "x,y" for a stick, "yaw0,pitch0,yaw1,pitch1" (degrees, linear over the interval) for
-// an aim pose. CK_MOCK_REPORT = a file that gets one line per event worth checking ("profile ...", "suggest ...", "attach ...").
+// an aim pose. VRC_MOCK_REPORT = a file that gets one line per event worth checking ("profile ...", "suggest ...", "attach ...").
 #include <windows.h>
 #include <cmath>
 #include <cstdarg>
@@ -38,7 +38,7 @@ std::string StrOf(XrPath p) { return p > 0 && p < g_paths.size() ? g_paths[(size
 
 void Report(const char* fmt, ...) {
     char path[MAX_PATH];
-    if (!GetEnvironmentVariableA("CK_MOCK_REPORT", path, MAX_PATH)) return;
+    if (!GetEnvironmentVariableA("VRC_MOCK_REPORT", path, MAX_PATH)) return;
     FILE* f = nullptr;
     if (fopen_s(&f, path, "ab") || !f) return;
     va_list a;
@@ -99,6 +99,9 @@ struct Session {
     std::string profile;                                  // in use (after attach)
     std::set<XrActionSet> activeSets;                     // of the last sync
     std::map<std::pair<XrAction, XrPath>, State> states;  // (action, subaction path or 0)
+    std::set<XrActionSet> attachedSets;
+    uint64_t syncs = 0, soloSyncs = 0;                    // soloSyncs: a sync that left an attached "input" set (the game's) inactive
+    int unfocusStep = 0;                                  // VRC_MOCK_UNFOCUS: 0 not yet, 1 unfocused, 2 focused again
 };
 struct Space { XrSession ses; XrAction action = XR_NULL_HANDLE; XrPath sub = XR_NULL_PATH; };
 
@@ -122,7 +125,7 @@ double Now() {
 // scripted value of input `path` at t seconds; false = not pressed / not moved
 bool Scripted(const std::string& path, double t, std::vector<double>& vals) {
     char spec[4096] = "";
-    GetEnvironmentVariableA("CK_MOCK_INPUT", spec, sizeof(spec));
+    GetEnvironmentVariableA("VRC_MOCK_INPUT", spec, sizeof(spec));
     std::string s = spec;
     size_t pos = 0;
     while (pos < s.size()) {
@@ -201,6 +204,9 @@ XrResult XRAPI_CALL CreateSession(XrInstance, const XrSessionCreateInfo*, XrSess
 XrResult XRAPI_CALL DestroySession(XrSession s) {
     std::lock_guard<std::mutex> lk(g_m);
     for (auto it = g_spaces.begin(); it != g_spaces.end();) it = it->second.ses == s ? g_spaces.erase(it) : std::next(it);
+    auto ss = g_sessions.find((uint64_t)s);
+    if (ss != g_sessions.end())
+        Report("syncs %llu solo %llu", (unsigned long long)ss->second.syncs, (unsigned long long)ss->second.soloSyncs);
     g_sessions.erase((uint64_t)s);
     return XR_SUCCESS;
 }
@@ -228,9 +234,18 @@ XrResult XRAPI_CALL PollEvent(XrInstance, XrEventDataBuffer* ev) {
     if (it != g_sessions.end()) it->second.focused = e.second == XR_SESSION_STATE_FOCUSED;
     return XR_SUCCESS;
 }
-XrResult XRAPI_CALL WaitFrame(XrSession, const XrFrameWaitInfo*, XrFrameState* fs) {
+XrResult XRAPI_CALL WaitFrame(XrSession s, const XrFrameWaitInfo*, XrFrameState* fs) {
     Sleep(11);
     std::lock_guard<std::mutex> lk(g_m);
+    // VRC_MOCK_UNFOCUS = "t0-t1": the session drops to VISIBLE at t0 and is FOCUSED again at t1 (seconds since xrCreateSession)
+    char uf[64] = "";
+    double u0 = 0, u1 = 0;
+    auto ss = g_sessions.find((uint64_t)s);
+    if (ss != g_sessions.end() && GetEnvironmentVariableA("VRC_MOCK_UNFOCUS", uf, sizeof(uf)) && sscanf_s(uf, "%lf-%lf", &u0, &u1) == 2) {
+        const double t = Now() - ss->second.created;
+        if (ss->second.unfocusStep == 0 && t >= u0) { ss->second.unfocusStep = 1; g_events.push_back({s, XR_SESSION_STATE_VISIBLE}); }
+        if (ss->second.unfocusStep == 1 && t >= u1) { ss->second.unfocusStep = 2; g_events.push_back({s, XR_SESSION_STATE_FOCUSED}); }
+    }
     g_time += 11111111;
     fs->predictedDisplayTime = g_time;
     fs->predictedDisplayPeriod = 11111111;
@@ -314,6 +329,15 @@ XrResult XRAPI_CALL SuggestBindings(XrInstance, const XrInteractionProfileSugges
         if (!ValidBinding(*pr, b)) { Report("suggest %s REFUSED (bad binding %s)", prof.c_str(), b.c_str()); return XR_ERROR_PATH_UNSUPPORTED; }
         if (!g_actions.count((uint64_t)sb->suggestedBindings[i].action)) return XR_ERROR_HANDLE_INVALID;
     }
+    // VRC_MOCK_REFUSE_MERGED = a profile: any suggestion for it that carries the layer's actions is refused (the restore path)
+    char refuse[256] = "";
+    if (GetEnvironmentVariableA("VRC_MOCK_REFUSE_MERGED", refuse, sizeof(refuse)) && prof == refuse) {
+        for (uint32_t i = 0; i < sb->countSuggestedBindings; ++i)
+            if (g_sets[(uint64_t)g_actions[(uint64_t)sb->suggestedBindings[i].action].set].name == "ets2_ats_vr_controls") {
+                Report("suggest %s REFUSED (test: merged)", prof.c_str());
+                return XR_ERROR_PATH_UNSUPPORTED;
+            }
+    }
     g_suggest[sb->interactionProfile].assign(sb->suggestedBindings, sb->suggestedBindings + sb->countSuggestedBindings);
     std::string list;
     for (uint32_t i = 0; i < sb->countSuggestedBindings; ++i)
@@ -331,12 +355,15 @@ XrResult XRAPI_CALL AttachSessionActionSets(XrSession s, const XrSessionActionSe
         auto st = g_sets.find((uint64_t)ai->actionSets[i]);
         if (st == g_sets.end()) return XR_ERROR_HANDLE_INVALID;
         st->second.attached = true;
+        it->second.attachedSets.insert(ai->actionSets[i]);
         names += " " + st->second.name + "(" + std::to_string(st->second.priority) + ")";
     }
     it->second.attached = true;
     g_anyAttached = true;
     const XrPath touch = PathOf("/interaction_profiles/oculus/touch_controller");
-    if (g_suggest.count(touch)) it->second.profile = StrOf(touch);
+    char want[256] = "";                                  // VRC_MOCK_PROFILE: the "controllers" are this profile instead of Touch
+    if (GetEnvironmentVariableA("VRC_MOCK_PROFILE", want, sizeof(want)) && g_suggest.count(PathOf(want))) it->second.profile = want;
+    else if (g_suggest.count(touch)) it->second.profile = StrOf(touch);
     else if (!g_suggest.empty()) it->second.profile = StrOf(g_suggest.begin()->first);
     Report("attach%s", names.c_str());
     Report("profile %s", it->second.profile.empty() ? "none" : it->second.profile.c_str());
@@ -354,6 +381,9 @@ XrResult XRAPI_CALL SyncActions(XrSession s, const XrActionsSyncInfo* si) {
     }
     ss.activeSets.clear();
     for (uint32_t i = 0; i < si->countActiveActionSets; ++i) ss.activeSets.insert(si->activeActionSets[i].actionSet);
+    ++ss.syncs;
+    for (XrActionSet a : ss.attachedSets)
+        if (g_sets[(uint64_t)a].name == "input" && !ss.activeSets.count(a)) { ++ss.soloSyncs; break; }
     ss.states.clear();
     if (!ss.focused) return XR_SESSION_NOT_FOCUSED;
     const double t = Now() - ss.created;
@@ -430,7 +460,7 @@ const struct { const char* name; PFN_xrVoidFunction fn; } kFns[] = {
 };
 #undef E
 XrResult XRAPI_CALL GetInstanceProcAddr(XrInstance, const char* name, PFN_xrVoidFunction* fn) {
-    if (GetEnvironmentVariableA("CK_MOCK_TRACE", nullptr, 0)) fprintf(stderr, "mock gipa %s\n", name);
+    if (GetEnvironmentVariableA("VRC_MOCK_TRACE", nullptr, 0)) fprintf(stderr, "mock gipa %s\n", name);
     for (const auto& f : kFns) if (strcmp(name, f.name) == 0) { *fn = f.fn; return XR_SUCCESS; }
     *fn = nullptr;
     return XR_ERROR_FUNCTION_UNSUPPORTED;

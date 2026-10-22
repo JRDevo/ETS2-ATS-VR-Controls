@@ -3,7 +3,7 @@
 // ONLY for khr/simple_controller, attached at session start, synced every frame. It prints "game select <hand> down/up at <t>"
 // when its own select action changes, so the test can check that the game keeps its buttons next to the layer's.
 //   fake_game <seconds> [--no-input] [--no-sync] [--touch]
-//     --no-input  no action set at all (the layer attaches its own after CK_TEST_SELF_ATTACH_S)
+//     --no-input  no action set at all (the layer attaches its own after VRC_TEST_SELF_ATTACH_S)
 //     --no-sync   attaches but never calls xrSyncActions (the layer syncs its own set)
 //     --touch     also suggests oculus/touch_controller itself (the layer merges into it, no translation)
 // Exit code 0 = every OpenXR call the game made succeeded.

@@ -1,7 +1,7 @@
 {
     "file_format_version": "1.0.0",
     "runtime": {
-        "name": "VR Controller Keys mock runtime",
+        "name": "ETS2 ATS VR Controls mock runtime",
         "library_path": "./mock_runtime.dll"
     }
 }

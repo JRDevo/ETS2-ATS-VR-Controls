@@ -43,7 +43,14 @@ Config ParseConfig(const std::string& text) {
         const size_t eq = line.find('=');
         if (eq == std::string::npos) { c.notes.push_back("line " + std::to_string(lineNo) + ": no '=' -- ignored"); continue; }
         const std::string key = Lower(Trim(line.substr(0, eq)));
-        const std::string val = Trim(line.substr(eq + 1));
+        // a comment after the value: from '#', or from a ';' after a space ("x = ;" is the ; key, "a = enter ; ok" a comment)
+        std::string raw = line.substr(eq + 1);
+        const size_t hash = raw.find('#');
+        if (hash != std::string::npos) raw.resize(hash);
+        raw = Trim(raw);
+        for (size_t k = 1; k < raw.size(); ++k)
+            if (raw[k] == ';' && (raw[k - 1] == ' ' || raw[k - 1] == '\t')) { raw.resize(k); break; }
+        const std::string val = Trim(raw);
         const std::string lv = Lower(val);
         auto bad = [&](const char* why) { c.notes.push_back("line " + std::to_string(lineNo) + ": " + key + " = " + val + " -- " + why); };
         double d = 0;
@@ -94,7 +101,7 @@ Config ParseConfig(const std::string& text) {
 
 Config LoadConfig(const std::wstring& dllDir) {
     wchar_t env[MAX_PATH];
-    std::wstring path = GetEnvironmentVariableW(L"CK_CONFIG", env, MAX_PATH) > 0 ? std::wstring(env) : dllDir + L"\\config.ini";
+    std::wstring path = GetEnvironmentVariableW(L"VRC_CONFIG", env, MAX_PATH) > 0 ? std::wstring(env) : dllDir + L"\\config.ini";
     std::string text;
     FILE* f = nullptr;
     if (_wfopen_s(&f, path.c_str(), L"rb") == 0 && f) {

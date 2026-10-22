@@ -1,4 +1,4 @@
-// config -- config.ini next to controller_keys.dll (or the file named by the CK_CONFIG environment variable, for tests).
+// config -- config.ini next to ets2_ats_vr_controls.dll (or the file named by the VRC_CONFIG environment variable, for tests).
 // key = value lines, '#' or ';' starts a comment line. Read once per game start. Unknown keys and bad values are logged and
 // ignored (the default stays). See config.ini in the repo for every key.
 #pragma once

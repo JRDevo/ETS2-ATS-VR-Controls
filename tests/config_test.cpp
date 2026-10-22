@@ -47,6 +47,17 @@ int main(int argc, char** argv) {
     CHECK(g.pad.airBtn == d.pad.airBtn && g.notes.size() == 1, "a stick direction is not an air mouse button");
     const Config h = ParseConfig("apps = \n");
     CHECK(!AppAllowed(h, L"eurotrucks2.exe") && h.notes.size() == 1, "empty apps = nowhere, noted");
+    // comments after a value
+    const Config k = ParseConfig("a = h   # horn\nb = shift+f ; hazards\nx = ;\ny = ' # quote key\nmouse_speed = 500 # px\n");
+    VrPad::Out o;
+    VrPad::ParseOut("h", &o);
+    CHECK(SameOut(k.pad.map[VrPad::kA], o), "a = h # comment");
+    VrPad::ParseOut("shift+f", &o);
+    CHECK(SameOut(k.pad.map[VrPad::kB], o), "b = shift+f ; comment");
+    CHECK(k.pad.map[VrPad::kX].kind == VrPad::kKeys && k.pad.map[VrPad::kX].code[0] == 0x27, "x = ; is the ; key");
+    CHECK(k.pad.map[VrPad::kY].kind == VrPad::kKeys && k.pad.map[VrPad::kY].code[0] == 0x28, "y = ' with a comment");
+    CHECK(k.pad.mouseSpeed == 500.0f && k.notes.empty(), "mouse_speed = 500 # px (%zu notes)", k.notes.size());
+    CHECK(!VrPad::ParseOut("pause", &o), "no pause key (it would be NumLock)");
     printf("%d checks, %d failed\n", g_checks, g_fails);
     return g_fails ? 1 : 0;
 }

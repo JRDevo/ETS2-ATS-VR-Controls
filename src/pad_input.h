@@ -16,9 +16,15 @@
 //     addition causes: the call is repeated exactly as the game made it and the controllers are off for that session (logged);
 //     the game always gets the result of its own call.
 //   * A game that never creates an action set gets ours attached by the layer after 20 s of frames, synced by the layer.
-//   * Every frame (the game's xrBeginFrame): our own sync when no game sync carried ours within 100 ms, then the states, the aim
-//     poses (in our own LOCAL space at the game's predicted display time), then the Mapper -> keys / mouse. Input is sent only
-//     while the session is FOCUSED and the game window is in front; otherwise everything held is released.
+//   * Every frame (the game's xrBeginFrame): the states (from the game's last xrSyncActions, which carried our set), the aim poses
+//     (in our own LOCAL space at the game's predicted display time), then the Mapper -> keys / mouse. The layer syncs on its own
+//     ONLY for a game that never syncs (no input of its own, or no game sync in the first 2 s of FOCUSED): a sync with only our
+//     set would make the game's own sets inactive until its next sync. A game sync older than 100 ms = the frame is skipped
+//     (nothing changes, held keys stay held); older than 0.5 s = everything held is released. Input is sent only while the
+//     session is FOCUSED and the game window is in front; otherwise (and when the session or instance ends) everything held is
+//     released.
+//   * On Index / Vive / WMR the game's translated menu lands on a button we also use (B / the right menu): ours is left out there,
+//     so one press never does two things. Shared triggers and poses are kept (both see them).
 // The layer calls the next layer's functions directly; our hooks never see our own calls.
 #pragma once
 #include <cstdint>
@@ -55,7 +61,9 @@ struct PadDispatch {
 class PadInput {
 public:
     PadInput(XrInstance instance, const PadDispatch& d, const Config& cfg);
+    ~PadInput();                          // releases everything still held (no OpenXR calls)
     bool Enabled() const { return enabled_; }
+    void ReleaseAll();                    // every held key / button up, in every session (no OpenXR calls)
 
     void SessionCreated(XrSession s);
     void SessionDestroyed(XrSession s);   // before the game's call is forwarded (our spaces go first)
@@ -79,6 +87,7 @@ private:
         bool     self = false;        // ... by us (the game has no input of its own): we sync it ourselves
         bool     off = false;         // our addition caused an error: controllers off for this session
         bool     focused = false;
+        double   focusedSince = -1;   // the last change to FOCUSED (seconds)
         XrTime   displayTime = 0;
         double   firstFrame = -1;
         double   lastGameSync = -1;   // a game sync that carried our set (seconds)

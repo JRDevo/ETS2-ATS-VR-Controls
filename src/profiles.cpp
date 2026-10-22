@@ -37,9 +37,9 @@ const ProfileDef kProfiles[] = {
 #undef TOUCH
 
 const char* const kActNames[kActCount] = { "trigger", "grip", "primary", "secondary", "stick_click", "menu", "stick", "aim" };
-const char* const kActLocalized[kActCount] = { "Trigger (Controller Keys)", "Grip (Controller Keys)", "A / X (Controller Keys)",
-                                               "B / Y (Controller Keys)", "Stick click (Controller Keys)", "Menu (Controller Keys)",
-                                               "Stick (Controller Keys)", "Aim (Controller Keys)" };
+const char* const kActLocalized[kActCount] = { "Trigger (VR Controls)", "Grip (VR Controls)", "A / X (VR Controls)",
+                                               "B / Y (VR Controls)", "Stick click (VR Controls)", "Menu (VR Controls)",
+                                               "Stick (VR Controls)", "Aim (VR Controls)" };
 }  // namespace
 
 const char* ActName(int a) { return a >= 0 && a < kActCount ? kActNames[a] : "?"; }
@@ -101,6 +101,16 @@ bool TranslateSimpleBinding(const std::string& target, const std::string& p, std
 std::string ShortProfile(const std::string& p) {
     const char* pre = "/interaction_profiles/";
     return p.compare(0, strlen(pre), pre) == 0 ? p.substr(strlen(pre)) : p;
+}
+
+bool SameInput(const std::string& a, const std::string& b) {
+    auto id = [](const std::string& p) {             // "<top>/input/<identifier>" (or the whole path)
+        const size_t in = p.find("/input/");
+        if (in == std::string::npos) return p;
+        const size_t slash = p.find('/', in + 7);
+        return slash == std::string::npos ? p : p.substr(0, slash);
+    };
+    return !a.empty() && id(a) == id(b);
 }
 
 }  // namespace ck

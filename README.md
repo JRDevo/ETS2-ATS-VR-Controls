@@ -1,9 +1,11 @@
-# VR Controller Keys
+# ETS2 ATS VR Controls
 
 Use your VR controllers as a keyboard and mouse in **Euro Truck Simulator 2** and **American Truck Simulator** (OpenXR VR).
 Press a controller button, and the game gets a key press. Move a stick or point the controller, and the mouse pointer moves.
 
-> Status: v0.1.0, first version. Tested with a fake game and a fake VR runtime. **Not tested in the real game yet.**
+> Status: v0.1.0, first version (phase 1: buttons, pointer and click). Tested with a fake game and a fake VR runtime.
+> **Not tested in the real game yet.** Planned: phase 2, an on-screen keyboard in VR that you can move, resize and hide;
+> phase 3, single buttons you place anywhere (for example over a cab switch) that press a key.
 
 ## What it does
 
@@ -41,7 +43,7 @@ function to a controller button instead (for example `y = l` for the lights).
 ## Install
 
 1. Close the game.
-2. Unzip the folder to a place where it can stay (for example `C:\VR Controller Keys`).
+2. Unzip the folder to a place where it can stay (for example `C:\ETS2 ATS VR Controls`).
 3. Right-click `install.ps1` > **Run with PowerShell**. Click **Yes** in the Windows admin prompt.
    (Admin is needed: ETS2 / ATS only load VR add-ons that are registered for all users.)
 4. Start the game in VR.
@@ -58,7 +60,7 @@ Values: a key (`h`, `f1`, `space`, `[`), up to 3 keys with `+` (`shift+f`), `mou
 
 ## Problems
 
-The log is `logs\controller_keys.log` next to the DLL. It says which controller the VR system uses, which buttons are mapped,
+The log is `logs\ets2_ats_vr_controls.log` next to the DLL. It says which controller the VR system uses, which buttons are mapped,
 and every problem. Set `log_inputs = 1` in `config.ini` to see every key the layer sends.
 
 ## Build from source

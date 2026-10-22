@@ -6,6 +6,6 @@
 CMakeSettings.json
 
 # installed copies that scripts/install.ps1 places next to config.ini (built from source)
-/controller_keys.dll
-/controller_keys.pdb
-/XR_APILAYER_JRDEVO_controller_keys.json
+/ets2_ats_vr_controls.dll
+/ets2_ats_vr_controls.pdb
+/XR_APILAYER_JRDEVO_ets2_ats_vr_controls.json

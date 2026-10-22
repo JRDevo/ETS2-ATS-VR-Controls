@@ -15,8 +15,8 @@ std::string  g_exe;
 
 bool OpenIn(const std::wstring& dir) {
     CreateDirectoryW(dir.c_str(), nullptr);
-    const std::wstring p = dir + L"\\controller_keys.log";
-    const std::wstring old = dir + L"\\controller_keys.old.log";
+    const std::wstring p = dir + L"\\ets2_ats_vr_controls.log";
+    const std::wstring old = dir + L"\\ets2_ats_vr_controls.old.log";
     MoveFileExW(p.c_str(), old.c_str(), MOVEFILE_REPLACE_EXISTING);
     FILE* f = nullptr;
     if (_wfopen_s(&f, p.c_str(), L"wb") != 0 || !f) return false;
@@ -32,11 +32,11 @@ void LogInit(const std::wstring& dllDir, const std::wstring& exeName) {
     g_exe.clear();
     for (wchar_t c : exeName) g_exe += (c < 128) ? (char)c : '?';
     wchar_t env[MAX_PATH];
-    if (GetEnvironmentVariableW(L"CK_LOG_DIR", env, MAX_PATH) > 0 && OpenIn(env)) return;   // tests
+    if (GetEnvironmentVariableW(L"VRC_LOG_DIR", env, MAX_PATH) > 0 && OpenIn(env)) return;   // tests
     if (OpenIn(dllDir + L"\\logs")) return;
     PWSTR la = nullptr;
     if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &la))) {
-        const std::wstring d = std::wstring(la) + L"\\VR Controller Keys";
+        const std::wstring d = std::wstring(la) + L"\\ETS2 ATS VR Controls";
         CoTaskMemFree(la);
         CreateDirectoryW(d.c_str(), nullptr);
         OpenIn(d + L"\\logs");

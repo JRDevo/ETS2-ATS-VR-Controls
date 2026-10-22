@@ -31,5 +31,8 @@ const std::vector<const char*>& SimpleTranslationTargets();
 bool TranslateSimpleBinding(const std::string& targetProfile, const std::string& simplePath, std::string& out);
 
 std::string ShortProfile(const std::string& p);   // "/interaction_profiles/oculus/touch_controller" -> "oculus/touch_controller"
+// Whether two binding paths read the same physical input: the same "<top>/input/<identifier>", whatever the component
+// ("/user/hand/right/input/b/click" and ".../b/touch" or ".../b" = the same; "a/click" and "b/click" = not).
+bool SameInput(const std::string& a, const std::string& b);
 
 }  // namespace ck

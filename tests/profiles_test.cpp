@@ -59,6 +59,29 @@ int main() {
     CHECK(!TranslateSimpleBinding(vive, "/user/hand/left/input/foo/click", o), "junk refused");
     for (const char* t : SimpleTranslationTargets()) CHECK(IsKnownProfile(t), "target %s known", t);
     CHECK(ShortProfile(touch) == "oculus/touch_controller" && ShortProfile("x") == "x", "short");
+
+    // SameInput + the clash rule of pad_input.cpp: where does the game's translated menu land on one of our buttons?
+    CHECK(SameInput("/user/hand/right/input/b/click", "/user/hand/right/input/b/click"), "same");
+    CHECK(SameInput("/user/hand/right/input/b/touch", "/user/hand/right/input/b/click"), "same id, other component");
+    CHECK(SameInput("/user/hand/left/input/thumbstick", "/user/hand/left/input/thumbstick/click"), "parent vs component");
+    CHECK(!SameInput("/user/hand/right/input/a/click", "/user/hand/right/input/b/click"), "a vs b");
+    CHECK(!SameInput("/user/hand/left/input/b/click", "/user/hand/right/input/b/click"), "other hand");
+    CHECK(!SameInput("", "/user/hand/right/input/b/click"), "empty");
+    auto clashes = [&](const std::string& prof) {   // our buttons (not trigger / aim) on the input of the game's translated menu
+        int n = 0;
+        for (int h = 0; h < 2; ++h) {
+            std::string m;
+            if (!TranslateSimpleBinding(prof, std::string(h ? "/user/hand/right" : "/user/hand/left") + "/input/menu/click", m)) continue;
+            for (int a = 0; a < kActCount; ++a) {
+                std::string q;
+                if (a != kActTrig && a != kActAim && ActPath(prof, a, h, q) && SameInput(m, q)) ++n;
+            }
+        }
+        return n;
+    };
+    CHECK(clashes(index) == 2, "index: B on both hands = the game's menu (%d)", clashes(index));
+    CHECK(clashes(vive) == 2, "vive: left menu + right menu(B) (%d)", clashes(vive));
+    CHECK(clashes(touch) == 1, "touch: only our left menu (default none) (%d)", clashes(touch));
     printf("%d checks, %d failed\n", g_checks, g_fails);
     return g_fails ? 1 : 0;
 }

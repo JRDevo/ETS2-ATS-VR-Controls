@@ -1,4 +1,4 @@
-// layer -- the OpenXR API layer XR_APILAYER_JRDEVO_controller_keys (implicit; the loader loads it into every OpenXR program).
+// layer -- the OpenXR API layer XR_APILAYER_JRDEVO_ets2_ats_vr_controls (implicit; the loader loads it into every OpenXR program).
 // Only programs named in config.ini 'apps' (default eurotrucks2.exe, amtrucks.exe) are touched: in every other program the layer
 // hands out the next layer's functions unchanged and writes no log. Hooked (pad_input.h says why each one):
 //   xrDestroyInstance                     forget the instance
@@ -24,7 +24,7 @@
 namespace ck {
 namespace {
 
-const char* const kLayerName = CK_LAYER_NAME;
+const char* const kLayerName = VRC_LAYER_NAME;
 
 struct InstanceData {
     XrInstance                              handle = XR_NULL_HANDLE;
@@ -72,7 +72,7 @@ void EnsureInit() {
         g_on = g_cfg.enabled && AppAllowed(g_cfg, g_exe);
         if (!g_on) return;                           // not our game: no log file, nothing touched
         LogInit(g_dllDir, g_exe);
-        LOGI("VR Controller Keys " CK_VERSION " (%s) loaded into this game", kLayerName);
+        LOGI("ETS2 ATS VR Controls " VRC_VERSION " (%s) loaded into this game", kLayerName);
         LOGI("config: %ls", g_cfg.loadedFrom.empty() ? L"(none, defaults)" : g_cfg.loadedFrom.c_str());
         for (const std::string& n : g_cfg.notes) LOGW("config: %s", n.c_str());
         LOGI("mapping: %s", DescribePad(g_cfg.pad).c_str());
@@ -111,6 +111,7 @@ XrResult XRAPI_CALL Hook_DestroyInstance(XrInstance instance) {
         }
     }
     if (!next) return XR_ERROR_HANDLE_INVALID;
+    if (dead && dead->pad) dead->pad->ReleaseAll();   // a game that skips xrDestroySession: nothing stays held
     LOGI("instance %p destroyed", (void*)instance);
     return next(instance);   // (dead is freed after the call returns)
 }

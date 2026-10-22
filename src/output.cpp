@@ -12,7 +12,7 @@ std::mutex g_m;   // the test file + SendInput order across threads
 
 InputSink::InputSink() {
     wchar_t p[MAX_PATH];
-    if (GetEnvironmentVariableW(L"CK_TEST_EVENTS", p, MAX_PATH) > 0) {
+    if (GetEnvironmentVariableW(L"VRC_TEST_EVENTS", p, MAX_PATH) > 0) {
         FILE* f = nullptr;
         if (_wfopen_s(&f, p, L"ab") == 0 && f) test_ = f;
     }
