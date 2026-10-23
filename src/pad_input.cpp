@@ -581,13 +581,17 @@ bool PadInput::EndFrame(XrSession s, const XrFrameEndInfo* in, XrFrameEndInfo* o
     if (!menu_ || !in) return false;
     std::lock_guard<std::mutex> lk(m_);
     auto it = sessions_.find(s);
-    if (it == sessions_.end() || !menu_->AnyShown()) return false;
+    if (it == sessions_.end()) return false;
     SessionData& sd = it->second;
     if (!sd.ov || sd.ov->Dead() || sd.local == XR_NULL_HANDLE) return false;
+    // ahead of time: ~3 s into the session (usually still loading) the swapchains are made and filled once with the hidden
+    // panels, so opening the menu later costs no swapchain creation and no full upload in a VR frame
+    const bool warm = !menu_->AnyShown() && !sd.ovWarm && ++sd.endFrames > 270;
+    if (!menu_->AnyShown() && !warm) return false;
     std::vector<QuadIn> quads;
     for (int p = 0; p < VrMenu::kPanCount; ++p) {
         const VrMenu::Panel& pn = menu_->Pan(p);
-        if (!pn.show || pn.px.empty()) continue;
+        if ((!pn.show && !warm) || pn.px.empty()) continue;
         QuadIn q;
         q.slot = p; q.pose = pn.pose; q.w = pn.width; q.h = pn.Height(); q.pw = pn.pw; q.ph = pn.ph; q.px = pn.px.data(); q.version = pn.version;
         menu_->TakeDirty(p, q.dirty);
@@ -604,6 +608,12 @@ bool PadInput::EndFrame(XrSession s, const XrFrameEndInfo* in, XrFrameEndInfo* o
         quads.push_back(q);
     }
     std::vector<const XrCompositionLayerBaseHeader*> ours;
+    if (warm) {
+        sd.ovWarm = true;
+        sd.ov->Frame(quads, sd.local, ours, false);
+        LOGI("VR menu: swapchains made and filled ahead of time (the menu opens without a hitch)");
+        return false;
+    }
     sd.ov->Frame(quads, sd.local, ours);
     if (ours.empty() || in->layerCount + ours.size() > 16) return false;   // (16 = the least any runtime allows)
     layers.assign(in->layers, in->layers + (in->layers ? in->layerCount : 0));

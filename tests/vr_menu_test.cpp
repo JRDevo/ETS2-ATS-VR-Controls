@@ -410,13 +410,34 @@ int main(int argc, char** argv) {
     CHECK(std::fabs(m2.Pan(VrMenu::kPanKb).pose.p.x - m.Pan(VrMenu::kPanKb).pose.p.x) < 0.002, "... at its saved place");
     m2.Open(true, head);
     CHECK(std::fabs(m2.Pan(VrMenu::kPanMenu).pose.p.x - m.Pan(VrMenu::kPanMenu).pose.p.x) < 0.002, "a new menu opens at the saved place");
+    // cost of opening the menu (a new VrMenu = a new game; then closed and opened again): printed, not checked
+    {
+        LARGE_INTEGER q0, q1, q2, q3, fq;
+        QueryPerformanceFrequency(&fq);
+        QueryPerformanceCounter(&q0);
+        VrMenu mo(back, std::wstring());
+        QueryPerformanceCounter(&q1);
+        mo.Open(true, head);
+        QueryPerformanceCounter(&q2);
+        mo.Close();
+        mo.Open(true, head);
+        QueryPerformanceCounter(&q3);
+        printf("   new menu (game start) %.2f ms, first open %.2f ms, open again %.2f ms\n", (q1.QuadPart - q0.QuadPart) * 1000.0 / fq.QuadPart,
+               (q2.QuadPart - q1.QuadPart) * 1000.0 / fq.QuadPart, (q3.QuadPart - q2.QuadPart) * 1000.0 / fq.QuadPart);
+    }
     // cost of one keyboard redraw (it happens when the pointer moves onto another key): printed, not checked
     {
         Config c3 = back;
         c3.look.kbShow = false;                         // (its menu button shows it below)
         VrMenu m3(c3, std::wstring());
         Rec s3;
-        auto u3 = [&](VrPad::Frame f) { m3.Update(f, true, true, head, now, s3); now += 0.011; };
+        auto u3 = [&](VrPad::Frame f) {                  // (+ the changed area taken every frame, as the layer's xrEndFrame does)
+            m3.Update(f, true, true, head, now, s3);
+            now += 0.011;
+            int dd[4];
+            m3.TakeDirty(VrMenu::kPanMenu, dd);
+            m3.TakeDirty(VrMenu::kPanKb, dd);
+        };
         m3.Open(true, head);
         V3 a1, a2;
         m3.ElemCentre(VrMenu::kPanMenu, VrMenu::eKbBtn, 0, &a1);
@@ -435,6 +456,56 @@ int main(int argc, char** argv) {
         const uint64_t n = m3.Pan(VrMenu::kPanKb).version - v0;
         CHECK(n >= 20, "a hover change redraws (%llu)", (unsigned long long)n);
         printf("   one hover change (only the changed keys drawn): %.2f ms\n", (q1.QuadPart - q0.QuadPart) * 1000.0 / fq.QuadPart / 20);
+    }
+    // the README screenshots (default look, solid): <work folder>\shots\*.bmp -- every tab, the keyboard full / compact, and the
+    // keyboard with the pointer on G (shot_pointer.txt = G's centre in pixels, for the dot)
+    {
+        const std::wstring shots = dir + L"\\shots";
+        CreateDirectoryW(shots.c_str(), nullptr);
+        Config cs = ParseConfig("menu_opacity = 1\nkeyboard_opacity = 1\n");   // (pointer smoothing medium: the default)
+        VrMenu ms(cs, std::wstring());
+        Rec s5;
+        auto u5 = [&](VrPad::Frame f) { ms.Update(f, true, true, head, now, s5); now += 0.011; };
+        auto press = [&](int pan, int kind, int arg) {
+            V3 at;
+            if (!ms.ElemCentre(pan, kind, arg, &at)) return;
+            for (int i = 0; i < 60; ++i) u5(Aim(1, at, 0.0f));   // (the smoothed pointer settles first)
+            u5(Aim(1, at, 1.0f)); u5(Aim(1, at, 0.0f));
+        };
+        auto settle = [&](const V3& at) { for (int i = 0; i < 60; ++i) u5(Aim(1, at, 0.0f)); };
+        const V3 away{ 0, 3, 0.5 };                     // (pointing away: nothing hovered in the pictures)
+        ms.Open(true, head);
+        u5(Aim(1, away, 0.0f));
+        static const wchar_t* const kTab[4] = { L"menu-buttons", L"menu-mouse", L"menu-panels", L"menu-look" };
+        for (int t = 0; t < 4; ++t) {
+            press(VrMenu::kPanMenu, VrMenu::eTab, t);
+            settle(away);
+            WriteBmp(shots + L"\\" + kTab[t] + L".bmp", ms.Pan(VrMenu::kPanMenu));
+        }
+        press(VrMenu::kPanMenu, VrMenu::eTab, 0);
+        press(VrMenu::kPanMenu, VrMenu::eRow, VrPad::kA);   // picking a key for A: the keyboard opens with its frame
+        settle(away);
+        WriteBmp(shots + L"\\menu-pick.bmp", ms.Pan(VrMenu::kPanMenu));
+        WriteBmp(shots + L"\\keyboard-pick.bmp", ms.Pan(VrMenu::kPanKb));
+        press(VrMenu::kPanMenu, VrMenu::ePickCancel, 0);
+        settle(away);
+        WriteBmp(shots + L"\\keyboard.bmp", ms.Pan(VrMenu::kPanKb));
+        V3 g;
+        if (ms.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("g"), &g)) {
+            settle(g);
+            WriteBmp(shots + L"\\keyboard-pointer.bmp", ms.Pan(VrMenu::kPanKb));
+            const VrMenu::Panel& kb = ms.Pan(VrMenu::kPanKb);
+            const V3 l = QRot(QConj(kb.pose.q), g - kb.pose.p);
+            FILE* f = nullptr;
+            if (!_wfopen_s(&f, (shots + L"\\shot_pointer.txt").c_str(), L"wb") && f) {
+                fprintf(f, "%d %d\n", (int)((l.x / kb.width + 0.5) * kb.pw), (int)((0.5 - l.y / kb.Height()) * kb.ph));
+                fclose(f);
+            }
+        }
+        press(VrMenu::kPanMenu, VrMenu::eTab, 2);
+        press(VrMenu::kPanMenu, VrMenu::eSet, 83);       // compact
+        settle(away);
+        WriteBmp(shots + L"\\keyboard-compact.bmp", ms.Pan(VrMenu::kPanKb));
     }
     printf("%d checks, %d failed\n", g_checks, g_fails);
     return g_fails ? 1 : 0;

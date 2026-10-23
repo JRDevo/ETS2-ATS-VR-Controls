@@ -117,6 +117,8 @@ private:
         bool     headOk = false;
         Pose     head;
         std::unique_ptr<Overlay> ov;      // the menu's pictures (D3D11 sessions)
+        uint64_t endFrames = 0;           // the game's xrEndFrame calls (the swapchains are made ahead of time after 3 s)
+        bool     ovWarm = false;
         bool     spacesFailed = false;
         VrPad::Mapper mapper;
         uint64_t ticks = 0, readFails = 0, ownSyncs = 0;

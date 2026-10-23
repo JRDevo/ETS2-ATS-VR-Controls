@@ -7,12 +7,14 @@
 //   * Size: a panel seen smaller than its picture (a 1081 px keyboard 0.2 m wide = ~450 headset pixels) shimmers when the
 //     compositor squeezes it -- and a runtime may ignore mipmaps (Virtual Desktop did). So the picture is first SHRUNK on the
 //     CPU to about the size it has in the headset (QuadIn::wantPx, from its angular size; an area filter in linear light), in
-//     steps of 10 % with some hysteresis (a new size = a new swapchain); only the changed area (QuadIn::dirty) is shrunk
-//     again. Then a mip chain from that (down to ~16 px, 2x2 box in linear light) for a runtime that does use mipmaps; one
-//     that refuses mipCount > 1 gets one level.
+//     steps of 10 % with some hysteresis (a new size = a new swapchain). Then a mip chain from that (down to ~16 px, 2x2 box
+//     in linear light) for a runtime that does use mipmaps; one that refuses mipCount > 1 gets one level.
+//   * Light: only the changed area (QuadIn::dirty, e.g. two keys under a moving pointer) is shrunk, mipped and uploaded --
+//     into each of the swapchain's images (they rotate) the area changed since that image was last written (Sc::pending).
 //   * Any failure (create / acquire / wait / release, or the runtime refusing the frame with our layers): the pictures are off
 //     for this session (logged); PadInput then re-sends the game's frame unchanged.
 #pragma once
+#include <array>
 #include <cstdint>
 #include <vector>
 #include <openxr/openxr.h>
@@ -54,8 +56,10 @@ public:
     void Abandon() { abandoned_ = true; }   // the session / instance is gone already: no OpenXR calls in the destructor
     bool Dead() const { return dead_; }
     void Kill(const char* why);      // pictures off for this session
-    // At the game's xrEndFrame: upload what changed, then the layers to append (valid until the next call).
-    void Frame(const std::vector<QuadIn>& quads, XrSpace space, std::vector<const XrCompositionLayerBaseHeader*>& out);
+    // At the game's xrEndFrame: upload what changed, then the layers to append (valid until the next call). submit = false:
+    // only make the swapchains and upload (ahead of time, while the panels are hidden), no layers.
+    void Frame(const std::vector<QuadIn>& quads, XrSpace space, std::vector<const XrCompositionLayerBaseHeader*>& out,
+               bool submit = true);
 
 private:
     struct Sc {
@@ -64,8 +68,9 @@ private:
         std::vector<ID3D11Texture2D*> img;
         uint32_t mips = 1;
         double   scale = 0;            // the picture is shrunk by this (0 = not yet chosen)
-        std::vector<uint32_t> shrunk;  // the shrunk picture (BGRA)
-        int      srcW = 0, srcH = 0;   // the picture it was shrunk from
+        std::vector<std::vector<uint32_t>> lv;   // what each mip level holds (swapchain size and channel order), kept
+        std::vector<std::array<int, 4>> pending; // per swapchain image: the level-0 area not yet written into it
+        bool     built = false;
         uint64_t uploaded = ~0ull;
         bool released = false;         // an image was released once (it may be shown)
     };
@@ -79,7 +84,7 @@ private:
     bool            dead_ = false, abandoned_ = false, formatTried_ = false;
     Sc              sc_[kSlots];
     std::vector<XrCompositionLayerQuad> layers_;
-    std::vector<uint32_t> conv_, mip_[2];
+
     uint64_t        frames_ = 0;
 };
 

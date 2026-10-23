@@ -161,14 +161,22 @@ public:
         const std::wstring ws = Wide(s);
         DrawTextW(dc_, ws.c_str(), (int)ws.size(), &r, align | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
     }
-    // the picture with `alpha` (0..255) everywhere, premultiplied (GDI leaves alpha 0)
-    void CopyTo(std::vector<uint32_t>& out, int alpha) {
+    // the picture's area [x0, x1) x [y0, y1) into `out` (w x h) with `alpha` (0..255) everywhere, premultiplied (GDI leaves
+    // alpha 0); `out` of another size: all of it
+    void CopyTo(std::vector<uint32_t>& out, int alpha, int x0, int y0, int x1, int y1) {
         GdiFlush();
-        out.assign(static_cast<const uint32_t*>(bits_), static_cast<const uint32_t*>(bits_) + (size_t)w_ * h_);
-        if (alpha >= 255) { for (uint32_t& p : out) p |= 0xFF000000u; return; }
-        const uint32_t a = (uint32_t)(alpha < 0 ? 0 : alpha);
-        for (uint32_t& p : out)
-            p = (a << 24) | ((((p >> 16) & 0xFFu) * a / 255u) << 16) | ((((p >> 8) & 0xFFu) * a / 255u) << 8) | ((p & 0xFFu) * a / 255u);
+        if (out.size() != (size_t)w_ * h_) { out.assign((size_t)w_ * h_, 0); x0 = y0 = 0; x1 = w_; y1 = h_; }
+        x0 = x0 < 0 ? 0 : x0; y0 = y0 < 0 ? 0 : y0; x1 = x1 > w_ ? w_ : x1; y1 = y1 > h_ ? h_ : y1;
+        const uint32_t a = (uint32_t)(alpha < 0 ? 0 : alpha > 255 ? 255 : alpha);
+        for (int y = y0; y < y1; ++y) {
+            const uint32_t* in = static_cast<const uint32_t*>(bits_) + (size_t)y * w_;
+            uint32_t* o = out.data() + (size_t)y * w_;
+            for (int x = x0; x < x1; ++x) {
+                const uint32_t p = in[x];
+                o[x] = a >= 255 ? (p | 0xFF000000u)
+                                : (a << 24) | ((((p >> 16) & 0xFFu) * a / 255u) << 16) | ((((p >> 8) & 0xFFu) * a / 255u) << 8) | ((p & 0xFFu) * a / 255u);
+            }
+        }
     }
 private:
     HFONT Font(int px, bool bold) {
@@ -272,6 +280,8 @@ VrMenu::VrMenu(const Config& cfg, const std::wstring& path) : pad_(cfg.pad), pat
         if (place_[kPanKb].set) pan_[kPanKb].show = true;   //   the head at the first frame that has the head)
         else kbPending_ = true;
     }
+    // both panels drawn now, while the game loads: opening the menu then only shows them (no 3-5 ms of GDI in a VR frame)
+    RedrawAll();
     // the pointer dot: white with a dark ring, soft edge, premultiplied alpha
     cursorPx_.resize((size_t)kCursorPx * kCursorPx);
     for (int y = 0; y < kCursorPx; ++y)
@@ -326,8 +336,7 @@ void VrMenu::Place(int p, bool headOk, const Pose& head, bool force) {
 void VrMenu::Open(bool headOk, const Pose& head) {
     Place(kPanMenu, headOk, head, false);
     pan_[kPanMenu].show = true;
-    status_.clear();
-    RedrawAll();
+    status_.clear();                                    // (redrawn in Update only if what it shows changed meanwhile)
     LOGI("VR menu open (%s)", Describe().c_str());
 }
 
@@ -603,14 +612,15 @@ bool VrMenu::DrawChanged(int p) {
 
 void VrMenu::Publish(int p) {
     const float op = p == kPanMenu ? look_.menuOpacity : look_.kbOpacity;
-    cv_[p]->CopyTo(pan_[p].px, (int)(op * 255.0f + 0.5f));
+    const int* d = pan_[p].dirty;                       // (only the changed area; a full draw marks all of it)
+    cv_[p]->CopyTo(pan_[p].px, (int)(op * 255.0f + 0.5f), d[0], d[1], d[2], d[3]);
     ++pan_[p].version;
 }
 
 void VrMenu::Redraw(int p) {
     Layout(p);
     Draw(p);
-    content_[p] = ContentKey();
+    content_[p] = ContentKey(p);
 }
 
 void VrMenu::DrawElem(MenuCanvas& c, const Elem& e, int st) {
@@ -947,11 +957,8 @@ void VrMenu::Update(VrPad::Frame& f, bool live, bool headOk, const Pose& head, d
             if (hov_[h].pan >= 0 || press_[h].pan >= 0) f.trig[h] = 0.0f;           // this trigger belongs to the menu now
         }
     }
-    if (AnyShown()) {                                   // (closed: nothing drawn)
-        const std::string ck = ContentKey();
-        for (int p = 0; p < kPanCount; ++p)
-            if (pan_[p].show && (needRedraw_ || ck != content_[p] || !DrawChanged(p))) Redraw(p);
-    }
+    for (int p = 0; p < kPanCount; ++p)                 // (closed: nothing drawn)
+        if (pan_[p].show && (needRedraw_ || ContentKey(p) != content_[p] || !DrawChanged(p))) Redraw(p);
     needRedraw_ = false;
     if (saveAt_ >= 0) {
         saveAt_ = -1;
@@ -959,19 +966,22 @@ void VrMenu::Update(VrPad::Frame& f, bool live, bool headOk, const Pose& head, d
             LOGI("VR menu: settings saved to %ls", path_.c_str());
         else if (!path_.empty()) {
             LOGW("VR menu: could not write %ls -- the change works until the game ends", path_.c_str());
-            status_ = "Could not save config.ini (the change works until the game ends).";
+            status_ = "Could not save config.ini (the change works until the game ends).";   // (a new status: redrawn)
         }
-        needRedraw_ = true;
     }
 }
 
-std::string VrMenu::ContentKey() const {
-    char b[160];
-    snprintf(b, sizeof(b), "%d%d|%d|%d|%d%d%d|%.3f,%.3f|", pan_[0].show, pan_[1].show, tab_, pickBtn_, latch_[0], latch_[1], latch_[2],
-             pan_[0].width, pan_[1].width);
-    char l[64];
-    snprintf(l, sizeof(l), "%d|%.2f|%.2f|%d|%d|", look_.theme, look_.menuOpacity, look_.kbOpacity, look_.smoothing, look_.kbCompact);
-    return std::string(b) + l + status_ + "|" + DescribePad(pad_);
+std::string VrMenu::ContentKey(int p) const {
+    char b[200];
+    if (p == kPanKb) {                                  // the keyboard: its colours, layout, latched modifiers, the pick frame
+        snprintf(b, sizeof(b), "%d|%.2f|%d|%d|%d%d%d", look_.theme, look_.kbOpacity, look_.kbCompact, pickBtn_ >= 0, latch_[0],
+                 latch_[1], latch_[2]);
+        return b;
+    }
+    // the menu: everything its tabs show (not whether it is shown itself)
+    snprintf(b, sizeof(b), "%d|%d|%d|%.3f,%.3f|%d|%.2f|%.2f|%d|%d|", pan_[1].show, tab_, pickBtn_, pan_[0].width, pan_[1].width,
+             look_.theme, look_.menuOpacity, look_.kbOpacity, look_.smoothing, look_.kbCompact);
+    return std::string(b) + status_ + "|" + DescribePad(pad_);
 }
 
 }  // namespace ck

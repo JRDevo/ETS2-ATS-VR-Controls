@@ -11,6 +11,8 @@
 //   xrAttachSessionActionSets / xrSyncActions   our action set appended to the game's
 //   xrEndFrame                            the VR menu's quad layers after the game's (only while it is shown)
 //   xrGetActionStateBoolean / Float       the game's trigger reads released while it points at the VR menu
+// Its own cost is measured (CPU time in our part of xrBeginFrame + xrEndFrame, not the game's or the runtime's) and logged
+// once a minute: "performance: ..." -- so anyone can see in the log how light it is.
 #include <windows.h>
 #include <d3d11.h>
 #include <cstring>
@@ -60,6 +62,46 @@ std::map<XrInstance, std::unique_ptr<InstanceData>> g_instances;
 std::map<XrSession, InstanceData*>   g_sessions;
 std::map<XrActionSet, InstanceData*> g_sets;
 PFN_xrGetInstanceProcAddr g_anyNextGipa = nullptr;
+
+// the layer's own CPU time per frame (see the header); one frame = our part of xrBeginFrame + our part of xrEndFrame
+struct Cost {
+    std::mutex m;
+    double begin = 0, t0 = -1, sum = 0, max = 0, bSum = 0, bMax = 0, eSum = 0, eMax = 0;
+    uint64_t frames = 0, menuFrames = 0;
+};
+Cost g_cost;
+void CostBegin(double s) { std::lock_guard<std::mutex> lk(g_cost.m); g_cost.begin = s; }
+void CostEnd(double s, bool menu) {
+    std::lock_guard<std::mutex> lk(g_cost.m);
+    const double now = NowS(), f = g_cost.begin + s;
+    g_cost.begin = 0;
+    if (g_cost.t0 < 0) g_cost.t0 = now;
+    g_cost.sum += f;
+    if (f > g_cost.max) g_cost.max = f;
+    g_cost.bSum += f - s;
+    if (f - s > g_cost.bMax) g_cost.bMax = f - s;
+    g_cost.eSum += s;
+    if (s > g_cost.eMax) g_cost.eMax = s;
+    static int slowLogs = 0;                           // a single frame over 3 ms: named (the first 10 per game)
+    if (f > 0.003 && slowLogs < 10) {
+        ++slowLogs;
+        LOGI("performance: one frame took %.2f ms (controllers + menu %.2f, pictures to the headset %.2f)%s", 1000.0 * f,
+             1000.0 * (f - s), 1000.0 * s, slowLogs == 10 ? " -- no more of these lines" : "");
+    }
+    ++g_cost.frames;
+    if (menu) ++g_cost.menuFrames;
+    if (now - g_cost.t0 >= 60.0 && g_cost.frames) {
+        const double n = (double)g_cost.frames;
+        LOGI("performance: the layer's own work took %.3f ms per frame on average (most %.2f ms) over %llu frames in %.0f s "
+             "[controllers + menu %.3f ms avg / %.2f most, pictures to the headset %.3f / %.2f]; VR menu / keyboard shown in "
+             "%llu of them", 1000.0 * g_cost.sum / n, 1000.0 * g_cost.max, (unsigned long long)g_cost.frames, now - g_cost.t0,
+             1000.0 * g_cost.bSum / n, 1000.0 * g_cost.bMax, 1000.0 * g_cost.eSum / n, 1000.0 * g_cost.eMax,
+             (unsigned long long)g_cost.menuFrames);
+        g_cost.t0 = now;
+        g_cost.sum = g_cost.max = g_cost.bSum = g_cost.bMax = g_cost.eSum = g_cost.eMax = 0;
+        g_cost.frames = g_cost.menuFrames = 0;
+    }
+}
 
 void EnsureInit() {
     std::call_once(g_initOnce, [] {
@@ -176,7 +218,9 @@ XrResult XRAPI_CALL Hook_BeginFrame(XrSession session, const XrFrameBeginInfo* b
     InstanceData* id = FindSession(session);
     if (!id || !id->BeginFrame) return XR_ERROR_HANDLE_INVALID;
     if (id->pad) {
+        const double t = NowS();
         try { id->pad->BeginFrame(session); } catch (...) { LOGE("frame tick failed (exception) -- skipped"); }
+        CostBegin(NowS() - t);
     }
     return id->BeginFrame(session, bi);
 }
@@ -188,7 +232,9 @@ XrResult XRAPI_CALL Hook_EndFrame(XrSession session, const XrFrameEndInfo* fe) {
         std::vector<const XrCompositionLayerBaseHeader*> layers;
         XrFrameEndInfo mine{};
         bool ours = false;
+        const double t = NowS();
         try { ours = id->pad->EndFrame(session, fe, &mine, layers); } catch (...) { LOGE("menu layers failed (exception) -- skipped"); }
+        CostEnd(NowS() - t, ours);
         if (ours) {
             const XrResult r = id->EndFrame(session, &mine);
             if (XR_SUCCEEDED(r)) return r;

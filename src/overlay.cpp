@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include "log.h"
 
 namespace ck {
@@ -39,16 +40,16 @@ const uint8_t* ToSrgb() {
     }
     return t;
 }
-// one mip level down: 2x2 box (the last row / column of an odd size counts twice), colour in linear light, alpha linear
-void Half(const uint32_t* in, int w, int h, std::vector<uint32_t>& out, int* ow, int* oh) {
-    const int nw = w > 1 ? w / 2 : 1, nh = h > 1 ? h / 2 : 1;
-    out.resize((size_t)nw * nh);
+// the area [x0, x1) x [y0, y1) of the next mip level (nw x nh) from `in` (w x h): 2x2 box (an odd size's last row / column
+// counts twice), colour in linear light, alpha linear
+void HalfRect(const uint32_t* in, int w, int h, uint32_t* out, int nw, int x0, int y0, int x1, int y1) {
     const float* lin = ToLin();
     const uint8_t* srgb = ToSrgb();
-    for (int y = 0; y < nh; ++y)
-        for (int x = 0; x < nw; ++x) {
-            const int x0 = x * 2, y0 = y * 2, x1 = x0 + 1 < w ? x0 + 1 : x0, y1 = y0 + 1 < h ? y0 + 1 : y0;
-            const uint32_t p[4] = { in[(size_t)y0 * w + x0], in[(size_t)y0 * w + x1], in[(size_t)y1 * w + x0], in[(size_t)y1 * w + x1] };
+    for (int y = y0; y < y1; ++y)
+        for (int x = x0; x < x1; ++x) {
+            const int sx0 = x * 2 < w ? x * 2 : w - 1, sy0 = y * 2 < h ? y * 2 : h - 1;
+            const int sx1 = sx0 + 1 < w ? sx0 + 1 : sx0, sy1 = sy0 + 1 < h ? sy0 + 1 : sy0;
+            const uint32_t p[4] = { in[(size_t)sy0 * w + sx0], in[(size_t)sy0 * w + sx1], in[(size_t)sy1 * w + sx0], in[(size_t)sy1 * w + sx1] };
             float c[3] = {};
             uint32_t a = 0;
             for (uint32_t q : p) {
@@ -59,8 +60,6 @@ void Half(const uint32_t* in, int w, int h, std::vector<uint32_t>& out, int* ow,
             for (int k = 0; k < 3; ++k) r |= (uint32_t)srgb[(int)(c[k] * 0.25f * 4095.0f + 0.5f)] << (8 * k);
             out[(size_t)y * nw + x] = r;
         }
-    *ow = nw;
-    *oh = nh;
 }
 // The area filter (each target pixel = the average of the source pixels it covers, colour in linear light). Weights per
 // axis are built once per size pair.
@@ -209,64 +208,90 @@ bool Overlay::Create(int slot, int w, int h) {
 
 bool Overlay::Upload(int slot, const QuadIn& q, bool full) {
     Sc& c = sc_[slot];
-    // the picture at the swapchain's size: shrunk (the changed area only, unless `full`), or as it is
-    const uint32_t* pic = q.px;
-    if (c.w != q.pw || c.h != q.ph) {
-        if (c.shrunk.size() != (size_t)c.w * c.h || c.srcW != q.pw || c.srcH != q.ph) { c.shrunk.assign((size_t)c.w * c.h, 0); full = true; }
-        c.srcW = q.pw;
-        c.srcH = q.ph;
-        int x0 = 0, y0 = 0, x1 = c.w, y1 = c.h;
-        if (!full) {
-            if (q.dirty[2] <= q.dirty[0] || q.dirty[3] <= q.dirty[1]) { x1 = y1 = 0; }
-            else {
-                const double kx = (double)c.w / q.pw, ky = (double)c.h / q.ph;
-                x0 = (int)(q.dirty[0] * kx) - 1; y0 = (int)(q.dirty[1] * ky) - 1;
-                x1 = (int)std::ceil(q.dirty[2] * kx) + 1; y1 = (int)std::ceil(q.dirty[3] * ky) + 1;
-                x0 = x0 < 0 ? 0 : x0; y0 = y0 < 0 ? 0 : y0; x1 = x1 > c.w ? c.w : x1; y1 = y1 > c.h ? c.h : y1;
-            }
+    const bool rgba = format_ == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB || format_ == DXGI_FORMAT_R8G8B8A8_UNORM;   // (ours are BGRA)
+    if (!c.built) {                                    // the kept levels + "everything still to write" for every image
+        c.lv.assign(c.mips, std::vector<uint32_t>());
+        for (uint32_t m = 0; m < c.mips; ++m) {
+            const int lw = c.w >> m ? c.w >> m : 1, lh = c.h >> m ? c.h >> m : 1;
+            c.lv[m].assign((size_t)lw * lh, 0);
         }
-        if (x1 > x0 && y1 > y0) Shrink(q.px, q.pw, q.ph, c.shrunk.data(), c.w, c.h, x0, y0, x1, y1);
-        pic = c.shrunk.data();
+        c.pending.assign(c.img.size(), std::array<int, 4>{ 0, 0, c.w, c.h });
+        c.built = true;
+        full = true;
     }
+    // 1. the changed area at level 0 (the swapchain's size)
+    int r[4] = { 0, 0, 0, 0 };
+    const bool shrunk = c.w != q.pw || c.h != q.ph;
+    if (full) { r[2] = c.w; r[3] = c.h; }
+    else if (q.dirty[2] > q.dirty[0] && q.dirty[3] > q.dirty[1]) {
+        const double kx = (double)c.w / q.pw, ky = (double)c.h / q.ph;
+        r[0] = (int)(q.dirty[0] * kx) - (shrunk ? 1 : 0); r[1] = (int)(q.dirty[1] * ky) - (shrunk ? 1 : 0);
+        r[2] = (int)std::ceil(q.dirty[2] * kx) + (shrunk ? 1 : 0); r[3] = (int)std::ceil(q.dirty[3] * ky) + (shrunk ? 1 : 0);
+        r[0] = r[0] < 0 ? 0 : r[0]; r[1] = r[1] < 0 ? 0 : r[1]; r[2] = r[2] > c.w ? c.w : r[2]; r[3] = r[3] > c.h ? c.h : r[3];
+    }
+    // 2. that area of every kept level: shrunk (or copied), channel order of the swapchain, then the mip levels below it
+    if (r[2] > r[0] && r[3] > r[1]) {
+        uint32_t* l0 = c.lv[0].data();
+        if (shrunk) Shrink(q.px, q.pw, q.ph, l0, c.w, c.h, r[0], r[1], r[2], r[3]);
+        else for (int y = r[1]; y < r[3]; ++y) memcpy(l0 + (size_t)y * c.w + r[0], q.px + (size_t)y * q.pw + r[0], (size_t)(r[2] - r[0]) * 4);
+        if (rgba)
+            for (int y = r[1]; y < r[3]; ++y)
+                for (uint32_t* p = l0 + (size_t)y * c.w + r[0], *e = l0 + (size_t)y * c.w + r[2]; p < e; ++p)
+                    *p = (*p & 0xFF00FF00u) | ((*p >> 16) & 0xFFu) | ((*p & 0xFFu) << 16);
+        int m0 = r[0], m1 = r[1], m2 = r[2], m3 = r[3];
+        for (uint32_t m = 1; m < c.mips; ++m) {
+            const int pw = c.w >> (m - 1) ? c.w >> (m - 1) : 1, ph = c.h >> (m - 1) ? c.h >> (m - 1) : 1;
+            const int lw = c.w >> m ? c.w >> m : 1, lh = c.h >> m ? c.h >> m : 1;
+            m0 /= 2; m1 /= 2; m2 = (m2 + 1) / 2; m3 = (m3 + 1) / 2;
+            m2 = m2 > lw ? lw : m2; m3 = m3 > lh ? lh : m3;
+            HalfRect(c.lv[m - 1].data(), pw, ph, c.lv[m].data(), lw, m0, m1, m2, m3);
+        }
+        for (auto& pd : c.pending) {                     // every image still needs this area
+            if (pd[2] <= pd[0] || pd[3] <= pd[1]) { pd = { r[0], r[1], r[2], r[3] }; continue; }
+            pd[0] = pd[0] < r[0] ? pd[0] : r[0]; pd[1] = pd[1] < r[1] ? pd[1] : r[1];
+            pd[2] = pd[2] > r[2] ? pd[2] : r[2]; pd[3] = pd[3] > r[3] ? pd[3] : r[3];
+        }
+    }
+    c.uploaded = q.version;
+    bool any = false;
+    for (const auto& pd : c.pending) any = any || (pd[2] > pd[0] && pd[3] > pd[1]);
+    if (!any && c.released) return true;               // nothing changed in the picture: nothing to send
+    // 3. the next image: the area changed since it was last written, every level
     uint32_t idx = 0;
     XrSwapchainImageAcquireInfo ai{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
-    XrResult r = d_.AcquireSwapchainImage(c.sc, &ai, &idx);
-    if (XR_FAILED(r)) { Kill("xrAcquireSwapchainImage failed"); return false; }
+    XrResult xr = d_.AcquireSwapchainImage(c.sc, &ai, &idx);
+    if (XR_FAILED(xr)) { Kill("xrAcquireSwapchainImage failed"); return false; }
     XrSwapchainImageWaitInfo wi{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
     wi.timeout = 100000000;            // 100 ms
-    r = d_.WaitSwapchainImage(c.sc, &wi);
-    if (r != XR_SUCCESS) { Kill("xrWaitSwapchainImage failed or timed out"); return false; }   // (an image we may not release)
-    const uint32_t* src = pic;
-    if (format_ == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB || format_ == DXGI_FORMAT_R8G8B8A8_UNORM) {   // BGRA -> RGBA
-        conv_.assign(pic, pic + (size_t)c.w * c.h);
-        for (uint32_t& p : conv_) p = (p & 0xFF00FF00u) | ((p >> 16) & 0xFFu) | ((p & 0xFFu) << 16);
-        src = conv_.data();
-    }
+    xr = d_.WaitSwapchainImage(c.sc, &wi);
+    if (xr != XR_SUCCESS) { Kill("xrWaitSwapchainImage failed or timed out"); return false; }   // (an image we may not release)
     if (idx < c.img.size() && c.img[idx]) {
+        std::array<int, 4>& pd = c.pending[idx];
         ID3D11DeviceContext* ctx = nullptr;
         dev_->GetImmediateContext(&ctx);
-        if (ctx) {
-            ctx->UpdateSubresource(c.img[idx], 0, nullptr, src, (UINT)c.w * 4, 0);
-            const uint32_t* lv = src;
-            int lw = c.w, lh = c.h;
-            for (uint32_t m = 1; m < c.mips; ++m) {   // the smaller copies (mip levels), each from the one before
-                std::vector<uint32_t>& dst = mip_[m & 1];
-                Half(lv, lw, lh, dst, &lw, &lh);
-                ctx->UpdateSubresource(c.img[idx], m, nullptr, dst.data(), (UINT)lw * 4, 0);
-                lv = dst.data();
+        if (ctx && pd[2] > pd[0] && pd[3] > pd[1]) {
+            int b0 = pd[0], b1 = pd[1], b2 = pd[2], b3 = pd[3];
+            for (uint32_t m = 0; m < c.mips; ++m) {
+                const int lw = c.w >> m ? c.w >> m : 1, lh = c.h >> m ? c.h >> m : 1;
+                if (m) { b0 /= 2; b1 /= 2; b2 = (b2 + 1) / 2; b3 = (b3 + 1) / 2; }
+                b2 = b2 > lw ? lw : b2; b3 = b3 > lh ? lh : b3;
+                if (b2 <= b0 || b3 <= b1) continue;
+                const D3D11_BOX box{ (UINT)b0, (UINT)b1, 0, (UINT)b2, (UINT)b3, 1 };
+                ctx->UpdateSubresource(c.img[idx], m, &box, c.lv[m].data() + (size_t)b1 * lw + b0, (UINT)lw * 4, 0);
             }
-            ctx->Release();
         }
+        if (ctx) ctx->Release();
+        pd = { 0, 0, 0, 0 };
     }
     XrSwapchainImageReleaseInfo ri{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
-    r = d_.ReleaseSwapchainImage(c.sc, &ri);
-    if (XR_FAILED(r)) { Kill("xrReleaseSwapchainImage failed"); return false; }
+    xr = d_.ReleaseSwapchainImage(c.sc, &ri);
+    if (XR_FAILED(xr)) { Kill("xrReleaseSwapchainImage failed"); return false; }
     c.released = true;
-    c.uploaded = q.version;
     return true;
 }
 
-void Overlay::Frame(const std::vector<QuadIn>& quads, XrSpace space, std::vector<const XrCompositionLayerBaseHeader*>& out) {
+void Overlay::Frame(const std::vector<QuadIn>& quads, XrSpace space, std::vector<const XrCompositionLayerBaseHeader*>& out,
+                    bool submit) {
     out.clear();
     layers_.clear();
     if (dead_ || !dev_ || space == XR_NULL_HANDLE) return;
@@ -301,7 +326,7 @@ void Overlay::Frame(const std::vector<QuadIn>& quads, XrSpace space, std::vector
         }
         c.scale = scale;
         if ((c.uploaded != q.version || full) && !Upload(q.slot, q, full)) return;
-        if (!c.released) continue;
+        if (!c.released || !submit) continue;
         XrCompositionLayerQuad l{XR_TYPE_COMPOSITION_LAYER_QUAD};
         l.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;   // premultiplied alpha
         l.space = space;

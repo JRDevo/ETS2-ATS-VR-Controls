@@ -24,6 +24,8 @@
 //     also keeps the pointer until it is 8 px outside it (no jumping between two keys at their edge).
 //   * The keyboard is its own panel: the combo opens / closes only the menu; the keyboard stays where it is (shown or not,
 //     also at the next game start: keyboard_show) until its x -- e.g. fixed at the side of the cab, always there.
+//   * Light: both panels are drawn once when the game starts (no drawing when the menu opens); a redraw only when what a panel
+//     shows changes (ContentKey per panel); a hover change draws, copies and marks (TakeDirty) only the changed elements.
 //   * Every change is written to config.ini at once (menu_place / keyboard_place in the room's LOCAL space: a recenter moves
 //     them with the room).
 // Pure logic + GDI drawing into memory: no OpenXR / D3D here (tests/vr_menu_test.cpp drives it with made-up frames).
@@ -119,7 +121,7 @@ private:
     void Redraw(int p);
     void RedrawAll() { Redraw(kPanMenu); Redraw(kPanKb); }
     bool Hit(const VrPad::Frame& f, int h, Ref* r, double* u, double* v);
-    std::string ContentKey() const;                 // everything a panel's look depends on but hover / press
+    std::string ContentKey(int p) const;            // everything panel p's look depends on but hover / press
     const Elem* Find(int p, int kind, int arg) const;
     void Activate(int h, const Ref& r, const VrPad::Frame& f, VrPad::Sink& sink);
     void Release(int h, VrPad::Sink& sink);
