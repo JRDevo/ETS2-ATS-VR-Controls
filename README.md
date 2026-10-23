@@ -170,6 +170,8 @@ a laser pointer. A **white dot** appears where you point, and the key under it l
   the wheel and the steering speed. Gas and brake: any button, Buttons tab. See [Driving](#driving-with-one-controller).
 - **Look** tab: colours (Dark, Blue, Grey, Light, Black, Green), how see-through the menu and the keyboard are, and
   **pointer smoothing** (Off / Low / Medium / High): calms a shaky hand, for the menu pointer and the air mouse.
+- **Reset tab** (bottom right of every tab): puts that tab's settings back to the defaults. Press it twice (the first
+  press asks "Sure?"). Only that tab changes. On the Panels tab it also brings both panels in front of you.
 - **Keyboard** (button at the top of the menu): a full keyboard with F-keys, arrows and number pad. A key goes down when
   you pull the trigger and up when you let go. Shift, Ctrl and Alt stay on for the next key.
   The keyboard **stays** when the menu closes, also at the next game start (put it at the side of your cab). Its x hides it.

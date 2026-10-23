@@ -118,6 +118,7 @@ public:
     std::string Describe() const;
     // element kinds (public for the tests)
     enum Kind { eNone, eBar, eClose, eSmaller, eBigger, eKbBtn, eTab, eRow, ePickOut, ePickCancel, eSet, eKey, eHere, eInfo };
+    static constexpr int kResetArg = 150;         // eSet arg of every tab's Reset button (tests)
     void Open(bool headOk, const Pose& head);     // as the combo does (tests)
     static int KeyIndex(const char* name);        // tests: the eKey arg of a keyboard key ("f1", "shift"); -1 = none
     void Close();                                 // the menu (the keyboard stays as it is)
@@ -146,6 +147,8 @@ private:
     void ShowKb(bool on);
     void SetKbCompact(bool on);
     void Pick(const VrPad::Out& o);
+    void ResetTab();                              // the current tab's settings back to the defaults (its Reset button)
+    static constexpr double kMenuWidth = 0.6, kKbWidth = 0.8;   // default panel widths (metres; the full keyboard)
     void Save();
     void SavePlaces();
 
@@ -158,6 +161,7 @@ private:
     int           pickBtn_ = -1;          // the button being set (a key / mouse button is picked next)
     bool          pickMod_ = false;       // ... its entry for while the modifier is held
     int           layer_ = 0;             // Buttons tab: 0 normal, 1 with the modifier held
+    int           resetArm_ = -1;         // the tab whose Reset was pressed once (the next press resets it)
     MenuLook      look_;
     bool          kbPending_ = false;     // keyboard_show without a saved place: shown at the first frame with the head
     struct Grab { int pan = -1; Pose off; };

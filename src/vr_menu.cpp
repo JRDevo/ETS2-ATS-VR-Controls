@@ -520,8 +520,8 @@ VrMenu::VrMenu(const Config& cfg, const std::wstring& path) : pad_(cfg.pad), pat
     gate_.hold = cfg.menuHold;
     place_[kPanMenu] = cfg.menuPlace;
     place_[kPanKb] = cfg.kbPlace;
-    pan_[kPanMenu].pw = kMenuW; pan_[kPanMenu].ph = kMenuH; pan_[kPanMenu].width = 0.6;
-    pan_[kPanKb].pw = kKbW; pan_[kPanKb].ph = kKbH; pan_[kPanKb].width = 0.8;
+    pan_[kPanMenu].pw = kMenuW; pan_[kPanMenu].ph = kMenuH; pan_[kPanMenu].width = kMenuWidth;
+    pan_[kPanKb].pw = kKbW; pan_[kPanKb].ph = kKbH; pan_[kPanKb].width = kKbWidth;
     look_ = cfg.look;
     if (look_.theme < 0 || look_.theme >= kThemeCount) look_.theme = 0;
     if (look_.kbCompact) { pan_[kPanKb].pw = kKbCompactW; pan_[kPanKb].width *= (double)kKbCompactW / kKbW; }   // (same key size)
@@ -689,8 +689,8 @@ void VrMenu::LayoutMenu() {
             for (int i = 0; i < 8; ++i) add(ePickOut, kOuts[i], 24 + i * 103, 716, 97, 64, kOutNames[i]);
             add(ePickCancel, 0, 852, 716, 124, 64, "Cancel");
         } else {
-            add(eInfo, 0, 24, 716, 952, 64, !status_.empty() ? status_
-                : layer_ ? "While the modifier is held, these buttons send this instead." : "Point at a button, pull the trigger, then pick its key.");
+            add(eInfo, 0, 24, 716, 742, 64, !status_.empty() ? status_
+                : layer_ ? "While the modifier is held, these buttons send this instead." : "Point at a button, pull the trigger, pick its key.");
         }
     } else if (tab_ == 1) {
         auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 162 + r * 88, 440, 70, label); };
@@ -719,7 +719,7 @@ void VrMenu::LayoutMenu() {
         row(5, "Air mouse speed");
         snprintf(b, sizeof(b), "%.0f px/deg", (double)pad_.airGain);
         plusMinus(5, 50, b);
-        add(eInfo, 0, 24, 716, 952, 64, status_.empty() ? "Changes work at once and are saved." : status_);
+        add(eInfo, 0, 24, 716, 742, 64, status_.empty() ? "Changes work at once and are saved." : status_);
     } else if (tab_ == 2) {
         auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 156 + r * 76, 440, 64, label); };
         auto plusMinus = [&](int r, int base, const std::string& value, const char* minus, const char* plus) {
@@ -753,7 +753,7 @@ void VrMenu::LayoutMenu() {
         snprintf(b, sizeof(b), " for %.1f s", gate_.hold);
         add(eInfo, 300, 24, 612, 952, 46, "Menu open / close: hold " + combo + b);
         add(eInfo, 301, 24, 656, 952, 46, "Move: point at a panel, hold the grip, move. Its stick: farther / closer.");
-        add(eInfo, 0, 24, 716, 952, 64, status_.empty() ? "The keyboard stays when the menu closes (its x hides it)." : status_);
+        add(eInfo, 0, 24, 716, 742, 64, status_.empty() ? "The keyboard stays when the menu closes (its x hides it)." : status_);
     } else if (tab_ == 3) {
         auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 162 + r * 88, 440, 70, label); };
         row(0, "Colours");
@@ -773,7 +773,7 @@ void VrMenu::LayoutMenu() {
         static const char* const kSm[4] = { "Off", "Low", "Medium", "High" };
         for (int i = 0; i < 4; ++i) add(eSet, 110 + i, 470 + i * 129, 514, 119, 70, kSm[i], look_.smoothing == i);
         add(eInfo, 302, 24, 596, 952, 56, "Smoothing calms a shaky hand (menu pointer and air mouse).");
-        add(eInfo, 0, 24, 716, 952, 64, status_.empty() ? "- = more see-through, + = more solid." : status_);
+        add(eInfo, 0, 24, 716, 742, 64, status_.empty() ? "- = more see-through, + = more solid." : status_);
     } else {                                            // Driving (scs_input.h): steering here, gas / brake on any button
         auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 162 + r * 88, 440, 70, label); };
         auto opts = [&](int r, int base, std::initializer_list<const char*> names, int cur) {
@@ -803,8 +803,10 @@ void VrMenu::LayoutMenu() {
         plusMinus(4, 139, b);
         add(eInfo, 303, 24, 600, 952, 46, "Gas / brake: any button, Buttons tab (pick Gas or Brake).");
         add(eInfo, 304, 24, 646, 952, 46, "Curve: more = finer near the middle. Speed: slower = calmer wheel.");
-        add(eInfo, 0, 24, 716, 952, 64, status_.empty() ? "Changes work at once and are saved." : status_);
+        add(eInfo, 0, 24, 716, 742, 64, status_.empty() ? "Changes work at once and are saved." : status_);
     }
+    if (!(tab_ == 0 && picking))                        // every tab: back to the defaults (a second press does it)
+        add(eSet, kResetArg, 776, 716, 200, 64, resetArm_ == tab_ ? "Sure? Reset" : "Reset tab", resetArm_ == tab_);
 }
 
 void VrMenu::LayoutKb() {
@@ -1072,6 +1074,13 @@ void VrMenu::Pick(const VrPad::Out& o) {
 
 void VrMenu::SetValue(int arg) {
     auto mul = [](float& v, bool up, float lo, float hi) { v = up ? v * 1.15f : v / 1.15f; v = v < lo ? lo : v > hi ? hi : v; };
+    if (arg == kResetArg) {                             // the first press arms, the second resets this tab
+        if (resetArm_ != tab_) { resetArm_ = tab_; status_ = "Press again: this tab goes back to the defaults."; return; }
+        resetArm_ = -1;
+        ResetTab();
+        status_ = "Back to the defaults. Saved.";
+        return;
+    }
     switch (arg) {
     case 0: case 1: case 2: pad_.mouseStick = arg == 0 ? 1 : arg == 1 ? 2 : 0; break;
     case 10: case 11: mul(pad_.mouseSpeed, arg == 11, 50.0f, 10000.0f); break;
@@ -1150,7 +1159,46 @@ void VrMenu::SetValue(int arg) {
     Save();
 }
 
+// the Reset button of the current tab: its settings as a fresh install has them (config.ini as shipped = these defaults)
+void VrMenu::ResetTab() {
+    const VrPad::Config d = VrPad::DefaultConfig();
+    switch (tab_) {
+    case 0:                                             // every button, both layers, the modifier button
+        for (int b = 0; b < VrPad::kBtnCount; ++b) { pad_.map[b] = d.map[b]; pad_.modMap[b] = d.modMap[b]; }
+        pad_.modBtn = d.modBtn;
+        pickBtn_ = -1;
+        break;
+    case 1:
+        pad_.mouseStick = d.mouseStick; pad_.mouseSpeed = d.mouseSpeed; pad_.deadzone = d.deadzone;
+        pad_.airBtn = d.airBtn; pad_.airHand = d.airHand; pad_.airToggle = d.airToggle; pad_.airGain = d.airGain;
+        break;
+    case 2: {                                           // default sizes, the full keyboard, both in front of the head
+        SetKbCompact(false);
+        pan_[kPanMenu].width = kMenuWidth;
+        pan_[kPanKb].width = kKbWidth;
+        for (int h = 0; h < 2; ++h) grab_[h] = Grab();
+        Place(kPanMenu, lastHeadOk_, lastHead_, true);
+        if (pan_[kPanKb].show) Place(kPanKb, lastHeadOk_, lastHead_, true);
+        SavePlaces();
+        break;
+    }
+    case 3: {
+        const MenuLook l;
+        look_.theme = l.theme; look_.menuOpacity = l.menuOpacity; look_.kbOpacity = l.kbOpacity; look_.smoothing = l.smoothing;
+        needRedraw_ = true;
+        break;
+    }
+    default:
+        pad_.steerStick = d.steerStick; pad_.steerDeadzone = d.steerDeadzone; pad_.steerCurve = d.steerCurve;
+        pad_.steerMax = d.steerMax; pad_.steerSpeed = d.steerSpeed;
+        break;
+    }
+    LOGI("VR menu: tab %d reset to the defaults", tab_);
+    Save();
+}
+
 void VrMenu::Activate(int h, const Ref& r, const VrPad::Frame&, VrPad::Sink& sink) {
+    if (!(r.kind == eSet && r.arg == kResetArg)) resetArm_ = -1;   // (anything else pressed: Reset is not armed any more)
     Press& ps = press_[h];
     ps = Press();
     ps.pan = r.pan; ps.kind = r.kind; ps.arg = r.arg;
@@ -1340,7 +1388,7 @@ std::string VrMenu::ContentKey(int p) const {
     // the menu: everything its tabs show (not whether it is shown itself)
     snprintf(b, sizeof(b), "%d|%d|%d|%d%d|%.3f,%.3f|%d|%.2f|%.2f|%d|%d|", pan_[1].show, tab_, pickBtn_, pickMod_, layer_, pan_[0].width,
              pan_[1].width, look_.theme, look_.menuOpacity, look_.kbOpacity, look_.smoothing, look_.kbCompact);
-    return std::string(b) + status_ + "|" + DescribePad(pad_);
+    return std::string(b) + std::to_string(resetArm_) + "|" + status_ + "|" + DescribePad(pad_);
 }
 
 }  // namespace ck

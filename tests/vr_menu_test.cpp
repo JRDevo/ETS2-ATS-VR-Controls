@@ -356,6 +356,25 @@ int main(int argc, char** argv) {
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kLGrip) &&
               click(1, VrMenu::kPanMenu, VrMenu::ePickOut, VrPad::kNone) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kNone,
               "left grip = none again");
+        // Reset tab: the first press only arms it (another press elsewhere disarms), the second resets that tab only
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kLGrip) && click(1, VrMenu::kPanMenu, VrMenu::ePickOut, VrPad::kBrake),
+              "left grip = Brake again");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kBrake,
+              "Reset pressed once: nothing reset yet");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 120) && click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) &&
+              m.Pad().map[VrPad::kLGrip].kind == VrPad::kBrake, "another press in between: Reset armed again only");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kNone &&
+              m.Pad().map[VrPad::kLTrig].kind == VrPad::kGas && m.Pad().modMap[VrPad::kB].kind == VrPad::kMouseR,
+              "Buttons tab reset: the default buttons");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kA) && click(1, VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("shift")) &&
+              click(1, VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("f")) && m.Pad().map[VrPad::kA].n == 2,
+              "A = Shift + F again (as the config.ini checks below expect)");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 4) && click(1, VrMenu::kPanMenu, VrMenu::eSet, 139) &&
+              click(1, VrMenu::kPanMenu, VrMenu::eSet, 131) && m.Pad().steerSpeed == 1.5f && m.Pad().steerStick == 2, "Driving changed");
+        const float mouseSpeed = m.Pad().mouseSpeed;
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) && click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) &&
+              m.Pad().steerSpeed == 2.0f && m.Pad().steerStick == 1 && m.Pad().mouseSpeed == mouseSpeed,
+              "Driving tab reset (the Mouse tab untouched)");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 3), "Look tab again");
     }
     WriteBmp(dir + L"\\menu.bmp", m, VrMenu::kPanMenu);
@@ -575,6 +594,21 @@ int main(int argc, char** argv) {
         press(VrMenu::kPanMenu, VrMenu::eSet, 83);       // compact
         settle(away);
         WriteBmp(shots + L"\\keyboard-compact.bmp", ms, VrMenu::kPanKb);
+        // (after the shots) Reset on the Panels tab: default sizes, the full keyboard; on the Look tab: the default look
+        press(VrMenu::kPanMenu, VrMenu::eSet, 61);       // menu bigger
+        press(VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg);
+        press(VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg);
+        CHECK(std::fabs(ms.Pan(VrMenu::kPanMenu).width - 0.6) < 1e-6 && std::fabs(ms.Pan(VrMenu::kPanKb).width - 0.8) < 1e-6 &&
+              !ms.Look().kbCompact, "Panels tab reset: 0.6 m menu, 0.8 m full keyboard (%.3f, %.3f)", ms.Pan(VrMenu::kPanMenu).width,
+              ms.Pan(VrMenu::kPanKb).width);
+        press(VrMenu::kPanMenu, VrMenu::eTab, 3);
+        press(VrMenu::kPanMenu, VrMenu::eSet, 104);      // black
+        press(VrMenu::kPanMenu, VrMenu::eSet, 92);       // keyboard more see-through
+        CHECK(ms.Look().theme == 4 && ms.Look().kbOpacity < 0.95f, "Look changed");
+        press(VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg);
+        press(VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg);
+        CHECK(ms.Look().theme == 0 && ms.Look().kbOpacity == 0.95f && ms.Look().menuOpacity == 0.95f && ms.Look().smoothing == 2,
+              "Look tab reset: dark, 95 %%, medium smoothing");
     }
     printf("%d checks, %d failed\n", g_checks, g_fails);
     return g_fails ? 1 : 0;
