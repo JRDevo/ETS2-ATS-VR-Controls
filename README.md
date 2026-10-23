@@ -1,7 +1,14 @@
 # ETS2 ATS VR Controls
 
-Use your VR controllers as a keyboard and mouse in **Euro Truck Simulator 2** and **American Truck Simulator** (OpenXR VR).
-Press a controller button, and the game gets a key press. Move a stick or point the controller, and the mouse pointer moves.
+Play **Euro Truck Simulator 2** and **American Truck Simulator** in VR with **only your headset and its own controllers**.
+No steering wheel, no gamepad, no keyboard, no mouse, no extra hardware.
+
+- **Drive with the controllers:** one stick steers (smooth, like a gamepad), the triggers are gas and brake.
+- **Every key on a button:** indicators, horn, lights, anything. Pick the keys in a menu in the headset.
+- **A mouse in your hand:** a stick or the controller's aim moves the pointer, a button clicks. For the game's menus and the map.
+- **A full keyboard in the headset:** point and pull the trigger. For the few things that need typing.
+
+Start the game in VR, put the headset on, and play. You never need to reach for the desk.
 
 > Status: v0.1.0, the first release: controller buttons as keys and mouse, **a VR menu and a full keyboard in the
 > headset**, and **driving with the controllers** (smooth steering, gas and brake). Planned: the keyboard pinned to the
