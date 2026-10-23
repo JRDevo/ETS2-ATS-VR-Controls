@@ -12,7 +12,7 @@ namespace {
 
 constexpr double kPi = 3.14159265358979;
 constexpr double kDeg = kPi / 180.0;
-constexpr int kMenuW = 1000, kMenuH = 800, kKbW = 1600, kKbH = 448;
+constexpr int kMenuW = 1000, kMenuH = 800, kKbW = 1600, kKbH = 450;
 
 // ---- the keyboard (units of one key; x 0..15 main block, 15.5..18.5 navigation, 19..23 number pad)
 struct KeyDef { const char* label; const char* name; float x, y, w, h; };
@@ -248,7 +248,7 @@ VrMenu::VrMenu(const Config& cfg, const std::wstring& path) : pad_(cfg.pad), pat
     place_[kPanMenu] = cfg.menuPlace;
     place_[kPanKb] = cfg.kbPlace;
     pan_[kPanMenu].pw = kMenuW; pan_[kPanMenu].ph = kMenuH; pan_[kPanMenu].width = 0.6;
-    pan_[kPanKb].pw = kKbW; pan_[kPanKb].ph = kKbH; pan_[kPanKb].width = 0.9;
+    pan_[kPanKb].pw = kKbW; pan_[kPanKb].ph = kKbH; pan_[kPanKb].width = 0.8;
     look_ = cfg.look;
     if (look_.theme < 0 || look_.theme >= kThemeCount) look_.theme = 0;
     for (int p = 0; p < kPanCount; ++p)
@@ -480,9 +480,21 @@ void VrMenu::LayoutKb() {
     };
     // one flat block, no title bar: - / + / x sit in the empty space above the number pad (move it with the grip anywhere).
     // Picking a key for a button: the whole keyboard gets an accent frame (the menu's bar says which button).
-    const double u = (kKbW - 16) / 23.0, x0 = 8, y0 = 8;   // 23 key units wide, 2 px of gap on each side of a key
+    // kKeys is a real keyboard's layout (gaps of 1 / 0.5 key between the groups); here every gap between groups is only
+    // kGap of a key: still visible, less wasted room. 22.3 x 6.1 key units, 2 px of gap on each side of a key.
+    constexpr double kGap = 0.15;
+    const double u = (kKbW - 16) / (23.0 - 2 * (0.5 - kGap)), x0 = 8, y0 = 8;
+    auto mapX = [&](double kx, double ky) {
+        if (kx >= 19) return kx - 1.0 + 2 * kGap;                       // number pad
+        if (kx >= 15.5) return kx - 0.5 + kGap;                         // navigation / arrows
+        if (ky == 0 && kx >= 11) return kx - 2.0 + 3 * kGap;            // F9 .. F12
+        if (ky == 0 && kx >= 6.5) return kx - 1.5 + 2 * kGap;           // F5 .. F8
+        if (ky == 0 && kx >= 2) return kx - 1.0 + kGap;                 // F1 .. F4
+        return kx;
+    };
     auto at = [&](int kind, int arg, double kx, double ky, double kw, double kh, const std::string& t, bool on = false) {
-        add(kind, arg, (int)(x0 + kx * u + 2), (int)(y0 + ky * u + 2), (int)(kw * u - 4), (int)(kh * u - 4), t, on);
+        const double ux = mapX(kx, ky), uy = ky >= 1 ? ky - (0.25 - kGap * 2.0 / 3.0) : ky;   // F-row gap 0.1 of a key
+        add(kind, arg, (int)(x0 + ux * u + 2), (int)(y0 + uy * u + 2), (int)(kw * u - 4), (int)(kh * u - 4), t, on);
     };
     at(eSmaller, 0, 19, 0, 1, 1, "\xE2\x88\x92");
     at(eBigger, 0, 20, 0, 1, 1, "+");
