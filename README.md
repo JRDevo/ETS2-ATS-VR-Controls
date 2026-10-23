@@ -3,7 +3,7 @@
 Use your VR controllers as a keyboard and mouse in **Euro Truck Simulator 2** and **American Truck Simulator** (OpenXR VR).
 Press a controller button, and the game gets a key press. Move a stick or point the controller, and the mouse pointer moves.
 
-> Status: v0.2.0, the first release: controller buttons as keys and mouse, **a VR menu and a full keyboard in the
+> Status: v0.1.0, the first release: controller buttons as keys and mouse, **a VR menu and a full keyboard in the
 > headset**, and **driving with the controllers** (smooth steering, gas and brake). Planned: the keyboard pinned to the
 > cab, and single buttons you place anywhere (for example over a cab switch) that press a key.
 
@@ -225,7 +225,7 @@ ETS2 / ATS DLAA mod's menu (`Delete`). The menu and keyboard float in the room: 
 
 ## Install
 
-1. Download `ETS2-ATS-VR-Controls-v0.2.0.zip` from the [Releases](../../releases) page. Close the game.
+1. Download `ETS2-ATS-VR-Controls-v0.1.0.zip` from the [Releases](../../releases) page. Close the game.
 2. Unzip the folder to a place where it can stay (for example `C:\ETS2 ATS VR Controls`).
 3. Right-click `install.ps1` > **Run with PowerShell**. Click **Yes** in the Windows admin prompt.
    (Admin is needed: ETS2 / ATS only load VR add-ons that are registered for all users.)

@@ -39,8 +39,8 @@ Read `README.md` and the header comments of `src/pad_input.h`, `src/layer.cpp`, 
   VR EyeCapture (implicit layer), VectorXR.
 
 ## Roadmap (set by the user 2026-10-23)
-1. **Phase 1 (v0.1, built):** controller buttons -> keys, stick mouse + air mouse + trigger click, for the game's menus.
-2. **Phase 2 (v0.2, built, not yet tested in the game):** the VR menu (both grips + left stick click 1 s) + a full ON-SCREEN keyboard in
+1. **Phase 1 (built; released in v0.1.0):** controller buttons -> keys, stick mouse + air mouse + trigger click, for the game's menus.
+2. **Phase 2 (built and tested in the game; released in v0.1.0 with driving):** the VR menu (both grips + left stick click 1 s) + a full ON-SCREEN keyboard in
    the headset; point + trigger; grab with the grip (stick = farther / closer), - / + size, distance, themes + opacity (Look tab);
    the keyboard is its own panel and stays (keyboard_show); the menu sets every button (keys picked on the keyboard), the
    mouse, air hold / toggle, and writes config.ini at once. OpenXR quad layers on D3D11 swapchains (no game graphics hooks).
