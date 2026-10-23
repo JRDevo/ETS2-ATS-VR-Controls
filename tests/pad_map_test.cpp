@@ -414,18 +414,19 @@ int main() {
               "speed factor: 1 / 0.65 at 50 / 0.3 from 90 km/h");
         Config off = c; off.steerAtSpeed = 1.0f;
         CHECK(SpeedFactor(120.0f, off) == 1.0f, "steer_at_speed = 1: off");
+        CHECK(SpeedFactor(std::nanf(""), c) == 1.0f, "a NaN speed counts as not known");
         Config sw = c; sw.steerSpeedSens = false;
         CHECK(SpeedFactor(120.0f, sw) == 1.0f, "steer_speed_sens = 0 (the switch): off");
         Mapper mp; Rec r; Frame f;                      // rate: at 90 km/h full stick 1 s = 0.3 * 1/5, the wheel at most 0.3
         f.hand[0] = true; f.sx[0] = 1.0f;
         mp.SetSpeed(90.0f);
         for (int i = 0; i < 10; ++i) mp.Step(f, true, 0.1, c, r);
-        CHECK(std::fabs(r.drv[0] - 0.06f) < 1e-4f, "90 km/h, full stick 1 s: 0.06 (%.3f)", (double)r.drv[0]);
+        CHECK(std::fabs(r.drv[0] - std::sqrt(0.3f) * 0.2f) < 1e-4f, "90 km/h, full stick 1 s: sqrt(0.3) / 5 = 0.110 (%.3f)", (double)r.drv[0]);
         for (int i = 0; i < 100; ++i) mp.Step(f, true, 0.1, c, r);
         CHECK(std::fabs(r.drv[0] - 0.3f) < 1e-4f, "90 km/h: never past 0.3 (%.3f)", (double)r.drv[0]);
         f.sx[0] = 0.0f;
         for (int i = 0; i < 10; ++i) mp.Step(f, true, 0.1, c, r);
-        CHECK(std::fabs(r.drv[0] - 0.2f) < 1e-4f, "let go 1 s at 90 km/h: back by 0.3 / 3 (%.3f)", (double)r.drv[0]);
+        CHECK(std::fabs(r.drv[0] - (0.3f - std::sqrt(0.3f) / 3.0f)) < 1e-4f, "let go 1 s at 90 km/h: back by sqrt(0.3) / 3 (%.3f)", (double)r.drv[0]);
         Config w = c; w.steerMode = 0; w.steerSpeed = 0.0f;   // wheel style: the place times the factor
         Mapper mw; Rec rw; Frame gw;
         gw.hand[0] = true; gw.sx[0] = 1.0f;

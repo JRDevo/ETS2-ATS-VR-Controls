@@ -61,7 +61,8 @@ int   g_next = 3;
 int   g_activeLogs = 0;
 // telemetry (log = 1: what the game made of our steering; the game's main thread too)
 std::atomic<float> g_tm[3];                                 // truck.input.steering, truck.effective.steering, truck.speed
-bool   g_tmOn = false, g_logDrive = false;
+std::atomic<bool> g_tmOn{false};                            // (main thread writes, the VR thread reads)
+bool   g_logDrive = false;
 double g_lastDriveLog = 0;
 float  g_lastLogged[3] = { NAN, NAN, NAN };
 int    g_driveLogs = 0;
@@ -169,11 +170,16 @@ extern "C" __declspec(dllexport) ck::scs_result_t __stdcall scs_telemetry_init(c
     static const char* const kCh[3] = { "truck.input.steering", "truck.effective.steering", "truck.speed" };
     int ok = 0;
     for (int i = 0; i < 3; ++i) ok += p->register_for_channel(kCh[i], 0xFFFFFFFFu, kValueFloat, 0, OnChannel, (void*)(intptr_t)i) == kOk;
+    g_tm[2].store(0.0f, std::memory_order_relaxed);
     g_tmOn = ok == 3;
-    LOGI("driving: telemetry (truck speed, steering) %d of 3 channels", ok);
+    if (ok == 3) LOGI("driving: telemetry (truck speed, steering) %d of 3 channels", ok);
+    else LOGW("driving: telemetry: only %d of 3 channels -- no speed-sensitive steering", ok);
     return kOk;
 }
 
-extern "C" __declspec(dllexport) void __stdcall scs_telemetry_shutdown(void) { ck::g_tmOn = false; }
+extern "C" __declspec(dllexport) void __stdcall scs_telemetry_shutdown(void) {
+    ck::g_tmOn = false;
+    for (std::atomic<float>& v : ck::g_tm) v.store(0.0f, std::memory_order_relaxed);   // (no stale speed after a re-init)
+}
 
 extern "C" __declspec(dllexport) void __stdcall scs_input_shutdown(void) {}

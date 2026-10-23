@@ -128,7 +128,7 @@ By default:
 | Wheel turns at most (`steer_max`) | how far the wheel can turn | 100 % |
 | Full stick: full turn in (`steer_turn_time`, turn speed) | seconds from the middle to full lock with the stick all the way. More = calmer | 5 s |
 | Let go: straight again in (`steer_return_time`, turn speed) | seconds from full lock back to straight after you let go | 3 s |
-| At 90 km/h (`steer_speed_sens`, `steer_at_speed`) | **speed-sensitive steering**, On / Off: up to 10 km/h the stick steers fully; at 90 km/h and faster only this much -- the wheel turns less, and turns and goes back more slowly | On, 30 % |
+| At 90 km/h (`steer_speed_sens`, `steer_at_speed`) | **speed-sensitive steering**, On / Off: up to 10 km/h the stick steers fully; at 90 km/h and faster the wheel turns at most this much (30 %), and turns and goes back a bit more slowly (about half as fast at 30 %) | On, 30 % |
 | Steering speed (`steer_speed`, wheel) | how fast the wheel follows the stick, in full turns per second. 0.5 = 2 seconds to full lock. 0 = at once (twitchy) | 0.50 |
 
 Too twitchy at speed? Lower "At 90 km/h". Too twitchy everywhere? Make the curve bigger, or the full turn slower.
@@ -193,7 +193,7 @@ a laser pointer. A **white dot** appears where you point, and the key under it l
 - **Keyboard** (button at the top of the menu): a full keyboard with F-keys, arrows and number pad. A key goes down when
   you pull the trigger and up when you let go. Shift, Ctrl and Alt stay on for the next key.
   **A button for the keyboard:** Buttons tab, point at a button, pick **Keyboard** in the bottom bar. Then that button
-  shows / hides the keyboard (`y = keyboard` in `config.ini`). The keyboard **stays** when the menu closes, also at the next game start (put it at the side of your cab). Its x hides it.
+  shows / hides the keyboard (`y = keyboard` in `config.ini`; it needs the VR menu on: `vr_menu = 1`). The keyboard **stays** when the menu closes, also at the next game start (put it at the side of your cab). Its x hides it.
   **Full or Compact** (Panels tab): Compact has only the main keys (Esc / F-keys down to Enter, Shift, Ctrl), with its
   only an x (above Backspace) to hide it: about 30 % narrower. Its size: Panels tab > Keyboard size.
 - **Move** a panel: point at it, **hold the grip** and move the controller. While you hold it, push that controller's stick
