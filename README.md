@@ -11,7 +11,27 @@ Press a controller button, and the game gets a key press. Move a stick or point 
 > `-openvr` (SteamVR native) or `-oculus` (Oculus native) modes. Every headset can use OpenXR, see
 > [Which VR mode?](#which-vr-mode).
 
-## Which VR mode?
+## Screenshots
+
+| Buttons tab: picking a key | Buttons tab: with the modifier | Mouse tab |
+|---|---|---|
+| ![The Buttons tab while a key is picked](docs/images/menu-pick.png) | ![The Buttons tab, with modifier](docs/images/menu-modifier.png) | ![The Mouse tab](docs/images/menu-mouse.png) |
+
+| Panels tab | Look tab | The keyboard |
+|---|---|---|
+| ![The Panels tab](docs/images/menu-panels.png) | ![The Look tab](docs/images/menu-look.png) | ![The on-screen keyboard](docs/images/keyboard.png) |
+
+| Driving tab | Pointing at a setting: its help at the bottom | The compact keyboard (Panels tab > Compact) |
+|---|---|---|
+| ![The Driving tab](docs/images/menu-driving.png) | ![The Driving tab while the pointer is on "Wheel follows the stick": its help line at the bottom](docs/images/menu-driving-help.png) | ![The compact keyboard](docs/images/keyboard-compact.png) |
+
+![The white pointer dot on the G key of the keyboard](docs/images/keyboard-pointer.png)
+
+**Menu:** [Screenshots](#screenshots) · [Which VR mode?](#which-vr-mode) · [What it does](#what-it-does) · [Default buttons](#default-buttons) · [Driving](#driving-with-one-controller) · [VR menu](#the-vr-menu) · [Install](#install) · [Privacy](#what-runs-when--privacy) · [Settings](#settings) · [Problems](#problems) · [Report a problem](#reporting-a-problem-what-to-upload) · [Build](#build-from-source) · [License](#license)
+
+<a name="which-vr-mode"></a>
+<details>
+<summary><h2>Which VR mode?</h2></summary>
 
 ETS2 / ATS have three VR modes, chosen by a launch option (Steam: right-click the game > Properties > Launch options).
 This mod works **only** in the OpenXR one:
@@ -36,7 +56,12 @@ How to use OpenXR with your headset:
 
 Only one OpenXR runtime is active at a time; the last one you set wins.
 
-## What it does
+
+</details>
+
+<a name="what-it-does"></a>
+<details>
+<summary><h2>What it does</h2></summary>
 
 - Each controller button sends a key or a mouse button that you choose in `config.ini`.
 - One stick moves the mouse pointer (the right stick by default).
@@ -55,7 +80,12 @@ Only one OpenXR runtime is active at a time; the last one you set wins.
 It is an OpenXR API layer: a small add-on that the VR system loads into the game. It does not change any game file, and it
 works next to the ETS2 / ATS DLAA mod, VR EyeCapture, Virtual Desktop, OpenXR Toolkit and VectorXR.
 
-## Default buttons
+
+</details>
+
+<a name="default-buttons"></a>
+<details>
+<summary><h2>Default buttons</h2></summary>
 
 Made so that **one controller (the right one) does the whole mouse**: point with the right stick or the air mouse, A =
 left click, right grip + right trigger = left click too, right grip + B = right click. **Driving**: left stick =
@@ -92,7 +122,12 @@ clicks): both react. If that is not what you want, set that button to `none` her
 **Cab buttons:** the game has no clickable buttons in the cab, so pointing at a switch does nothing. Map the key of that
 function to a controller button instead (for example `y = l` for the lights).
 
-## Driving with one controller
+
+</details>
+
+<a name="driving-with-one-controller"></a>
+<details>
+<summary><h2>Driving with one controller</h2></summary>
 
 By default:
 
@@ -157,7 +192,12 @@ settings). `install.ps1` tells the game where the mod is (see [What install.ps1 
 - It works in every OpenXR mode and headset (Virtual Desktop, Link, SteamVR, Windows MR): the driving part does not depend
   on the headset at all.
 
-## The VR menu
+
+</details>
+
+<a name="the-vr-menu"></a>
+<details>
+<summary><h2>The VR menu</h2></summary>
 
 Hold **both grips**, then press and hold the **left stick click**, for 1 second. The menu opens in front of you. Do it again
 to close it. (Grips first: the left stick click alone is still the hazard lights.) It is not both stick clicks, because
@@ -209,21 +249,12 @@ a laser pointer. A **white dot** appears where you point, and the key under it l
 Every change works at once and is saved in `config.ini`. The menu uses no keyboard key, so it never clashes with the
 ETS2 / ATS DLAA mod's menu (`Delete`). The menu and keyboard float in the room: after a recenter they move with it.
 
-### Screenshots
 
-| Buttons tab: picking a key | Buttons tab: with the modifier | Mouse tab |
-|---|---|---|
-| ![The Buttons tab while a key is picked](docs/images/menu-pick.png) | ![The Buttons tab, with modifier](docs/images/menu-modifier.png) | ![The Mouse tab](docs/images/menu-mouse.png) |
+</details>
 
-| Panels tab | Look tab | The keyboard |
-|---|---|---|
-| ![The Panels tab](docs/images/menu-panels.png) | ![The Look tab](docs/images/menu-look.png) | ![The on-screen keyboard](docs/images/keyboard.png) |
-
-| Driving tab | Pointing at a setting: its help at the bottom | The compact keyboard (Panels tab > Compact) |
-|---|---|---|
-| ![The Driving tab](docs/images/menu-driving.png) | ![The Driving tab while the pointer is on "Wheel follows the stick": its help line at the bottom](docs/images/menu-driving-help.png) | ![The compact keyboard](docs/images/keyboard-compact.png) |
-
-## Install
+<a name="install"></a>
+<details>
+<summary><h2>Install</h2></summary>
 
 1. Download `ETS2-ATS-VR-Controls-v0.1.0.zip` from the [Releases](../../releases) page. Close the game.
 2. Unzip the folder to a place where it can stay (for example `C:\ETS2 ATS VR Controls`).
@@ -233,7 +264,9 @@ ETS2 / ATS DLAA mod's menu (`Delete`). The menu and keyboard float in the room: 
 
 Uninstall: run `uninstall.ps1` the same way. Then you can delete the folder.
 
-### What `install.ps1` does, and why there is one
+<a name="what-installps1-does-and-why-there-is-one"></a>
+<details>
+<summary><h3>What <code>install.ps1</code> does, and why there is one</h3></summary>
 
 **Why a script?** This mod is not a game mod (`.scs` file) and does not go into the game folder. It is an *OpenXR API
 layer*: a small add-on that the VR system (OpenXR) loads into the game when the game starts VR. OpenXR finds add-ons through
@@ -272,7 +305,14 @@ the folder yourself if you like. You can check the entries yourself with `regedi
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-## What runs when / privacy
+
+</details>
+
+</details>
+
+<a name="what-runs-when--privacy"></a>
+<details>
+<summary><h2>What runs when / privacy</h2></summary>
 
 - **Nothing runs in the background.** No service, no tray icon, no startup entry. With no VR game running, Task Manager
   shows nothing from this mod.
@@ -287,7 +327,12 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 - **One install, both games:** the registry entry is for the whole PC, so it works in ETS2 and ATS (the `apps` line in
   `config.ini` lists both). All of the source code is in this repository.
 
-## Settings
+
+</details>
+
+<a name="settings"></a>
+<details>
+<summary><h2>Settings</h2></summary>
 
 Use the VR menu, or open `config.ini` in Notepad. Every setting is explained in the file. Restart the game after a change
 in Notepad (the VR menu's changes work at once).
@@ -296,7 +341,12 @@ Button names: `ltrigger rtrigger lgrip rgrip x y a b lstick rstick menu lup ldow
 Values: a key (`h`, `f1`, `space`, `[`), up to 3 keys with `+` (`shift+f`), `mouse_left`, `mouse_right`, `mouse_middle`,
 `wheel_up`, `wheel_down`, `gas`, `brake` (driving), `keyboard` (shows / hides the VR keyboard) or `none`.
 
-## Problems
+
+</details>
+
+<a name="problems"></a>
+<details>
+<summary><h2>Problems</h2></summary>
 
 The log is `logs\ets2_ats_vr_controls.log` next to the DLL. It says which controller the VR system uses, which buttons are mapped,
 and every problem. The log is **off by default** (no file, nothing measured: the lightest). Set `log = 1` in `config.ini`
@@ -310,7 +360,12 @@ to write it, and also `log_inputs = 1` to see every key the layer sends.
 3. Quit the game.
 4. Open a [bug report](../../issues/new/choose) and drag `logs\ets2_ats_vr_controls.log` and `config.ini` into it.
 
-## Build from source
+
+</details>
+
+<a name="build-from-source"></a>
+<details>
+<summary><h2>Build from source</h2></summary>
 
 Visual Studio 2022 (C++), CMake 3.20+. The OpenXR SDK is downloaded on the first configure.
 
@@ -324,6 +379,13 @@ powershell -ExecutionPolicy Bypass -File tests\run_e2e.ps1
 `tests\run_e2e.ps1` runs a fake game through the real OpenXR loader, this layer and a fake VR runtime with scripted button
 presses. No headset is needed, and no real key presses are sent.
 
-## License
+
+</details>
+
+<a name="license"></a>
+<details>
+<summary><h2>License</h2></summary>
 
 PolyForm Noncommercial 1.0.0, see `LICENSE.md`.
+
+</details>
