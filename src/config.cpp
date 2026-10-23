@@ -79,6 +79,43 @@ Config ParseConfig(const std::string& text) {
         if (key == "mouse_speed") { if (Num(val, 50, 10000, &d)) c.pad.mouseSpeed = (float)d; else bad("a number (pixels per second)"); continue; }
         if (key == "deadzone")    { if (Num(val, 0, 0.9, &d)) c.pad.deadzone = (float)d; else bad("a number 0 .. 0.9"); continue; }
         if (key == "air_speed")   { if (Num(val, 1, 500, &d)) c.pad.airGain = (float)d; else bad("a number (pixels per degree)"); continue; }
+        if (key == "air_mode") {
+            if (lv == "hold") c.pad.airToggle = false;
+            else if (lv == "toggle") c.pad.airToggle = true;
+            else bad("use hold or toggle");
+            continue;
+        }
+        if (key == "vr_menu") { c.menu = lv != "0" && lv != "off" && lv != "no"; continue; }
+        if (key == "menu_hold") { if (Num(val, 0.3, 5, &d)) c.menuHold = (float)d; else bad("a number of seconds (0.3 .. 5)"); continue; }
+        if (key == "menu_combo") {
+            const size_t plus = lv.find('+');
+            const int b1 = plus == std::string::npos ? -1 : VrPad::BtnOfName(Trim(lv.substr(0, plus)).c_str());
+            const int b2 = plus == std::string::npos ? -1 : VrPad::BtnOfName(Trim(lv.substr(plus + 1)).c_str());
+            if (b1 < 0 || b2 < 0 || b1 == b2 || b1 >= VrPad::kLUp || b2 >= VrPad::kLUp) { bad("two different buttons with + (lstick+rstick); no stick directions"); continue; }
+            c.menuBtnA = b1;
+            c.menuBtnB = b2;
+            continue;
+        }
+        if (key == "menu_place" || key == "keyboard_place") {
+            PanelPlace p;
+            double v[6] = {};
+            int n = 0;
+            size_t a = 0;
+            bool ok = true;
+            while (ok && a <= val.size() && n < 7) {
+                size_t comma = val.find(',', a);
+                if (comma == std::string::npos) comma = val.size();
+                const std::string one = Trim(val.substr(a, comma - a));
+                if (n < 6) ok = Num(one, -1000, 1000, &v[n]);
+                ++n;
+                a = comma + 1;
+            }
+            if (!ok || n != 6 || v[5] < 0.1 || v[5] > 3.0) { bad("x, y, z, yaw, pitch, width (6 numbers; width 0.1 .. 3 m)"); continue; }
+            p.set = true;
+            p.x = v[0]; p.y = v[1]; p.z = v[2]; p.yaw = v[3]; p.pitch = v[4]; p.width = v[5];
+            (key == "menu_place" ? c.menuPlace : c.kbPlace) = p;
+            continue;
+        }
         if (key == "air_mouse") {
             if (lv == "off" || lv == "none" || lv == "0") { c.pad.airBtn = -1; continue; }
             const int b = VrPad::BtnOfName(lv.c_str());
@@ -120,6 +157,86 @@ Config LoadConfig(const std::wstring& dllDir) {
     return c;
 }
 
+std::string PlaceString(const PanelPlace& p) {
+    char b[160];
+    snprintf(b, sizeof(b), "%.3f, %.3f, %.3f, %.1f, %.1f, %.3f", p.x, p.y, p.z, p.yaw, p.pitch, p.width);
+    return b;
+}
+
+std::vector<std::pair<std::string, std::string>> MenuValues(const VrPad::Config& p, const PanelPlace& menu, const PanelPlace& kb) {
+    std::vector<std::pair<std::string, std::string>> kv;
+    char b[64];
+    for (int i = 0; i < VrPad::kBtnCount; ++i) {
+        VrPad::OutToString(p.map[i], b, sizeof(b));
+        kv.push_back({ VrPad::BtnNames()[i], b });
+    }
+    kv.push_back({ "mouse_stick", p.mouseStick == 1 ? "left" : p.mouseStick == 2 ? "right" : "off" });
+    snprintf(b, sizeof(b), "%.0f", (double)p.mouseSpeed);
+    kv.push_back({ "mouse_speed", b });
+    snprintf(b, sizeof(b), "%.2f", (double)p.deadzone);
+    kv.push_back({ "deadzone", b });
+    kv.push_back({ "air_mouse", p.airBtn >= 0 ? VrPad::BtnNames()[p.airBtn] : "off" });
+    kv.push_back({ "air_mode", p.airToggle ? "toggle" : "hold" });
+    snprintf(b, sizeof(b), "%.0f", (double)p.airGain);
+    kv.push_back({ "air_speed", b });
+    if (menu.set) kv.push_back({ "menu_place", PlaceString(menu) });
+    if (kb.set) kv.push_back({ "keyboard_place", PlaceString(kb) });
+    return kv;
+}
+
+bool SaveConfigValues(const std::wstring& path, const std::vector<std::pair<std::string, std::string>>& kv) {
+    if (path.empty()) return false;
+    std::string text;
+    FILE* f = nullptr;
+    if (_wfopen_s(&f, path.c_str(), L"rb") == 0 && f) {
+        char buf[4096];
+        size_t n;
+        while ((n = fread(buf, 1, sizeof(buf), f)) > 0) text.append(buf, n);
+        fclose(f);
+    }
+    const bool crlf = text.find("\r\n") != std::string::npos;
+    std::vector<std::string> lines;
+    size_t pos = 0;
+    while (pos < text.size()) {
+        size_t nl = text.find('\n', pos);
+        if (nl == std::string::npos) nl = text.size();
+        std::string l = text.substr(pos, nl - pos);
+        if (!l.empty() && l.back() == '\r') l.pop_back();
+        lines.push_back(l);
+        pos = nl + 1;
+    }
+    bool header = false;
+    for (const std::string& l : lines) header = header || l.find("# ---- saved by the VR menu") == 0;
+    for (const auto& e : kv) {
+        bool done = false;
+        for (std::string& l : lines) {
+            const std::string t = Trim(l);
+            if (t.empty() || t[0] == '#' || t[0] == ';') continue;
+            const size_t eq = t.find('=');
+            if (eq == std::string::npos || Lower(Trim(t.substr(0, eq))) != e.first) continue;
+            l = e.first + " = " + e.second;
+            done = true;
+            break;
+        }
+        if (done) continue;
+        if (!header) {
+            if (!lines.empty() && !Trim(lines.back()).empty()) lines.push_back("");
+            lines.push_back("# ---- saved by the VR menu (in the headset: hold both stick clicks 1 s) ------------------------------------------");
+            header = true;
+        }
+        lines.push_back(e.first + " = " + e.second);
+    }
+    std::string out;
+    for (const std::string& l : lines) out += l + (crlf ? "\r\n" : "\n");
+    const std::wstring tmp = path + L".tmp";
+    FILE* w = nullptr;
+    if (_wfopen_s(&w, tmp.c_str(), L"wb") || !w) return false;
+    const bool ok = fwrite(out.data(), 1, out.size(), w) == out.size();
+    fclose(w);
+    if (!ok || !MoveFileExW(tmp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING)) { DeleteFileW(tmp.c_str()); return false; }
+    return true;
+}
+
 bool AppAllowed(const Config& c, const std::wstring& exeName) {
     std::wstring e;
     for (wchar_t ch : exeName) e += (wchar_t)towlower(ch);
@@ -152,6 +269,7 @@ std::string DescribePad(const VrPad::Config& p) {
     snprintf(tail, sizeof(tail), "| mouse stick %s %.0f px/s, dead zone %.2f | air mouse %s %.0f px/deg",
              p.mouseStick == 1 ? "left" : p.mouseStick == 2 ? "right" : "off", (double)p.mouseSpeed, (double)p.deadzone,
              p.airBtn >= 0 ? VrPad::BtnNames()[p.airBtn] : "off", (double)p.airGain);
+    if (p.airToggle) strncat_s(tail, sizeof(tail), " (toggle)", _TRUNCATE);
     return s + tail;
 }
 

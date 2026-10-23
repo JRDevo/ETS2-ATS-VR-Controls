@@ -10,7 +10,12 @@
 // Pressed inputs come from VRC_MOCK_INPUT = "<t0>-<t1>:<input path>=<value>;..." (seconds since xrCreateSession). Values:
 // "1" for a button, "0.9" for a trigger, "x,y" for a stick, "yaw0,pitch0,yaw1,pitch1" (degrees, linear over the interval) for
 // an aim pose. VRC_MOCK_REPORT = a file that gets one line per event worth checking ("profile ...", "suggest ...", "attach ...").
+// D3D11 (XR_KHR_D3D11_enable, for the VR menu): swapchains of real D3D11 textures on the game's device (R8G8B8A8_TYPELESS for
+// the _SRGB format, as real runtimes do), acquire / wait / release, and xrEndFrame checks the layers like a runtime (at most 16;
+// a quad's swapchain must have a released image, its space must exist) and reports "endframe quads N" on each change. With
+// VRC_MOCK_DUMP = a folder, each quad picture is written there as quad_<w>x<h>.bmp after it changed (the last released image).
 #include <windows.h>
+#include <d3d11.h>
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
@@ -21,8 +26,11 @@
 #include <set>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 #include <openxr/openxr.h>
+#define XR_USE_GRAPHICS_API_D3D11
+#include <openxr/openxr_platform.h>
 #include <openxr/openxr_loader_negotiation.h>
 
 namespace {
@@ -102,6 +110,14 @@ struct Session {
     std::set<XrActionSet> attachedSets;
     uint64_t syncs = 0, soloSyncs = 0;                    // soloSyncs: a sync that left an attached "input" set (the game's) inactive
     int unfocusStep = 0;                                  // VRC_MOCK_UNFOCUS: 0 not yet, 1 unfocused, 2 focused again
+    ID3D11Device* dev = nullptr;                          // XrGraphicsBindingD3D11KHR (AddRef'd)
+    int lastQuads = -1;
+};
+struct Swapchain {
+    XrSession ses; uint32_t w = 0, h = 0; int64_t format = 0;
+    std::vector<ID3D11Texture2D*> tex;
+    uint32_t next = 0; int acquired = -1, waited = -1, lastReleased = -1;
+    uint64_t releases = 0, dumped = 0;
 };
 struct Space { XrSession ses; XrAction action = XR_NULL_HANDLE; XrPath sub = XR_NULL_PATH; };
 
@@ -110,6 +126,7 @@ std::map<uint64_t, ActionSet> g_sets;
 std::map<uint64_t, Action> g_actions;
 std::map<uint64_t, Session> g_sessions;
 std::map<uint64_t, Space> g_spaces;
+std::map<uint64_t, Swapchain> g_swapchains;
 std::map<XrPath, std::vector<XrActionSuggestedBinding>> g_suggest;   // per profile
 bool g_anyAttached = false;
 std::vector<std::pair<XrSession, XrSessionState>> g_events;
@@ -165,8 +182,12 @@ std::vector<std::string> BoundPaths(const Session& s, XrAction a, XrPath sub) {
 }
 
 // ------------------------------------------------------------------------------------------------ functions
-XrResult XRAPI_CALL EnumerateInstanceExtensionProperties(const char*, uint32_t, uint32_t* n, XrExtensionProperties*) {
-    if (n) *n = 0;
+XrResult XRAPI_CALL EnumerateInstanceExtensionProperties(const char*, uint32_t cap, uint32_t* n, XrExtensionProperties* p) {
+    if (n) *n = 1;
+    if (!cap) return XR_SUCCESS;
+    if (!p) return XR_ERROR_VALIDATION_FAILURE;
+    strcpy_s(p[0].extensionName, XR_KHR_D3D11_ENABLE_EXTENSION_NAME);
+    p[0].extensionVersion = 1;
     return XR_SUCCESS;
 }
 XrResult XRAPI_CALL CreateInstance(const XrInstanceCreateInfo*, XrInstance* i) { *i = (XrInstance)(uintptr_t)0x1; return XR_SUCCESS; }
@@ -192,10 +213,15 @@ XrResult XRAPI_CALL PathToString(XrInstance, XrPath p, uint32_t cap, uint32_t* n
     memcpy(buf, s.c_str(), *n);
     return XR_SUCCESS;
 }
-XrResult XRAPI_CALL CreateSession(XrInstance, const XrSessionCreateInfo*, XrSession* s) {
+XrResult XRAPI_CALL CreateSession(XrInstance, const XrSessionCreateInfo* ci, XrSession* s) {
     std::lock_guard<std::mutex> lk(g_m);
     const uint64_t h = g_next++;
     g_sessions[h].created = Now();
+    for (const XrBaseInStructure* b = static_cast<const XrBaseInStructure*>(ci->next); b; b = b->next)
+        if (b->type == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR) {
+            g_sessions[h].dev = reinterpret_cast<const XrGraphicsBindingD3D11KHR*>(b)->device;
+            if (g_sessions[h].dev) g_sessions[h].dev->AddRef();
+        }
     *s = (XrSession)h;
     g_events.push_back({*s, XR_SESSION_STATE_IDLE});
     g_events.push_back({*s, XR_SESSION_STATE_READY});
@@ -207,6 +233,15 @@ XrResult XRAPI_CALL DestroySession(XrSession s) {
     auto ss = g_sessions.find((uint64_t)s);
     if (ss != g_sessions.end())
         Report("syncs %llu solo %llu", (unsigned long long)ss->second.syncs, (unsigned long long)ss->second.soloSyncs);
+    int left = 0;
+    for (auto it = g_swapchains.begin(); it != g_swapchains.end();) {
+        if (it->second.ses != s) { ++it; continue; }
+        ++left;
+        for (ID3D11Texture2D* t : it->second.tex) t->Release();
+        it = g_swapchains.erase(it);
+    }
+    if (left) Report("session destroyed with %d swapchain(s) still alive", left);
+    if (ss != g_sessions.end() && ss->second.dev) ss->second.dev->Release();
     g_sessions.erase((uint64_t)s);
     return XR_SUCCESS;
 }
@@ -253,7 +288,145 @@ XrResult XRAPI_CALL WaitFrame(XrSession s, const XrFrameWaitInfo*, XrFrameState*
     return XR_SUCCESS;
 }
 XrResult XRAPI_CALL BeginFrame(XrSession, const XrFrameBeginInfo*) { return XR_SUCCESS; }
-XrResult XRAPI_CALL EndFrame(XrSession, const XrFrameEndInfo*) { return XR_SUCCESS; }
+void DumpLocked(Session& ss, Swapchain& sc) {
+    char dir[MAX_PATH];
+    if (!GetEnvironmentVariableA("VRC_MOCK_DUMP", dir, MAX_PATH) || !ss.dev || sc.lastReleased < 0) return;
+    D3D11_TEXTURE2D_DESC d{};
+    sc.tex[(size_t)sc.lastReleased]->GetDesc(&d);
+    d.Usage = D3D11_USAGE_STAGING; d.BindFlags = 0; d.CPUAccessFlags = D3D11_CPU_ACCESS_READ; d.MiscFlags = 0;
+    ID3D11Texture2D* st = nullptr;
+    if (FAILED(ss.dev->CreateTexture2D(&d, nullptr, &st))) return;
+    ID3D11DeviceContext* ctx = nullptr;
+    ss.dev->GetImmediateContext(&ctx);
+    ctx->CopyResource(st, sc.tex[(size_t)sc.lastReleased]);
+    D3D11_MAPPED_SUBRESOURCE m{};
+    if (SUCCEEDED(ctx->Map(st, 0, D3D11_MAP_READ, 0, &m))) {
+        char path[MAX_PATH + 64];
+        snprintf(path, sizeof(path), "%s\\quad_%ux%u.bmp", dir, sc.w, sc.h);
+        FILE* f = nullptr;
+        if (!fopen_s(&f, path, "wb") && f) {
+            BITMAPFILEHEADER fh{};
+            BITMAPINFOHEADER ih{};
+            ih.biSize = sizeof(ih); ih.biWidth = (LONG)sc.w; ih.biHeight = -(LONG)sc.h; ih.biPlanes = 1; ih.biBitCount = 32;
+            fh.bfType = 0x4D42; fh.bfOffBits = sizeof(fh) + sizeof(ih); fh.bfSize = fh.bfOffBits + sc.w * sc.h * 4;
+            fwrite(&fh, sizeof(fh), 1, f);
+            fwrite(&ih, sizeof(ih), 1, f);
+            std::vector<uint8_t> row(sc.w * 4);
+            for (uint32_t y = 0; y < sc.h; ++y) {
+                memcpy(row.data(), static_cast<const uint8_t*>(m.pData) + (size_t)y * m.RowPitch, row.size());
+                for (uint32_t x = 0; x < sc.w; ++x) std::swap(row[x * 4], row[x * 4 + 2]);   // RGBA -> BGRA
+                fwrite(row.data(), 1, row.size(), f);
+            }
+            fclose(f);
+        }
+        ctx->Unmap(st, 0);
+    }
+    ctx->Release();
+    st->Release();
+}
+XrResult XRAPI_CALL EndFrame(XrSession s, const XrFrameEndInfo* fe) {
+    std::lock_guard<std::mutex> lk(g_m);
+    auto ss = g_sessions.find((uint64_t)s);
+    if (ss == g_sessions.end()) return XR_ERROR_HANDLE_INVALID;
+    if (fe->layerCount > 16) { Report("endframe REFUSED (%u layers)", fe->layerCount); return XR_ERROR_LAYER_LIMIT_EXCEEDED; }
+    int quads = 0;
+    for (uint32_t i = 0; i < fe->layerCount; ++i) {
+        const XrCompositionLayerBaseHeader* l = fe->layers[i];
+        if (!l) return XR_ERROR_LAYER_INVALID;
+        if (l->type != XR_TYPE_COMPOSITION_LAYER_QUAD) continue;
+        const auto* q = reinterpret_cast<const XrCompositionLayerQuad*>(l);
+        auto sc = g_swapchains.find((uint64_t)q->subImage.swapchain);
+        if (sc == g_swapchains.end() || sc->second.releases == 0 || !g_spaces.count((uint64_t)q->space)) {
+            Report("endframe REFUSED (quad %u: bad swapchain / no released image / bad space)", i);
+            return XR_ERROR_LAYER_INVALID;
+        }
+        ++quads;
+        if (sc->second.dumped != sc->second.releases) { sc->second.dumped = sc->second.releases; DumpLocked(ss->second, sc->second); }
+    }
+    if (quads != ss->second.lastQuads) { ss->second.lastQuads = quads; Report("endframe quads %d", quads); }
+    return XR_SUCCESS;
+}
+XrResult XRAPI_CALL EnumerateSwapchainFormats(XrSession, uint32_t cap, uint32_t* n, int64_t* f) {
+    *n = 2;
+    if (!cap) return XR_SUCCESS;
+    if (cap < 2) return XR_ERROR_SIZE_INSUFFICIENT;
+    f[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+    f[1] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    return XR_SUCCESS;
+}
+XrResult XRAPI_CALL CreateSwapchain(XrSession s, const XrSwapchainCreateInfo* ci, XrSwapchain* out) {
+    std::lock_guard<std::mutex> lk(g_m);
+    auto ss = g_sessions.find((uint64_t)s);
+    if (ss == g_sessions.end()) return XR_ERROR_HANDLE_INVALID;
+    if (!ss->second.dev) return XR_ERROR_GRAPHICS_DEVICE_INVALID;
+    if (ci->format != DXGI_FORMAT_R8G8B8A8_UNORM_SRGB && ci->format != DXGI_FORMAT_R8G8B8A8_UNORM) return XR_ERROR_SWAPCHAIN_FORMAT_UNSUPPORTED;
+    Swapchain sc;
+    sc.ses = s; sc.w = ci->width; sc.h = ci->height; sc.format = ci->format;
+    D3D11_TEXTURE2D_DESC d{};
+    d.Width = ci->width; d.Height = ci->height; d.MipLevels = 1; d.ArraySize = 1;
+    d.Format = DXGI_FORMAT_R8G8B8A8_TYPELESS;
+    d.SampleDesc.Count = 1; d.Usage = D3D11_USAGE_DEFAULT; d.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+    for (int i = 0; i < 3; ++i) {
+        ID3D11Texture2D* t = nullptr;
+        if (FAILED(ss->second.dev->CreateTexture2D(&d, nullptr, &t))) return XR_ERROR_RUNTIME_FAILURE;
+        sc.tex.push_back(t);
+    }
+    const uint64_t h = g_next++;
+    g_swapchains[h] = sc;
+    *out = (XrSwapchain)h;
+    Report("swapchain %ux%u", ci->width, ci->height);
+    return XR_SUCCESS;
+}
+XrResult XRAPI_CALL DestroySwapchain(XrSwapchain sc) {
+    std::lock_guard<std::mutex> lk(g_m);
+    auto it = g_swapchains.find((uint64_t)sc);
+    if (it == g_swapchains.end()) return XR_ERROR_HANDLE_INVALID;
+    for (ID3D11Texture2D* t : it->second.tex) t->Release();
+    g_swapchains.erase(it);
+    return XR_SUCCESS;
+}
+XrResult XRAPI_CALL EnumerateSwapchainImages(XrSwapchain sc, uint32_t cap, uint32_t* n, XrSwapchainImageBaseHeader* im) {
+    std::lock_guard<std::mutex> lk(g_m);
+    auto it = g_swapchains.find((uint64_t)sc);
+    if (it == g_swapchains.end()) return XR_ERROR_HANDLE_INVALID;
+    *n = (uint32_t)it->second.tex.size();
+    if (!cap) return XR_SUCCESS;
+    if (cap < *n) return XR_ERROR_SIZE_INSUFFICIENT;
+    auto* d = reinterpret_cast<XrSwapchainImageD3D11KHR*>(im);
+    for (uint32_t i = 0; i < *n; ++i) {
+        if (d[i].type != XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR) return XR_ERROR_VALIDATION_FAILURE;
+        d[i].texture = it->second.tex[i];
+    }
+    return XR_SUCCESS;
+}
+XrResult XRAPI_CALL AcquireSwapchainImage(XrSwapchain sc, const XrSwapchainImageAcquireInfo*, uint32_t* idx) {
+    std::lock_guard<std::mutex> lk(g_m);
+    auto it = g_swapchains.find((uint64_t)sc);
+    if (it == g_swapchains.end()) return XR_ERROR_HANDLE_INVALID;
+    if (it->second.acquired >= 0) return XR_ERROR_CALL_ORDER_INVALID;
+    it->second.acquired = (int)it->second.next;
+    it->second.next = (it->second.next + 1) % (uint32_t)it->second.tex.size();
+    *idx = (uint32_t)it->second.acquired;
+    return XR_SUCCESS;
+}
+XrResult XRAPI_CALL WaitSwapchainImage(XrSwapchain sc, const XrSwapchainImageWaitInfo*) {
+    std::lock_guard<std::mutex> lk(g_m);
+    auto it = g_swapchains.find((uint64_t)sc);
+    if (it == g_swapchains.end()) return XR_ERROR_HANDLE_INVALID;
+    if (it->second.acquired < 0 || it->second.waited >= 0) return XR_ERROR_CALL_ORDER_INVALID;
+    it->second.waited = it->second.acquired;
+    return XR_SUCCESS;
+}
+XrResult XRAPI_CALL ReleaseSwapchainImage(XrSwapchain sc, const XrSwapchainImageReleaseInfo*) {
+    std::lock_guard<std::mutex> lk(g_m);
+    auto it = g_swapchains.find((uint64_t)sc);
+    if (it == g_swapchains.end()) return XR_ERROR_HANDLE_INVALID;
+    if (it->second.waited < 0) return XR_ERROR_CALL_ORDER_INVALID;
+    it->second.lastReleased = it->second.waited;
+    it->second.acquired = it->second.waited = -1;
+    ++it->second.releases;
+    return XR_SUCCESS;
+}
 XrResult XRAPI_CALL CreateReferenceSpace(XrSession s, const XrReferenceSpaceCreateInfo*, XrSpace* sp) {
     std::lock_guard<std::mutex> lk(g_m);
     const uint64_t h = g_next++;
@@ -457,6 +630,10 @@ const struct { const char* name; PFN_xrVoidFunction fn; } kFns[] = {
     E("xrSyncActions", SyncActions), E("xrGetActionStateBoolean", GetActionStateBoolean), E("xrGetActionStateFloat", GetActionStateFloat),
     E("xrGetActionStateVector2f", GetActionStateVector2f), E("xrGetActionStatePose", GetActionStatePose),
     E("xrGetCurrentInteractionProfile", GetCurrentInteractionProfile),
+    E("xrEnumerateSwapchainFormats", EnumerateSwapchainFormats), E("xrCreateSwapchain", CreateSwapchain),
+    E("xrDestroySwapchain", DestroySwapchain), E("xrEnumerateSwapchainImages", EnumerateSwapchainImages),
+    E("xrAcquireSwapchainImage", AcquireSwapchainImage), E("xrWaitSwapchainImage", WaitSwapchainImage),
+    E("xrReleaseSwapchainImage", ReleaseSwapchainImage),
 };
 #undef E
 XrResult XRAPI_CALL GetInstanceProcAddr(XrInstance, const char* name, PFN_xrVoidFunction* fn) {

@@ -110,6 +110,39 @@ inline bool ParseOut(const char* in, Out* o) {
     return true;
 }
 
+// the config.ini name of scan code `code` ("f", "f1", "enter", "[", "num7" ...); nullptr = none
+inline const char* NameOfScan(uint16_t code) {
+    static const char* const kAll[] = {
+        "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x",
+        "y", "z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10",
+        "f11", "f12", "space", "enter", "esc", "tab", "backspace", "up", "down", "left", "right", "insert", "delete", "home", "end",
+        "pageup", "pagedown", "shift", "rshift", "ctrl", "rctrl", "alt", "ralt", "capslock", "num0", "num1", "num2", "num3", "num4",
+        "num5", "num6", "num7", "num8", "num9", "numdot", "numplus", "numminus", "nummul", "numdiv", "numenter", "scrolllock",
+        "-", "=", "[", "]", ";", "'", "`", "\\", ",", ".", "/" };
+    for (const char* n : kAll) if (ScanOfName(n) == code) return n;
+    return nullptr;
+}
+
+// the config.ini text of `o` ("none", "mouse_left", "shift+f" ...) into buf (cap >= 32)
+inline void OutToString(const Out& o, char* buf, size_t cap) {
+    if (!cap) return;
+    buf[0] = 0;
+    switch (o.kind) {
+    case kMouseL: strncpy_s(buf, cap, "mouse_left", _TRUNCATE); return;
+    case kMouseR: strncpy_s(buf, cap, "mouse_right", _TRUNCATE); return;
+    case kMouseM: strncpy_s(buf, cap, "mouse_middle", _TRUNCATE); return;
+    case kWheelUp: strncpy_s(buf, cap, "wheel_up", _TRUNCATE); return;
+    case kWheelDown: strncpy_s(buf, cap, "wheel_down", _TRUNCATE); return;
+    case kKeys: break;
+    default: strncpy_s(buf, cap, "none", _TRUNCATE); return;
+    }
+    for (int i = 0; i < o.n; ++i) {
+        const char* n = NameOfScan(o.code[i]);
+        if (i) strncat_s(buf, cap, "+", _TRUNCATE);
+        strncat_s(buf, cap, n ? n : "?", _TRUNCATE);
+    }
+}
+
 struct Config {
     Out   map[kBtnCount];
     int   mouseStick = 1;                              // 0 off, 1 left stick, 2 right stick moves the mouse
@@ -118,6 +151,7 @@ struct Config {
     int   airBtn = kRGrip;                             // held = air mouse (the button's own mapping is not sent); -1 = off
     int   airHand = 1;                                 // the hand whose aim moves the mouse (follows airBtn's hand)
     float airGain = 25.0f;                             // pixels per degree of aim turn
+    bool  airToggle = false;                           // false: air mouse while airBtn is held; true: one press on, the next off
 };
 inline Config DefaultConfig() {
     Config c;
@@ -151,6 +185,8 @@ struct Frame {
     float sx[2] = {}, sy[2] = {};                      // stick, +x right, +y up
     bool  aim[2] = {};                                 // aim orientation valid + tracked
     double q[2][4] = {};                               // aim orientation (x, y, z, w) in the game's space
+    bool  pos[2] = {};                                 // aim position valid + tracked (the VR menu's pointer)
+    double p[2][3] = {};                               // aim position (metres) in the same space
 };
 
 // what the Mapper asks for (vr_controls.cpp: SendInput)
@@ -181,12 +217,17 @@ public:
         for (int b = 0; b < kBtnCount; ++b) {
             if (want[b] == down_[b]) continue;
             down_[b] = want[b];
-            if (b == c.airBtn) continue;               // the air mouse hold button sends nothing itself
+            if (b == c.airBtn) {                       // the air mouse button sends nothing itself
+                if (want[b]) airLatch_ = !airLatch_;   // (toggle mode: each press switches)
+                continue;
+            }
             Send(c.map[b], want[b], s);
         }
+        if (!active || !c.airToggle) airLatch_ = false;
         // air mouse
         const int ah = c.airHand & 1;
-        const bool air = active && c.airBtn >= 0 && c.airBtn < kBtnCount && down_[c.airBtn] && f.aim[ah];
+        const bool airBtnOn = c.airBtn >= 0 && c.airBtn < kBtnCount && (c.airToggle ? airLatch_ : down_[c.airBtn]);
+        const bool air = active && airBtnOn && f.aim[ah];
         if (air) {
             double yaw, pitch;
             YawPitch(f.q[ah], &yaw, &pitch);
@@ -220,6 +261,7 @@ public:
         if (mx || my) { s.Move(mx, my); accX_ -= mx; accY_ -= my; }
     }
     bool Down(int b) const { return b >= 0 && b < kBtnCount && down_[b]; }
+    bool AirOn() const { return airOn_; }
 
 private:
     void Want(const Frame& f, const Config& c, bool* w) const {
@@ -257,6 +299,7 @@ private:
     }
     bool   down_[kBtnCount] = {};
     bool   airOn_ = false;
+    bool   airLatch_ = false;                          // toggle mode: the air mouse is switched on
     double yaw_ = 0.0, pitch_ = 0.0;
     double accX_ = 0.0, accY_ = 0.0;
 };

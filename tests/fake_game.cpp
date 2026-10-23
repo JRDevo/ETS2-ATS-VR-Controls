@@ -11,12 +11,16 @@
 //     --sync-every  syncs only every Nth frame
 //     --stall       no sync from t0 to t1 seconds (a loading screen / hitch)
 //     --no-destroy-session  ends with xrDestroyInstance only (no xrEndSession / xrDestroySession)
+//     --d3d11       a D3D11 session (WARP device, XR_KHR_D3D11_enable) like ETS2 / ATS: the VR menu can draw
 // Exit code 0 = every OpenXR call the game made succeeded.
 #include <windows.h>
+#include <d3d11.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <openxr/openxr.h>
+#define XR_USE_GRAPHICS_API_D3D11
+#include <openxr/openxr_platform.h>
 
 static int g_bad = 0;
 #define CK(call) do { XrResult r_ = (call); if (XR_FAILED(r_)) { printf("FAILED %s -> %d\n", #call, (int)r_); ++g_bad; } } while (0)
@@ -30,7 +34,7 @@ static double Now() {
 
 int main(int argc, char** argv) {
     const double seconds = argc > 1 ? atof(argv[1]) : 5.0;
-    bool noInput = false, noSync = false, touch = false, noDestroySession = false;
+    bool noInput = false, noSync = false, touch = false, noDestroySession = false, d3d = false;
     int syncEvery = 1;
     double stall0 = -1, stall1 = -1;
     for (int i = 2; i < argc; ++i) {
@@ -38,6 +42,7 @@ int main(int argc, char** argv) {
         if (!strcmp(argv[i], "--no-sync")) noSync = true;
         if (!strcmp(argv[i], "--touch")) touch = true;
         if (!strcmp(argv[i], "--no-destroy-session")) noDestroySession = true;
+        if (!strcmp(argv[i], "--d3d11")) d3d = true;
         if (!strcmp(argv[i], "--sync-every") && i + 1 < argc) syncEvery = atoi(argv[++i]) > 0 ? atoi(argv[i]) : 1;
         if (!strcmp(argv[i], "--stall") && i + 1 < argc) sscanf_s(argv[++i], "%lf-%lf", &stall0, &stall1);
     }
@@ -48,6 +53,8 @@ int main(int argc, char** argv) {
     strcpy_s(ic.applicationInfo.applicationName, "fake_game");
     strcpy_s(ic.applicationInfo.engineName, "prism3d-ish");
     ic.applicationInfo.apiVersion = XR_MAKE_VERSION(1, 0, 0);
+    const char* ext[1] = { XR_KHR_D3D11_ENABLE_EXTENSION_NAME };
+    if (d3d) { ic.enabledExtensionCount = 1; ic.enabledExtensionNames = ext; }
     XrInstance inst = XR_NULL_HANDLE;
     XrResult r = xrCreateInstance(&ic, &inst);
     if (XR_FAILED(r)) { printf("xrCreateInstance failed %d\n", (int)r); return 2; }
@@ -95,6 +102,16 @@ int main(int argc, char** argv) {
     }
     XrSessionCreateInfo sci{XR_TYPE_SESSION_CREATE_INFO};
     sci.systemId = sys;
+    ID3D11Device* dev = nullptr;
+    XrGraphicsBindingD3D11KHR gb{XR_TYPE_GRAPHICS_BINDING_D3D11_KHR};
+    if (d3d) {
+        if (FAILED(D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &dev, nullptr, nullptr))) {
+            printf("D3D11CreateDevice (WARP) failed\n");
+            return 2;
+        }
+        gb.device = dev;
+        sci.next = &gb;
+    }
     XrSession ses = XR_NULL_HANDLE;
     CK(xrCreateSession(inst, &sci, &ses));
     if (!noInput) {
@@ -158,6 +175,7 @@ int main(int argc, char** argv) {
         CK(xrDestroySession(ses));
     }
     CK(xrDestroyInstance(inst));
+    if (dev) dev->Release();
     printf("game input inactive reads: %d\n", inactive);
     printf("fake_game done, %d failed call(s)\n", g_bad);
     return g_bad ? 1 : 0;

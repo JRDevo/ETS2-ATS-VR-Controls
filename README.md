@@ -3,15 +3,17 @@
 Use your VR controllers as a keyboard and mouse in **Euro Truck Simulator 2** and **American Truck Simulator** (OpenXR VR).
 Press a controller button, and the game gets a key press. Move a stick or point the controller, and the mouse pointer moves.
 
-> Status: v0.1.0, first version (phase 1: buttons, pointer and click). Tested with a fake game and a fake VR runtime.
-> **Not tested in the real game yet.** Planned: phase 2, an on-screen keyboard in VR that you can move, resize and hide;
-> phase 3, single buttons you place anywhere (for example over a cab switch) that press a key.
+> Status: v0.2.0. Phase 1 (buttons, pointer and click) works in the game. New in v0.2.0 (phase 2): **a VR menu and a full
+> keyboard in the headset** -- tested with a fake game and a fake VR runtime, **not in the real game yet**. Planned: phase 3,
+> single buttons you place anywhere (for example over a cab switch) that press a key.
 
 ## What it does
 
 - Each controller button sends a key or a mouse button that you choose in `config.ini`.
 - One stick moves the mouse pointer (the left stick by default).
-- **Air mouse**: hold the right grip and turn the controller. The pointer follows, like a laser pointer.
+- **Air mouse**: hold the right grip and turn the controller. The pointer follows, like a laser pointer. (Or set it to
+  toggle: one press on, the next press off.)
+- **VR menu + keyboard**: hold both stick clicks for 1 second. A menu opens in front of you. See [The VR menu](#the-vr-menu).
 - The game's own VR controls (the trigger and the left menu button) still work.
 - It only works in the games named in `config.ini`. In every other VR program it does nothing.
 - It only sends input while the game window is in front. It never types into another program.
@@ -32,6 +34,7 @@ works next to the ETS2 / ATS DLAA mod, VR EyeCapture, Virtual Desktop, OpenXR To
 | Y | `]` | right indicator |
 | Right stick click | H | horn |
 | Left stick click | F | hazard lights |
+| Both stick clicks, 1 second | opens / closes the VR menu | |
 | Right stick up / down / left / right | arrow keys | |
 | Left stick | moves the mouse pointer | |
 
@@ -42,6 +45,24 @@ Mixed Reality. A key set for that button does nothing (the log says so).
 
 **Cab buttons:** the game has no clickable buttons in the cab, so pointing at a switch does nothing. Map the key of that
 function to a controller button instead (for example `y = l` for the lights).
+
+## The VR menu
+
+Hold **both stick clicks** for 1 second. The menu opens in front of you. Do it again to close it.
+A short press of one stick click alone still works as before (horn / hazards).
+
+- **Point** with either controller. A white dot shows where. **Pull the trigger** to press.
+  While you point at the menu, the game does not get that trigger.
+- **Buttons** tab: every controller button and what it sends. Point at one, pull the trigger, then press a key on the
+  keyboard (or pick Mouse L / Mouse R / Wheel / None at the bottom). For Shift + F: press Shift, then F.
+- **Mouse** tab: which stick moves the mouse, its speed and dead zone, the air mouse button, hold or toggle, its speed.
+- **Panels** tab: menu size, keyboard size, show / hide the keyboard, bring both in front of you.
+- **Keyboard** (button at the top of the menu): a full keyboard with F-keys, arrows and number pad. A key goes down when
+  you pull the trigger and up when you let go. Shift, Ctrl and Alt stay on for the next key.
+- **Move** a panel: point at its top bar, hold the trigger and move the controller. **Size**: the - and + at the top.
+
+Every change works at once and is saved in `config.ini`. The menu uses no keyboard key, so it never clashes with the
+ETS2 / ATS DLAA mod's menu (`Delete`). The menu and keyboard float in the room: after a recenter they move with it.
 
 ## Install
 
@@ -55,7 +76,8 @@ Uninstall: run `uninstall.ps1` the same way. Then you can delete the folder.
 
 ## Settings
 
-Open `config.ini` in Notepad. Every setting is explained in the file. Restart the game after a change.
+Use the VR menu, or open `config.ini` in Notepad. Every setting is explained in the file. Restart the game after a change
+in Notepad (the VR menu's changes work at once).
 
 Button names: `ltrigger rtrigger lgrip rgrip x y a b lstick rstick menu lup ldown lleft lright rup rdown rleft rright`.
 Values: a key (`h`, `f1`, `space`, `[`), up to 3 keys with `+` (`shift+f`), `mouse_left`, `mouse_right`, `mouse_middle`,

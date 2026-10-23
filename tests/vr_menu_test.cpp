@@ -1,0 +1,260 @@
+// Unit test: the VR menu + keyboard (src/vr_menu.cpp) with made-up controller frames -- no OpenXR, no game.
+//   (1) the combo gate: a short stick click still goes through (as a tap), a long one after 0.25 s, both held 1 s = the combo
+//       and neither click reaches the Mapper.
+//   (2) the menu: opens in front of the head; pointing + trigger on a tab / a setting / a button row; picking a key on the
+//       keyboard (Shift latched + F = shift+f); typing a key (down on the trigger, up on its release); the trigger is taken out
+//       of the frame while it points at a panel; moving a panel by its top bar; - / + size; close.
+//   (3) config.ini: the changes are written into a copy (comments kept, new keys added at the end) and read back the same.
+// Usage: vr_menu_test <work folder>. Writes menu.bmp / keyboard.bmp (the panel pictures) and config.ini there.
+// Exit code 0 = every check passed.
+#include <windows.h>
+#include <cmath>
+#include <cstdio>
+#include <string>
+#include <vector>
+#include "config.h"
+#include "vr_menu.h"
+
+static int g_checks = 0, g_fails = 0;
+#define CHECK(c, ...) do { ++g_checks; if (!(c)) { ++g_fails; if (g_fails <= 40) { printf("   FAIL: "); printf(__VA_ARGS__); printf("\n"); } } } while (0)
+
+struct Rec : VrPad::Sink {
+    std::vector<std::string> ev;
+    void Key(uint16_t c, bool d) override { char b[32]; snprintf(b, sizeof(b), "k%03x%s", c, d ? "v" : "^"); ev.push_back(b); }
+    void MouseButton(int w, bool d) override { char b[32]; snprintf(b, sizeof(b), "m%d%s", w, d ? "v" : "^"); ev.push_back(b); }
+    void Wheel(int n) override { char b[32]; snprintf(b, sizeof(b), "w%+d", n); ev.push_back(b); }
+    void Move(int, int) override {}
+    std::string Take() { std::string s; for (auto& e : ev) { if (!s.empty()) s += ' '; s += e; } ev.clear(); return s; }
+};
+
+static std::string ReadFile(const std::wstring& p) {
+    std::string t;
+    FILE* f = nullptr;
+    if (_wfopen_s(&f, p.c_str(), L"rb") || !f) return t;
+    char b[4096];
+    size_t n;
+    while ((n = fread(b, 1, sizeof(b), f)) > 0) t.append(b, n);
+    fclose(f);
+    return t;
+}
+static void WriteBmp(const std::wstring& path, const ck::VrMenu::Panel& p) {
+    FILE* f = nullptr;
+    if (_wfopen_s(&f, path.c_str(), L"wb") || !f) return;
+    BITMAPFILEHEADER fh{};
+    BITMAPINFOHEADER ih{};
+    ih.biSize = sizeof(ih); ih.biWidth = p.pw; ih.biHeight = -p.ph; ih.biPlanes = 1; ih.biBitCount = 32; ih.biCompression = BI_RGB;
+    fh.bfType = 0x4D42;
+    fh.bfOffBits = sizeof(fh) + sizeof(ih);
+    fh.bfSize = fh.bfOffBits + (DWORD)(p.px.size() * 4);
+    fwrite(&fh, sizeof(fh), 1, f);
+    fwrite(&ih, sizeof(ih), 1, f);
+    fwrite(p.px.data(), 4, p.px.size(), f);
+    fclose(f);
+}
+
+// a frame with hand h aiming from the head (origin) at world point `at`, trigger `trig`
+static VrPad::Frame Aim(int h, ck::V3 at, float trig) {
+    VrPad::Frame f;
+    f.hand[0] = f.hand[1] = true;
+    const double len = ck::Len(at);
+    double yaw, pitch;
+    ck::YawPitchOf(at * (1.0 / len), &yaw, &pitch);
+    const ck::Q4 q = ck::QYawPitch(yaw, pitch);
+    f.aim[h] = f.pos[h] = true;
+    f.q[h][0] = q.x; f.q[h][1] = q.y; f.q[h][2] = q.z; f.q[h][3] = q.w;
+    f.trig[h] = trig;
+    return f;
+}
+
+int main(int argc, char** argv) {
+    using namespace ck;
+    if (argc < 2) { printf("usage: vr_menu_test <work folder>\n"); return 2; }
+    const std::string dirA = argv[1];
+    const std::wstring dir(dirA.begin(), dirA.end());
+    CreateDirectoryW(dir.c_str(), nullptr);
+
+    printf("(1) combo gate\n");
+    {
+        ComboGate g;
+        VrPad::Frame f;
+        double t = 0;
+        auto step = [&](bool l, bool r) { f = VrPad::Frame(); f.click[0] = l; f.click[1] = r; const bool done = g.Step(f, t); t += 0.011; return done; };
+        // a short tap of the left click: held back, then sent as a tap at its release
+        step(true, false);
+        CHECK(!f.click[0], "a click is held back first");
+        step(true, false);
+        step(false, false);
+        CHECK(f.click[0], "a short click goes through at its release (tap)");
+        for (int i = 0; i < 10; ++i) step(false, false);
+        CHECK(!f.click[0], "the tap ends");
+        // a long press passes after 0.25 s
+        bool seen = false;
+        for (int i = 0; i < 40; ++i) { step(true, false); seen = seen || f.click[0]; }
+        CHECK(seen, "a long click passes after 0.25 s");
+        step(false, false);
+        // both: masked, the combo after 1 s
+        bool done = false, leak = false;
+        for (int i = 0; i < 100 && !done; ++i) { done = step(true, true); leak = leak || f.click[0] || f.click[1]; }
+        CHECK(done && !leak, "both held 1 s = the combo, no click leaks (%d %d)", done, leak);
+        CHECK(t > 1.2 && t < 1.8, "the combo after ~1 s of both (t=%.2f)", t);
+        done = false;
+        for (int i = 0; i < 20; ++i) done = done || step(true, true);
+        CHECK(!done, "fires once per hold");
+        step(false, false);
+    }
+
+    printf("(2) menu\n");
+    const std::wstring cfgPath = dir + L"\\config.ini";
+    {
+        FILE* f = nullptr;
+        _wfopen_s(&f, cfgPath.c_str(), L"wb");
+        if (f) { fputs("# test\r\na = enter   # was\r\nmouse_speed = 900\r\n", f); fclose(f); }
+    }
+    Config cfg = ParseConfig("a = enter\n");
+    VrMenu m(cfg, cfgPath);
+    Rec sink;
+    double now = 10.0;
+    Pose head;                                         // at the origin, looking down -z
+    auto upd = [&](VrPad::Frame& f) { m.Update(f, true, true, head, now, sink); now += 0.011; };
+    VrPad::Frame idle;
+    idle.hand[0] = idle.hand[1] = true;
+    // open with the combo
+    for (int i = 0; i < 120 && !m.AnyShown(); ++i) { VrPad::Frame f = idle; f.click[0] = f.click[1] = true; upd(f); }
+    CHECK(m.AnyShown() && m.Pan(VrMenu::kPanMenu).show && !m.Pan(VrMenu::kPanKb).show, "the combo opens the menu (keyboard hidden)");
+    for (int i = 0; i < 3; ++i) { VrPad::Frame f = idle; upd(f); }
+    const VrMenu::Panel& mp = m.Pan(VrMenu::kPanMenu);
+    CHECK(mp.pose.p.z < -0.6 && mp.pose.p.z > -0.9 && std::fabs(mp.pose.p.x) < 0.01, "in front of the head (%.2f %.2f %.2f)", mp.pose.p.x, mp.pose.p.y, mp.pose.p.z);
+    CHECK(mp.px.size() == (size_t)mp.pw * mp.ph && mp.version > 0, "the menu picture is drawn");
+    // press = aim at the element, trigger down one frame, up the next; returns the frame the menu saw (trigger taken out?)
+    auto click = [&](int h, int pan, int kind, int arg, bool* taken = nullptr) {
+        V3 at;
+        if (!m.ElemCentre(pan, kind, arg, &at)) { printf("   (element %d/%d/%d not shown)\n", pan, kind, arg); return false; }
+        VrPad::Frame f = Aim(h, at, 0.0f);
+        upd(f);
+        f = Aim(h, at, 1.0f);
+        upd(f);
+        if (taken) *taken = f.trig[h] == 0.0f;
+        f = Aim(h, at, 0.0f);
+        upd(f);
+        return true;
+    };
+    bool taken = false;
+    CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 1, &taken), "Mouse tab shown");
+    CHECK(taken, "the trigger is taken out of the frame on a panel");
+    CHECK(m.Describe().find("tab 1") != std::string::npos, "Mouse tab selected (%s)", m.Describe().c_str());
+    CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 41), "air toggle option shown");
+    CHECK(m.Pad().airToggle, "air mouse: toggle");
+    CHECK(click(0, VrMenu::kPanMenu, VrMenu::eSet, 11), "stick speed + shown (left hand)");
+    CHECK(m.Pad().mouseSpeed > 1000.0f, "stick speed up (%.0f)", (double)m.Pad().mouseSpeed);
+    CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 0), "Buttons tab");
+    CHECK(click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kA), "row A");
+    CHECK(m.Pan(VrMenu::kPanKb).show, "picking opens the keyboard");
+    for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
+    const VrMenu::Panel& kp = m.Pan(VrMenu::kPanKb);
+    CHECK(kp.pose.p.y < mp.pose.p.y - 0.15, "the keyboard below the menu (%.2f vs %.2f)", kp.pose.p.y, mp.pose.p.y);
+    WriteBmp(dir + L"\\keyboard_pick.bmp", kp);
+    WriteBmp(dir + L"\\menu_pick.bmp", mp);
+    CHECK(click(1, VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("shift")), "Shift key");
+    CHECK(click(1, VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("f")), "F key");
+    char out[64];
+    VrPad::OutToString(m.Pad().map[VrPad::kA], out, sizeof(out));
+    CHECK(std::string(out) == "shift+f", "A = shift+f (%s)", out);
+    CHECK(sink.Take().empty(), "picking sends no key");
+    // typing: F1 down on the trigger, up at its release
+    {
+        V3 at;
+        CHECK(m.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("f1"), &at), "F1 shown");
+        VrPad::Frame f = Aim(0, at, 0.0f);
+        upd(f);
+        f = Aim(0, at, 1.0f);
+        upd(f);
+        CHECK(sink.Take() == "k03bv", "F1 down on the trigger");
+        for (int i = 0; i < 5; ++i) { f = Aim(0, at, 1.0f); upd(f); }
+        CHECK(sink.Take().empty(), "held: nothing more");
+        f = Aim(0, at, 0.0f);
+        upd(f);
+        CHECK(sink.Take() == "k03b^", "F1 up at the release");
+    }
+    // ctrl latched + c: ctrl down, c down ... c up, ctrl up
+    click(1, VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("ctrl"));
+    click(1, VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("c"));
+    CHECK(sink.Take() == "k01dv k02ev k02e^ k01d^", "Ctrl + C (latched Ctrl)");
+    // not on a panel: the trigger stays in the frame
+    {
+        VrPad::Frame f = Aim(1, V3{ 0, 2, 0.5 }, 1.0f);   // up and behind: nothing there
+        upd(f);
+        CHECK(f.trig[1] == 1.0f, "off the panels the trigger stays the game's");
+        f = Aim(1, V3{ 0, 2, 0.5 }, 0.0f);
+        upd(f);
+    }
+    // move the menu by its bar: grab, turn 20 deg left, let go
+    {
+        V3 at;
+        m.ElemCentre(VrMenu::kPanMenu, VrMenu::eBar, 0, &at);
+        const V3 before = m.Pan(VrMenu::kPanMenu).pose.p;
+        VrPad::Frame f = Aim(1, at, 0.0f);
+        upd(f);
+        f = Aim(1, at, 1.0f);
+        upd(f);
+        const V3 turned = QRot(QYawPitch(20.0 * 3.14159265358979 / 180.0, 0), at);
+        for (int i = 0; i < 5; ++i) { f = Aim(1, turned, 1.0f); upd(f); }
+        f = Aim(1, turned, 0.0f);
+        upd(f);
+        const V3 after = m.Pan(VrMenu::kPanMenu).pose.p;
+        CHECK(after.x < before.x - 0.15, "dragged to the left (x %.2f -> %.2f)", before.x, after.x);
+        CHECK(std::fabs(Len(after) - Len(before)) < 0.01, "same distance");
+    }
+    // size
+    const double w0 = m.Pan(VrMenu::kPanKb).width;
+    click(1, VrMenu::kPanKb, VrMenu::eBigger, 0);
+    CHECK(m.Pan(VrMenu::kPanKb).width > w0 * 1.1, "keyboard bigger");
+    for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
+    WriteBmp(dir + L"\\menu.bmp", m.Pan(VrMenu::kPanMenu));
+    WriteBmp(dir + L"\\keyboard.bmp", m.Pan(VrMenu::kPanKb));
+    // close: the menu's x; the keyboard stays hidden too (it is reopened with the menu only when it was shown)
+    click(1, VrMenu::kPanMenu, VrMenu::eClose, 0);
+    CHECK(!m.Pan(VrMenu::kPanMenu).show, "closed");
+
+    printf("(3) config.ini\n");
+    const std::string text = ReadFile(cfgPath);
+    CHECK(text.find("# test\r\n") == 0, "comments kept, CRLF kept");
+    CHECK(text.find("a = shift+f\r\n") != std::string::npos, "a = shift+f written in place");
+    CHECK(text.find("# was") == std::string::npos, "the old a line replaced");
+    CHECK(text.find("air_mode = toggle") != std::string::npos, "air_mode added");
+    CHECK(text.find("menu_place = ") != std::string::npos && text.find("keyboard_place = ") != std::string::npos, "places added");
+    const Config back = ParseConfig(text);
+    for (const std::string& n : back.notes) printf("   note: %s\n", n.c_str());
+    CHECK(back.notes.empty(), "it reads back without notes");
+    CHECK(back.pad.airToggle && back.pad.mouseSpeed > 1000.0f, "read back: toggle, speed");
+    CHECK(back.menuPlace.set && std::fabs(back.menuPlace.x - m.Pan(VrMenu::kPanMenu).pose.p.x) < 0.002, "read back: the menu place");
+    CHECK(std::fabs(back.kbPlace.width - m.Pan(VrMenu::kPanKb).width) < 0.002, "read back: the keyboard width");
+    VrMenu m2(back, std::wstring());
+    m2.Open(true, head);
+    CHECK(std::fabs(m2.Pan(VrMenu::kPanMenu).pose.p.x - m.Pan(VrMenu::kPanMenu).pose.p.x) < 0.002, "a new menu opens at the saved place");
+    // cost of one keyboard redraw (it happens when the pointer moves onto another key): printed, not checked
+    {
+        VrMenu m3(back, std::wstring());
+        Rec s3;
+        auto u3 = [&](VrPad::Frame f) { m3.Update(f, true, true, head, now, s3); now += 0.011; };
+        m3.Open(true, head);
+        V3 a1, a2;
+        m3.ElemCentre(VrMenu::kPanMenu, VrMenu::eKbBtn, 0, &a1);
+        u3(Aim(1, a1, 0.0f));
+        u3(Aim(1, a1, 1.0f));
+        u3(Aim(1, a1, 0.0f));
+        const bool ok = m3.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("g"), &a1) &&
+                        m3.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("h"), &a2);
+        CHECK(ok, "keyboard shown by its menu button");
+        LARGE_INTEGER q0, q1, fq;
+        QueryPerformanceFrequency(&fq);
+        const uint64_t v0 = m3.Pan(VrMenu::kPanKb).version;
+        QueryPerformanceCounter(&q0);
+        for (int i = 0; ok && i < 20; ++i) u3(Aim(1, (i & 1) ? a1 : a2, 0.0f));
+        QueryPerformanceCounter(&q1);
+        const uint64_t n = m3.Pan(VrMenu::kPanKb).version - v0;
+        CHECK(n >= 20, "a hover change redraws (%llu)", (unsigned long long)n);
+        printf("   one hover change (only the changed keys drawn): %.2f ms\n", (q1.QuadPart - q0.QuadPart) * 1000.0 / fq.QuadPart / 20);
+    }
+    printf("%d checks, %d failed\n", g_checks, g_fails);
+    return g_fails ? 1 : 0;
+}

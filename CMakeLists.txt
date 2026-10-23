@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(ets2_ats_vr_controls VERSION 0.1.0 LANGUAGES C CXX)
+project(ets2_ats_vr_controls VERSION 0.2.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -41,12 +41,14 @@ add_library(ets2_ats_vr_controls SHARED
     src/profiles.cpp
     src/output.cpp
     src/config.cpp
-    src/log.cpp)
+    src/log.cpp
+    src/vr_menu.cpp
+    src/overlay.cpp)
 target_include_directories(ets2_ats_vr_controls PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_definitions(ets2_ats_vr_controls PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX
     VRC_VERSION="${PROJECT_VERSION}" VRC_LAYER_NAME="${VRC_LAYER_NAME}")
 target_compile_options(ets2_ats_vr_controls PRIVATE ${VRC_WARN_FLAGS})
-target_link_libraries(ets2_ats_vr_controls PRIVATE OpenXR::headers user32)
+target_link_libraries(ets2_ats_vr_controls PRIVATE OpenXR::headers user32 gdi32)
 ck_add_version_info(ets2_ats_vr_controls "ETS2 ATS VR Controls (OpenXR API layer)" "ets2_ats_vr_controls.dll")
 set(VRC_LAYER_DLL "ets2_ats_vr_controls.dll")
 configure_file(${CMAKE_SOURCE_DIR}/src/${VRC_LAYER_NAME}.json.in ${CMAKE_BINARY_DIR}/${VRC_LAYER_NAME}.json @ONLY)
@@ -71,11 +73,18 @@ target_include_directories(config_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_options(config_test PRIVATE ${VRC_WARN_FLAGS})
 target_compile_definitions(config_test PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
+# unit test of the VR menu + keyboard (made-up frames, no OpenXR; writes a config.ini and the panel pictures into a folder)
+add_executable(vr_menu_test tests/vr_menu_test.cpp src/vr_menu.cpp src/config.cpp src/log.cpp)
+target_include_directories(vr_menu_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_options(vr_menu_test PRIVATE ${VRC_WARN_FLAGS})
+target_compile_definitions(vr_menu_test PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(vr_menu_test PRIVATE user32 gdi32)
+
 # end to end: a fake game (the real OpenXR loader) -> the layer -> a mock runtime with scripted controller input
 add_library(mock_runtime SHARED tests/mock_runtime.cpp)
 target_compile_options(mock_runtime PRIVATE ${VRC_WARN_FLAGS})
 target_compile_definitions(mock_runtime PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(mock_runtime PRIVATE OpenXR::headers)
+target_link_libraries(mock_runtime PRIVATE OpenXR::headers d3d11)
 configure_file(${CMAKE_SOURCE_DIR}/tests/mock_runtime.json.in ${CMAKE_BINARY_DIR}/mock_runtime.json @ONLY)
 add_custom_command(TARGET mock_runtime POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/mock_runtime.json $<TARGET_FILE_DIR:mock_runtime>/mock_runtime.json)
@@ -83,7 +92,7 @@ add_custom_command(TARGET mock_runtime POST_BUILD
 add_executable(fake_game tests/fake_game.cpp)
 target_compile_options(fake_game PRIVATE ${VRC_WARN_FLAGS})
 target_compile_definitions(fake_game PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(fake_game PRIVATE OpenXR::openxr_loader OpenXR::headers)
+target_link_libraries(fake_game PRIVATE OpenXR::openxr_loader OpenXR::headers d3d11)
 add_custom_command(TARGET fake_game POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:OpenXR::openxr_loader> $<TARGET_FILE_DIR:fake_game>)
 add_dependencies(fake_game ets2_ats_vr_controls mock_runtime)

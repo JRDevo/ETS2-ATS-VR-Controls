@@ -3,14 +3,15 @@
 An implicit OpenXR API layer (`ets2_ats_vr_controls.dll`, `XR_APILAYER_JRDEVO_ets2_ats_vr_controls`) that turns VR controller buttons,
 sticks and aim into keys / mouse (SendInput) for ETS2 / ATS. Split out of the ETS2 DLAA injector on 2026-10-23 (scope: that mod
 is DLAA / DLSS only). The OpenXR input approach is the one of VR EyeCapture's controller hotkey (`E:\VR-EyeCapture\src\vr_input.cpp`).
-Read `README.md` and the header comments of `src/pad_input.h` and `src/layer.cpp` first.
+Read `README.md` and the header comments of `src/pad_input.h`, `src/layer.cpp`, `src/vr_menu.h` and `src/overlay.h` first.
 
 ## Build / test
 - CMake is NOT on PATH:
   `"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --build build --config Release`
 - First configure without internet: `-DFETCHCONTENT_SOURCE_DIR_OPENXR_SDK=E:/VR-EyeCapture/build32/_deps/openxr_sdk-src`.
-- 0 warnings (/W4) is the bar. Tests: `tests\run_unit.ps1` (CPU), `tests\run_e2e.ps1` (fake game + loader + layer + mock runtime,
-  CPU, no real input sent: VRC_TEST_EVENTS). The e2e script turns every installed implicit layer off through its
+- 0 warnings (/W4) is the bar. Tests: `tests\run_unit.ps1` (CPU; vr_menu_test writes the panel pictures to build\menu_test\*.bmp
+  -- look at them after a layout change), `tests\run_e2e.ps1` (fake game + loader + layer + mock runtime, CPU, no real input sent:
+  VRC_TEST_EVENTS; case `menu` = a D3D11 WARP session, the mock dumps the quad swapchains to build\e2e\menu\quad_*.bmp). The e2e script turns every installed implicit layer off through its
   disable_environment (Virtual Desktop, VectorXR, EyeCapture break the mock runtime).
 
 ## Install rules
@@ -32,9 +33,12 @@ Read `README.md` and the header comments of `src/pad_input.h` and `src/layer.cpp
 
 ## Roadmap (set by the user 2026-10-23)
 1. **Phase 1 (v0.1, built):** controller buttons -> keys, stick mouse + air mouse + trigger click, for the game's menus.
-2. **Phase 2:** an ON-SCREEN keyboard in the headset: full size, the user moves / resizes / hides it; point + trigger presses a
-   key (F1, 1..9 cameras, ...). Drawn by the layer as an OpenXR quad layer (no game graphics hooks).
+2. **Phase 2 (v0.2, built, not yet tested in the game):** the VR menu (both stick clicks 1 s) + a full ON-SCREEN keyboard in
+   the headset; point + trigger; move by the top bar, - / + size; the menu sets every button (keys picked on the keyboard), the
+   mouse, air hold / toggle, and writes config.ini at once. OpenXR quad layers on D3D11 swapchains (no game graphics hooks).
 3. **Phase 3:** single buttons ("hot boxes") the user places anywhere (e.g. over a cab switch); pointing + trigger on one presses
    its key. Room space: a seated player's cab does not move; a recenter moves them.
 - Own settings must never use keyboard keys (no clash with the DLAA mod's Delete / arrows / Ctrl-Shift-Alt+F10..F12): a
-  controller combo opens this mod's own VR panel (planned with phase 2).
+  controller combo (menu_combo, default both stick clicks) opens this mod's own VR panel.
+- The menu WRITES the root config.ini (the installed one, tracked in git): a dirty config.ini there can be the user's own
+  settings -- never revert it without asking. run_unit.ps1 tests the staged / committed copy.

@@ -25,17 +25,25 @@
 //   * A button the game itself uses on a profile is left to the game: ETS2 / ATS's menu = the left menu everywhere, B AND Y on
 //     Index (b/click), the right menu (= our B) on Vive / WMR. One press never does two things; a config.ini mapping that is lost
 //     this way is logged as a warning. Shared triggers and poses are kept (both see them).
+//   * Phase 2, the VR menu + keyboard (vr_menu.h): fed every frame with the controllers (aim poses with positions) and the head
+//     (our VIEW space), before the Mapper; it takes what it uses out of the frame and may change the mapping (the Mapper then
+//     uses the menu's). Its pictures go out at the game's xrEndFrame (EndFrame: overlay.h quad layers after the game's). While a
+//     controller points at a panel, the game's own actions bound to that trigger read "not pressed" (FilterBool / FilterFloat).
 // The layer calls the next layer's functions directly; our hooks never see our own calls.
 #pragma once
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <vector>
 #include <openxr/openxr.h>
 #include "config.h"
+#include "overlay.h"
 #include "pad_map.h"
 #include "profiles.h"
+#include "vr_menu.h"
 
 namespace ck {
 
@@ -60,12 +68,13 @@ struct PadDispatch {
 
 class PadInput {
 public:
-    PadInput(XrInstance instance, const PadDispatch& d, const Config& cfg);
+    // configPath: where the VR menu writes its changes; od: the swapchain functions (incomplete = no menu pictures)
+    PadInput(XrInstance instance, const PadDispatch& d, const Config& cfg, const std::wstring& configPath, const OverlayDispatch& od);
     ~PadInput();                          // releases everything still held (no OpenXR calls)
     bool Enabled() const { return enabled_; }
     void ReleaseAll();                    // every held key / button up, in every session (no OpenXR calls)
 
-    void SessionCreated(XrSession s);
+    void SessionCreated(XrSession s, ID3D11Device* dev);   // dev: the game's D3D11 device (nullptr: another graphics API)
     void SessionDestroyed(XrSession s);   // before the game's call is forwarded (our spaces go first)
     void SessionState(XrSession s, XrSessionState st);
 
@@ -79,6 +88,12 @@ public:
     // game thread: after the game's xrWaitFrame (its predicted display time) / before its xrBeginFrame is forwarded (the tick)
     void FrameWaited(XrSession s, XrTime predictedDisplayTime);
     void BeginFrame(XrSession s);
+    // the game's xrEndFrame: true = send *out instead (the game's layers + the menu's; `layers` holds the list)
+    bool EndFrame(XrSession s, const XrFrameEndInfo* in, XrFrameEndInfo* out, std::vector<const XrCompositionLayerBaseHeader*>& layers);
+    void EndFrameRefused(XrSession s, XrResult r);   // the runtime refused the frame with our layers: pictures off (session)
+    // the game reads an action: a trigger the menu owns this frame reads released
+    void FilterBool(XrSession s, const XrActionStateGetInfo* gi, XrActionStateBoolean* st);
+    void FilterFloat(XrSession s, const XrActionStateGetInfo* gi, XrActionStateFloat* st);
 
 private:
     struct SessionData {
@@ -94,7 +109,11 @@ private:
         std::vector<XrActiveActionSet> gameActive;   // the game's active sets: its last sync (or its attach list before that)
         double   lastTick = -1;
         XrSpace  local = XR_NULL_HANDLE;
+        XrSpace  view = XR_NULL_HANDLE;   // the head (VR menu placement)
         XrSpace  aim[2] = {XR_NULL_HANDLE, XR_NULL_HANDLE};
+        bool     headOk = false;
+        Pose     head;
+        std::unique_ptr<Overlay> ov;      // the menu's pictures (D3D11 sessions)
         bool     spacesFailed = false;
         VrPad::Mapper mapper;
         uint64_t ticks = 0, readFails = 0, ownSyncs = 0;
@@ -107,6 +126,7 @@ private:
     bool PrepareLocked(const std::vector<XrActionSet>& appSets);
     void OffLocked(SessionData& sd, const char* what, XrResult r);
     void ReadLocked(XrSession s, SessionData& sd, VrPad::Frame& f);
+    bool MenuOwnsLocked(XrSession s, XrAction a, XrPath sub);
     void ProfilesLocked(XrSession s, SessionData& sd, const VrPad::Frame& f, double now);
     std::string PathString(XrPath p);
     XrPath Path(const std::string& s);
@@ -131,6 +151,10 @@ private:
     std::string ownSummary_;
     std::map<XrSession, SessionData> sessions_;
     double selfAttachS_ = 20.0;
+    // phase 2
+    std::unique_ptr<VrMenu> menu_;
+    OverlayDispatch od_;
+    std::set<XrAction> gameTrig_;     // the game's actions bound to a trigger (select on ETS2 / ATS)
 };
 
 double NowS();   // monotonic seconds (QPC)

@@ -9,13 +9,18 @@
 //   xrCreateActionSet / xrCreateAction    the game's input (priorities, which set an action belongs to)
 //   xrSuggestInteractionProfileBindings   the game's bindings (merged with ours at its attach)
 //   xrAttachSessionActionSets / xrSyncActions   our action set appended to the game's
+//   xrEndFrame                            the VR menu's quad layers after the game's (only while it is shown)
+//   xrGetActionStateBoolean / Float       the game's trigger reads released while it points at the VR menu
 #include <windows.h>
+#include <d3d11.h>
 #include <cstring>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <openxr/openxr.h>
+#define XR_USE_GRAPHICS_API_D3D11
+#include <openxr/openxr_platform.h>
 #include <openxr/openxr_loader_negotiation.h>
 #include "config.h"
 #include "log.h"
@@ -40,6 +45,9 @@ struct InstanceData {
     PFN_xrSuggestInteractionProfileBindings SuggestInteractionProfileBindings = nullptr;
     PFN_xrAttachSessionActionSets           AttachSessionActionSets = nullptr;
     PFN_xrSyncActions                       SyncActions = nullptr;
+    PFN_xrEndFrame                          EndFrame = nullptr;
+    PFN_xrGetActionStateBoolean             GetActionStateBoolean = nullptr;
+    PFN_xrGetActionStateFloat               GetActionStateFloat = nullptr;
     std::unique_ptr<PadInput>               pad;
 };
 
@@ -125,7 +133,10 @@ XrResult XRAPI_CALL Hook_CreateSession(XrInstance instance, const XrSessionCreat
             std::lock_guard<std::mutex> lk(g_lock);
             g_sessions[*session] = id;
         }
-        if (id->pad) id->pad->SessionCreated(*session);
+        ID3D11Device* dev = nullptr;                   // the game's graphics: the VR menu draws only into D3D11 swapchains
+        for (const XrBaseInStructure* b = ci ? static_cast<const XrBaseInStructure*>(ci->next) : nullptr; b; b = b->next)
+            if (b->type == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR) dev = reinterpret_cast<const XrGraphicsBindingD3D11KHR*>(b)->device;
+        if (id->pad) id->pad->SessionCreated(*session, dev);
         LOGI("session %p created", (void*)*session);
     }
     return r;
@@ -168,6 +179,39 @@ XrResult XRAPI_CALL Hook_BeginFrame(XrSession session, const XrFrameBeginInfo* b
         try { id->pad->BeginFrame(session); } catch (...) { LOGE("frame tick failed (exception) -- skipped"); }
     }
     return id->BeginFrame(session, bi);
+}
+
+XrResult XRAPI_CALL Hook_EndFrame(XrSession session, const XrFrameEndInfo* fe) {
+    InstanceData* id = FindSession(session);
+    if (!id || !id->EndFrame) return XR_ERROR_HANDLE_INVALID;
+    if (id->pad && fe) {
+        std::vector<const XrCompositionLayerBaseHeader*> layers;
+        XrFrameEndInfo mine{};
+        bool ours = false;
+        try { ours = id->pad->EndFrame(session, fe, &mine, layers); } catch (...) { LOGE("menu layers failed (exception) -- skipped"); }
+        if (ours) {
+            const XrResult r = id->EndFrame(session, &mine);
+            if (XR_SUCCEEDED(r)) return r;
+            id->pad->EndFrameRefused(session, r);      // the game's own frame below
+        }
+    }
+    return id->EndFrame(session, fe);
+}
+
+XrResult XRAPI_CALL Hook_GetActionStateBoolean(XrSession session, const XrActionStateGetInfo* gi, XrActionStateBoolean* st) {
+    InstanceData* id = FindSession(session);
+    if (!id || !id->GetActionStateBoolean) return XR_ERROR_HANDLE_INVALID;
+    const XrResult r = id->GetActionStateBoolean(session, gi, st);
+    if (XR_SUCCEEDED(r) && id->pad) id->pad->FilterBool(session, gi, st);
+    return r;
+}
+
+XrResult XRAPI_CALL Hook_GetActionStateFloat(XrSession session, const XrActionStateGetInfo* gi, XrActionStateFloat* st) {
+    InstanceData* id = FindSession(session);
+    if (!id || !id->GetActionStateFloat) return XR_ERROR_HANDLE_INVALID;
+    const XrResult r = id->GetActionStateFloat(session, gi, st);
+    if (XR_SUCCEEDED(r) && id->pad) id->pad->FilterFloat(session, gi, st);
+    return r;
 }
 
 XrResult XRAPI_CALL Hook_CreateActionSet(XrInstance instance, const XrActionSetCreateInfo* ci, XrActionSet* set) {
@@ -234,7 +278,7 @@ struct HookEntry { const char* name; PFN_xrVoidFunction fn; };
 const HookEntry kHooks[] = {
     HOOK(DestroyInstance), HOOK(CreateSession), HOOK(DestroySession), HOOK(PollEvent), HOOK(WaitFrame), HOOK(BeginFrame),
     HOOK(CreateActionSet), HOOK(CreateAction), HOOK(SuggestInteractionProfileBindings), HOOK(AttachSessionActionSets),
-    HOOK(SyncActions),
+    HOOK(SyncActions), HOOK(EndFrame), HOOK(GetActionStateBoolean), HOOK(GetActionStateFloat),
 };
 #undef HOOK
 
@@ -292,7 +336,8 @@ XrResult XRAPI_CALL Layer_CreateApiLayerInstance(const XrInstanceCreateInfo* inf
 #define RESOLVE(fn) id->nextGipa(*instance, "xr" #fn, reinterpret_cast<PFN_xrVoidFunction*>(&id->fn))
         RESOLVE(DestroyInstance); RESOLVE(CreateSession); RESOLVE(DestroySession); RESOLVE(PollEvent); RESOLVE(WaitFrame);
         RESOLVE(BeginFrame); RESOLVE(CreateActionSet); RESOLVE(CreateAction); RESOLVE(SuggestInteractionProfileBindings);
-        RESOLVE(AttachSessionActionSets); RESOLVE(SyncActions);
+        RESOLVE(AttachSessionActionSets); RESOLVE(SyncActions); RESOLVE(EndFrame); RESOLVE(GetActionStateBoolean);
+        RESOLVE(GetActionStateFloat);
 #undef RESOLVE
         PadDispatch d;
         d.CreateActionSet = id->CreateActionSet;
@@ -305,7 +350,13 @@ XrResult XRAPI_CALL Layer_CreateApiLayerInstance(const XrInstanceCreateInfo* inf
         RESOLVE_D(GetActionStateVector2f); RESOLVE_D(GetCurrentInteractionProfile); RESOLVE_D(CreateActionSpace);
         RESOLVE_D(CreateReferenceSpace); RESOLVE_D(LocateSpace); RESOLVE_D(DestroySpace);
 #undef RESOLVE_D
-        id->pad = std::make_unique<PadInput>(*instance, d, g_cfg);
+        OverlayDispatch od;
+#define RESOLVE_O(fn) id->nextGipa(*instance, "xr" #fn, reinterpret_cast<PFN_xrVoidFunction*>(&od.fn))
+        RESOLVE_O(EnumerateSwapchainFormats); RESOLVE_O(CreateSwapchain); RESOLVE_O(DestroySwapchain);
+        RESOLVE_O(EnumerateSwapchainImages); RESOLVE_O(AcquireSwapchainImage); RESOLVE_O(WaitSwapchainImage);
+        RESOLVE_O(ReleaseSwapchainImage);
+#undef RESOLVE_O
+        id->pad = std::make_unique<PadInput>(*instance, d, g_cfg, g_cfg.loadedFrom.empty() ? g_dllDir + L"\\config.ini" : g_cfg.loadedFrom, od);
         if (!id->pad->Enabled()) id->pad.reset();
         LOGI("instance %p created: app '%s' (engine '%s') -- %s", (void*)*instance, info ? info->applicationInfo.applicationName : "?",
              info ? info->applicationInfo.engineName : "?",

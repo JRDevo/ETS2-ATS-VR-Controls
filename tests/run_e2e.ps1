@@ -16,6 +16,9 @@
       vive       Vive wands: the game's right menu = our B, left to the game with a warning
       unfocus    the session leaves FOCUSED while the trigger is held: released at once, pressed again after
       restore    the runtime refuses our bindings merged into the game's Touch suggestion: the game's own is put back
+      menu       a D3D11 game: both stick clicks held 1 s open the VR menu (quad layers on D3D11 swapchains), the right hand
+                 points at the Mouse tab and at "air mouse: toggled on" (written to config.ini), the game never sees those
+                 trigger pulls, a short stick click alone is still the horn, both stick clicks again close it
     Also checked: the layer never syncs alone while the game syncs (mock "solo" syncs = 0); own sync only after 2 s of FOCUSED.
     Windows PowerShell 5.1 compatible:  powershell -ExecutionPolicy Bypass -File tests\run_e2e.ps1 [-Only ats]
 #>
@@ -75,6 +78,7 @@ function RunCase($name, $apps, $gameArgs, $seconds, [hashtable]$extraEnv) {
     $env:VRC_MOCK_UNFOCUS = $null
     $env:VRC_MOCK_REFUSE_MERGED = $null
     $env:VRC_MOCK_PROFILE = $null
+    $env:VRC_MOCK_DUMP = $null
     if ($extraEnv) { foreach ($k in $extraEnv.Keys) { Set-Item "env:$k" $extraEnv[$k] } }
     Write-Host "`n=== $name" -ForegroundColor Cyan
     $out = Join-Path $d 'game.txt'
@@ -201,6 +205,40 @@ if (-not $Only -or $Only -eq 'restore') {
     $last = @($r.mock -split "`n" | Where-Object { $_ -match '^suggest /interaction_profiles/oculus/touch_controller \d+:' }) | Select-Object -Last 1
     Check 'restore' ($last -match 'touch_controller 3:') "the last Touch suggestion is the game's 3 bindings ($last)"
     Check 'restore' ($r.game -match 'game select right down') 'the game keeps its select'
+}
+# ---- menu: the VR menu on a D3D11 session. The menu opens 0.75 m ahead, 8 deg down: the Mouse tab is at aim yaw 0 / pitch 5,
+# "Toggled on" (air mouse) at yaw 16.1 / pitch -14.2 (vr_menu.cpp layout; mock: + yaw = right)
+if (-not $Only -or $Only -eq 'menu') {
+    $menuScript = '1.0-2.4:/user/hand/left/input/thumbstick/click=1;1.0-2.4:/user/hand/right/input/thumbstick/click=1;' +
+                  '2.6-3.6:/user/hand/right/input/aim/pose=0,5,0,5;' +
+                  '3.0-3.3:/user/hand/right/input/trigger/value=0.9;3.0-3.3:/user/hand/right/input/select/click=1;' +
+                  '3.7-4.6:/user/hand/right/input/aim/pose=16.1,-14.2,16.1,-14.2;' +
+                  '4.0-4.3:/user/hand/right/input/trigger/value=0.9;4.0-4.3:/user/hand/right/input/select/click=1;' +
+                  '5.0-5.1:/user/hand/right/input/thumbstick/click=1;' +
+                  '5.5-6.8:/user/hand/left/input/thumbstick/click=1;5.5-6.8:/user/hand/right/input/thumbstick/click=1'
+    $d = Join-Path $work 'menu'
+    $r = RunCase 'menu' 'fake_game.exe' @('--d3d11') 7.5 @{ VRC_MOCK_INPUT = $menuScript; VRC_MOCK_DUMP = $d }
+    $b = Buttons $r.events
+    Write-Host "  events: $b"
+    $cfgText = Get-Content (Join-Path $d 'config.ini') -Raw
+    Check 'menu' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
+    Check 'menu' ($r.log -match 'VR menu open') 'log: the combo opened the menu'
+    Check 'menu' ($r.log -match 'right hand presses menu tab 1') 'log: Mouse tab pressed'
+    Check 'menu' ($r.log -match 'right hand presses menu setting 41') 'log: air mouse "toggled on" pressed'
+    Check 'menu' ($r.log -match 'VR menu closed') 'log: the combo closed it'
+    Check 'menu' ($cfgText -match '(?m)^air_mode = toggle') 'config.ini: air_mode = toggle written'
+    Check 'menu' ($cfgText -match '(?m)^b = shift\+f') 'config.ini: the test''s own b line kept'
+    Check 'menu' ($r.mock -match 'swapchain 1000x800') 'the menu swapchain made on the game''s D3D11 device'
+    # (the left controller is not scripted: it points straight ahead, at the menu too -- 2 dots)
+    Check 'menu' ($r.mock -match 'endframe quads 3') 'frames with 3 quads (menu + both pointer dots)'
+    Check 'menu' ($r.mock -match 'endframe quads 0[\s\S]*endframe quads 3[\s\S]*endframe quads 0') 'no quads before / after the menu'
+    Check 'menu' ($r.mock -notmatch 'REFUSED \(quad|endframe REFUSED') 'every frame with our layers accepted'
+    Check 'menu' ($r.mock -notmatch 'session destroyed with') 'our swapchains destroyed before the session'
+    Check 'menu' (Test-Path (Join-Path $d 'quad_1000x800.bmp')) 'the menu picture reached the swapchain (quad_1000x800.bmp)'
+    Check 'menu' ($r.game -notmatch 'game select right down at [34]\.') 'the game never saw the trigger pulls on the menu'
+    Check 'menu' ($b -notmatch 'mouse 0') 'no left click from the menu trigger pulls'
+    Check 'menu' ($b -eq 'key 023 down | key 023 up') "only the short right stick click (horn H) went out ($b)"
+    Check 'menu' ($r.log -notmatch ' E ') 'log: no errors'
 }
 # ---- touch
 if (-not $Only -or $Only -eq 'touch') {

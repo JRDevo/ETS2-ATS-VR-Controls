@@ -26,7 +26,8 @@ bool PadDispatch::Complete() const {
            GetCurrentInteractionProfile && CreateActionSpace && CreateReferenceSpace && LocateSpace && DestroySpace;
 }
 
-PadInput::PadInput(XrInstance instance, const PadDispatch& d, const Config& cfg) : inst_(instance), d_(d), cfg_(cfg) {
+PadInput::PadInput(XrInstance instance, const PadDispatch& d, const Config& cfg, const std::wstring& configPath, const OverlayDispatch& od)
+    : inst_(instance), d_(d), cfg_(cfg), od_(od) {
     if (!d_.Complete()) {
         LOGW("the next layer / runtime did not return every action function -- controllers off, the game's input untouched");
         enabled_ = false;
@@ -37,12 +38,22 @@ PadInput::PadInput(XrInstance instance, const PadDispatch& d, const Config& cfg)
         LOGI("VRC_TEST_SELF_ATTACH_S=%.1f (test): a game without input gets our action set after %.1f s", selfAttachS_, selfAttachS_);
     }
     Sink().SetLogEvents(cfg_.logInputs);
+    if (enabled_ && cfg_.menu) {
+        menu_ = std::make_unique<VrMenu>(cfg_, configPath);
+        LOGI("VR menu: hold %s + %s for %.1f s to open it%s", VrPad::BtnNames()[cfg_.menuBtnA], VrPad::BtnNames()[cfg_.menuBtnB],
+             (double)cfg_.menuHold, od_.Complete() ? "" : " (no swapchain functions from the runtime: it cannot be shown)");
+    }
 }
 
-PadInput::~PadInput() { ReleaseAll(); }
+PadInput::~PadInput() {
+    ReleaseAll();
+    std::lock_guard<std::mutex> lk(m_);
+    for (auto& kv : sessions_) if (kv.second.ov) kv.second.ov->Abandon();   // (the instance is gone: no OpenXR calls)
+}
 
 void PadInput::ReleaseAll() {
     std::lock_guard<std::mutex> lk(m_);
+    if (menu_) menu_->ReleaseAll(Sink());
     for (auto& kv : sessions_) kv.second.mapper.Step(VrPad::Frame(), false, 0.0, cfg_.pad, Sink());
 }
 
@@ -65,9 +76,12 @@ XrPath PadInput::Path(const std::string& s) {
     return p;
 }
 
-void PadInput::SessionCreated(XrSession s) {
+void PadInput::SessionCreated(XrSession s, ID3D11Device* dev) {
     std::lock_guard<std::mutex> lk(m_);
-    sessions_[s] = SessionData();
+    SessionData& sd = sessions_[s] = SessionData();
+    if (!menu_) return;
+    if (!dev) LOGW("the game's session does not use D3D11 -- the VR menu cannot be shown in this session (the controls work)");
+    else if (od_.Complete()) sd.ov = std::make_unique<Overlay>(s, dev, od_);
 }
 
 void PadInput::SessionDestroyed(XrSession s) {
@@ -76,7 +90,9 @@ void PadInput::SessionDestroyed(XrSession s) {
     if (it == sessions_.end()) return;
     SessionData& sd = it->second;
     sd.mapper.Step(VrPad::Frame(), false, 0.0, cfg_.pad, Sink());   // nothing stays held
-    for (XrSpace* sp : { &sd.local, &sd.aim[0], &sd.aim[1] })
+    if (menu_) menu_->ReleaseAll(Sink());
+    sd.ov.reset();                                                   // our swapchains go before the session
+    for (XrSpace* sp : { &sd.local, &sd.view, &sd.aim[0], &sd.aim[1] })
         if (*sp != XR_NULL_HANDLE) { d_.DestroySpace(*sp); *sp = XR_NULL_HANDLE; }
     LOGI("session %p ends: %llu frames read, %llu own syncs, %llu read failures", (void*)s, (unsigned long long)sd.ticks,
          (unsigned long long)sd.ownSyncs, (unsigned long long)sd.readFails);
@@ -94,7 +110,10 @@ void PadInput::SessionState(XrSession s, XrSessionState st) {
         sd.focusedSince = NowS();
     }
     sd.focused = f;
-    if (!f) sd.mapper.Step(VrPad::Frame(), false, 0.0, cfg_.pad, Sink());   // now, not at the next frame (there may be none)
+    if (!f) {                                                          // now, not at the next frame (there may be none)
+        sd.mapper.Step(VrPad::Frame(), false, 0.0, cfg_.pad, Sink());
+        if (menu_) menu_->ReleaseAll(Sink());
+    }
 }
 
 void PadInput::ActionSetCreated(XrActionSet set, const XrActionSetCreateInfo* ci) {
@@ -202,6 +221,10 @@ bool PadInput::PrepareLocked(const std::vector<XrActionSet>& appSets) {
         std::vector<XrActionSuggestedBinding> all;
         auto bit = base.find(prof);
         if (bit != base.end()) all = bit->second;
+        for (const XrActionSuggestedBinding& g : all) {                // the game's trigger actions (hidden while the menu owns it)
+            const std::string gp = PathString(g.binding);
+            if (gp.find("/input/trigger") != std::string::npos || gp.find("/input/select") != std::string::npos) gameTrig_.insert(g.action);
+        }
         // a button the game itself uses on this profile is left to the game (Index: its menu is b/click; Vive / WMR: the right
         // menu) -- one press must not do two things. The trigger and the aim pose are shared (both see them).
         std::vector<XrActionSuggestedBinding> ours;
@@ -375,6 +398,10 @@ void PadInput::ReadLocked(XrSession s, SessionData& sd, VrPad::Frame& f) {
         rc.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
         rc.poseInReferenceSpace.orientation.w = 1.0f;
         XrResult r = d_.CreateReferenceSpace(s, &rc, &sd.local);
+        if (XR_SUCCEEDED(r) && menu_) {
+            rc.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
+            if (XR_FAILED(d_.CreateReferenceSpace(s, &rc, &sd.view))) { sd.view = XR_NULL_HANDLE; LOGW("no VIEW space: the VR menu opens at the room's centre"); }
+        }
         for (int h = 0; XR_SUCCEEDED(r) && h < 2; ++h) {
             XrActionSpaceCreateInfo ac{XR_TYPE_ACTION_SPACE_CREATE_INFO};
             ac.action = acts_[kActAim];
@@ -423,6 +450,18 @@ void PadInput::ReadLocked(XrSession s, SessionData& sd, VrPad::Frame& f) {
                        (loc.locationFlags & XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT);
             f.q[h][0] = loc.pose.orientation.x; f.q[h][1] = loc.pose.orientation.y;
             f.q[h][2] = loc.pose.orientation.z; f.q[h][3] = loc.pose.orientation.w;
+            f.pos[h] = XR_SUCCEEDED(r) && (loc.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT);
+            f.p[h][0] = loc.pose.position.x; f.p[h][1] = loc.pose.position.y; f.p[h][2] = loc.pose.position.z;
+        }
+    }
+    sd.headOk = false;
+    if (sd.view != XR_NULL_HANDLE && sd.displayTime > 0) {
+        XrSpaceLocation loc{XR_TYPE_SPACE_LOCATION};
+        if (XR_SUCCEEDED(d_.LocateSpace(sd.view, sd.local, sd.displayTime, &loc)) &&
+            (loc.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) && (loc.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT)) {
+            sd.headOk = true;
+            sd.head.q = Q4{ loc.pose.orientation.x, loc.pose.orientation.y, loc.pose.orientation.z, loc.pose.orientation.w };
+            sd.head.p = V3{ loc.pose.position.x, loc.pose.position.y, loc.pose.position.z };
         }
     }
     if (fails) {
@@ -518,7 +557,71 @@ void PadInput::BeginFrame(XrSession s) {
     }
     const double dt = sd.lastTick < 0 ? 0.0 : now - sd.lastTick;   // since the last Step (frames that waited are not lost)
     sd.lastTick = now;
+    if (menu_) {                                                     // first: it takes what it uses out of the frame
+        menu_->Update(f, live, sd.headOk, sd.head, now, Sink());
+        cfg_.pad = menu_->Pad();
+    }
     sd.mapper.Step(f, live, dt, cfg_.pad, Sink());   // (not live = everything held is released)
+}
+
+bool PadInput::EndFrame(XrSession s, const XrFrameEndInfo* in, XrFrameEndInfo* out, std::vector<const XrCompositionLayerBaseHeader*>& layers) {
+    if (!menu_ || !in) return false;
+    std::lock_guard<std::mutex> lk(m_);
+    auto it = sessions_.find(s);
+    if (it == sessions_.end() || !menu_->AnyShown()) return false;
+    SessionData& sd = it->second;
+    if (!sd.ov || sd.ov->Dead() || sd.local == XR_NULL_HANDLE) return false;
+    std::vector<QuadIn> quads;
+    for (int p = 0; p < VrMenu::kPanCount; ++p) {
+        const VrMenu::Panel& pn = menu_->Pan(p);
+        if (!pn.show || pn.px.empty()) continue;
+        QuadIn q;
+        q.slot = p; q.pose = pn.pose; q.w = pn.width; q.h = pn.Height(); q.pw = pn.pw; q.ph = pn.ph; q.px = pn.px.data(); q.version = pn.version;
+        quads.push_back(q);
+    }
+    for (int h = 0; h < 2; ++h) {
+        QuadIn q;
+        if (!menu_->Cursor(h, &q.pose)) continue;
+        q.slot = 2; q.w = q.h = VrMenu::kCursorM; q.pw = q.ph = VrMenu::kCursorPx; q.px = menu_->CursorPixels().data(); q.version = 1;
+        quads.push_back(q);
+    }
+    std::vector<const XrCompositionLayerBaseHeader*> ours;
+    sd.ov->Frame(quads, sd.local, ours);
+    if (ours.empty() || in->layerCount + ours.size() > 16) return false;   // (16 = the least any runtime allows)
+    layers.assign(in->layers, in->layers + (in->layers ? in->layerCount : 0));
+    layers.insert(layers.end(), ours.begin(), ours.end());
+    *out = *in;
+    out->layerCount = (uint32_t)layers.size();
+    out->layers = layers.data();
+    return true;
+}
+
+void PadInput::EndFrameRefused(XrSession s, XrResult r) {
+    std::lock_guard<std::mutex> lk(m_);
+    auto it = sessions_.find(s);
+    if (it == sessions_.end() || !it->second.ov) return;
+    char b[96];
+    snprintf(b, sizeof(b), "the runtime refused xrEndFrame with the menu's layers (%d); the game's frame was sent alone", (int)r);
+    it->second.ov->Kill(b);
+}
+
+bool PadInput::MenuOwnsLocked(XrSession, XrAction a, XrPath sub) {
+    if (!menu_ || !menu_->AnyShown() || !gameTrig_.count(a)) return false;
+    if (sub == hand_[0]) return menu_->HandOnPanel(0);
+    if (sub == hand_[1]) return menu_->HandOnPanel(1);
+    return menu_->HandOnPanel(0) || menu_->HandOnPanel(1);
+}
+
+void PadInput::FilterBool(XrSession s, const XrActionStateGetInfo* gi, XrActionStateBoolean* st) {
+    if (!menu_ || !gi || !st) return;
+    std::lock_guard<std::mutex> lk(m_);
+    if (MenuOwnsLocked(s, gi->action, gi->subactionPath)) { st->currentState = XR_FALSE; st->changedSinceLastSync = XR_FALSE; }
+}
+
+void PadInput::FilterFloat(XrSession s, const XrActionStateGetInfo* gi, XrActionStateFloat* st) {
+    if (!menu_ || !gi || !st) return;
+    std::lock_guard<std::mutex> lk(m_);
+    if (MenuOwnsLocked(s, gi->action, gi->subactionPath)) { st->currentState = 0.0f; st->changedSinceLastSync = XR_FALSE; }
 }
 
 }  // namespace ck
