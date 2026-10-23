@@ -67,6 +67,7 @@ public:
         std::vector<Elem>     el;
         std::vector<uint32_t> px;     // BGRA, premultiplied, top-down
         uint64_t version = 0;         // + 1 on every redraw
+        int      dirty[4] = {};       // x0, y0, x1, y1 changed since TakeDirty (empty: x1 <= x0)
         double   Height() const { return width * ph / pw; }
     };
 
@@ -85,6 +86,8 @@ public:
     bool HandOnPanel(int h) const { return h >= 0 && h < 2 && (hov_[h].pan >= 0 || press_[h].pan >= 0 || grab_[h].pan >= 0); }
     const MenuLook& Look() const { return look_; }
     const Panel& Pan(int i) const { return pan_[i]; }
+    // the area of panel p that changed since the last call (x0, y0, x1, y1; empty: x1 <= x0), then cleared (overlay.h)
+    void TakeDirty(int p, int out[4]);
     // the pointer dot of hand h: shown + its pose (on the panel, facing out)
     bool Cursor(int h, Pose* p) const;
     const std::vector<uint32_t>& CursorPixels() const { return cursorPx_; }

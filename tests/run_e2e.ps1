@@ -73,12 +73,12 @@ $script = '1.0-1.5:/user/hand/right/input/trigger/value=0.9;1.0-1.5:/user/hand/r
           '3.4-4.0:/user/hand/right/input/aim/pose=0,0,10,0;4.0-4.6:/user/hand/right/input/aim/pose=10,0;' +
           '4.8-5.0:/user/hand/right/input/b/click=1'
 
-function RunCase($name, $apps, $gameArgs, $seconds, [hashtable]$extraEnv) {
+function RunCase($name, $apps, $gameArgs, $seconds, [hashtable]$extraEnv, [string]$cfgExtra = '') {
     $d = Join-Path $work $name
     if (Test-Path $d) { Remove-Item $d -Recurse -Force }
     New-Item -ItemType Directory -Force $d | Out-Null
     $cfg = Join-Path $d 'config.ini'
-    "apps = $apps`nb = shift+f`nlog_inputs = 1`n" | Set-Content -Encoding ASCII $cfg
+    "apps = $apps`nb = shift+f`nlog_inputs = 1`n$cfgExtra" | Set-Content -Encoding ASCII $cfg
     $env:VRC_CONFIG = $cfg
     $env:VRC_LOG_DIR = Join-Path $d 'logs'
     $env:VRC_TEST_EVENTS = Join-Path $d 'events.txt'
@@ -253,6 +253,19 @@ if (-not $Only -or $Only -eq 'menu') {
     Check 'menu' ($b -notmatch 'mouse 0') 'no left click from the menu trigger pulls'
     Check 'menu' ($b -eq 'key 023 down | key 023 up') "only the short right stick click (horn H) went out ($b)"
     Check 'menu' ($r.log -notmatch ' E ') 'log: no errors'
+}
+# ---- menusmall: the menu 0.3 m wide at 0.76 m (~22.6 deg = ~680 headset px at 30 px/deg): its 1000 x 800 picture is shrunk
+# on the CPU to the 10 % step just above that (68.3 % = 683 x 546) before the swapchain, so the compositor never squeezes it 2-3x
+if (-not $Only -or $Only -eq 'menusmall') {
+    $d = Join-Path $work 'menusmall'
+    $s = '1.0-2.6:/user/hand/left/input/squeeze/value=1;1.0-2.6:/user/hand/right/input/squeeze/value=1;1.2-2.6:/user/hand/left/input/thumbstick/click=1;' +
+         '2.8-3.6:/user/hand/right/input/aim/pose=-4,-6,-4,-6'   # (then hovers a button: only that area is shrunk again)
+    $r = RunCase 'menusmall' 'fake_game.exe' @('--d3d11') 3.5 @{ VRC_MOCK_INPUT = $s; VRC_MOCK_DUMP = $d } "menu_place = 0, -0.104, -0.743, 0, -8, 0.3`n"
+    Check 'menusmall' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
+    Check 'menusmall' ($r.log -match 'menu shown at 683 x 546 \(68 % of its 1000 x 800 picture') 'log: the menu shrunk to its size in the headset'
+    Check 'menusmall' ($r.mock -match 'swapchain 683x546 mips 6') 'the swapchain has the shrunk size (+ mips)'
+    Check 'menusmall' (Test-Path (Join-Path $d 'quad_683x546.bmp')) 'the shrunk picture reached the swapchain'
+    Check 'menusmall' ($r.mock -notmatch 'endframe REFUSED|REFUSED \(quad') 'every frame accepted'
 }
 # ---- touch
 if (-not $Only -or $Only -eq 'touch') {

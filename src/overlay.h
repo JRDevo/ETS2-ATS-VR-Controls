@@ -4,9 +4,12 @@
 //     (XrGraphicsBindingD3D11KHR). Any other graphics API: no menu pictures (logged once), the controls work as before.
 //   * A picture is uploaded only when it changed (CPU pixels -> UpdateSubresource on the device's immediate context, at the
 //     game's xrEndFrame = its render thread); the runtime keeps showing the last released image of a swapchain.
-//   * Mipmaps: a panel seen smaller than its picture (a 1600 px keyboard 0.3 m wide) shimmers without them, so each swapchain
-//     has a mip chain (down to ~16 px) built on the CPU at upload (2x2 box filter in linear light). A runtime that refuses
-//     mipCount > 1 gets one level (as before).
+//   * Size: a panel seen smaller than its picture (a 1081 px keyboard 0.2 m wide = ~450 headset pixels) shimmers when the
+//     compositor squeezes it -- and a runtime may ignore mipmaps (Virtual Desktop did). So the picture is first SHRUNK on the
+//     CPU to about the size it has in the headset (QuadIn::wantPx, from its angular size; an area filter in linear light), in
+//     steps of 10 % with some hysteresis (a new size = a new swapchain); only the changed area (QuadIn::dirty) is shrunk
+//     again. Then a mip chain from that (down to ~16 px, 2x2 box in linear light) for a runtime that does use mipmaps; one
+//     that refuses mipCount > 1 gets one level.
 //   * Any failure (create / acquire / wait / release, or the runtime refusing the frame with our layers): the pictures are off
 //     for this session (logged); PadInput then re-sends the game's frame unchanged.
 #pragma once
@@ -39,6 +42,8 @@ struct QuadIn {
     int             pw = 0, ph = 0;    // pixels
     const uint32_t* px = nullptr;      // BGRA premultiplied, top-down
     uint64_t        version = 0;       // uploaded again when it changes
+    double          wantPx = 0;        // the width it has in the headset (pixels); 0 = use the picture as it is
+    int             dirty[4] = {};     // x0, y0, x1, y1 of px changed since the last call (empty: x1 <= x0)
 };
 
 class Overlay {
@@ -58,11 +63,14 @@ private:
         int w = 0, h = 0;
         std::vector<ID3D11Texture2D*> img;
         uint32_t mips = 1;
+        double   scale = 0;            // the picture is shrunk by this (0 = not yet chosen)
+        std::vector<uint32_t> shrunk;  // the shrunk picture (BGRA)
+        int      srcW = 0, srcH = 0;   // the picture it was shrunk from
         uint64_t uploaded = ~0ull;
         bool released = false;         // an image was released once (it may be shown)
     };
     bool Create(int slot, int w, int h);
-    bool Upload(int slot, const QuadIn& q);
+    bool Upload(int slot, const QuadIn& q, bool full);
 
     XrSession       s_;
     ID3D11Device*   dev_ = nullptr;

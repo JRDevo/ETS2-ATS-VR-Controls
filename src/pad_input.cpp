@@ -8,6 +8,9 @@
 
 namespace ck {
 namespace {
+// pixels per degree a panel's picture gets (overlay.h): a little above today's headsets (Quest 3 via Virtual Desktop ~20-25),
+// so the compositor still squeezes it a bit (sharp), never 2-3x (shimmer)
+constexpr double kHeadsetPxPerDeg = 30.0;
 const char* const kSetName = "ets2_ats_vr_controls";
 const char* const kSetLocalized = "ETS2 ATS VR Controls";
 const char* const kSimple = "/interaction_profiles/khr/simple_controller";
@@ -587,6 +590,11 @@ bool PadInput::EndFrame(XrSession s, const XrFrameEndInfo* in, XrFrameEndInfo* o
         if (!pn.show || pn.px.empty()) continue;
         QuadIn q;
         q.slot = p; q.pose = pn.pose; q.w = pn.width; q.h = pn.Height(); q.pw = pn.pw; q.ph = pn.ph; q.px = pn.px.data(); q.version = pn.version;
+        menu_->TakeDirty(p, q.dirty);
+        if (sd.headOk) {                       // its width in the headset: angle x pixels per degree (overlay.h)
+            const double dist = Len(pn.pose.p - sd.head.p);
+            if (dist > 0.05) q.wantPx = 2.0 * std::atan(0.5 * pn.width / dist) * 57.29577951308232 * kHeadsetPxPerDeg;
+        }
         quads.push_back(q);
     }
     for (int h = 0; h < 2; ++h) {

@@ -556,7 +556,14 @@ void VrMenu::Draw(int p) {
         elState_[p][i] = (uint8_t)ElemState(p, pn.el[i]);
         DrawElem(c, pn.el[i], elState_[p][i]);
     }
+    pn.dirty[0] = pn.dirty[1] = 0;
+    pn.dirty[2] = pn.pw;
+    pn.dirty[3] = pn.ph;
     Publish(p);
+}
+
+void VrMenu::TakeDirty(int p, int out[4]) {
+    for (int i = 0; i < 4; ++i) { out[i] = pan_[p].dirty[i]; pan_[p].dirty[i] = 0; }
 }
 
 int VrMenu::ElemState(int p, const Elem& e) const {
@@ -584,6 +591,10 @@ bool VrMenu::DrawChanged(int p) {
         elState_[p][i] = (uint8_t)st;
         c.Round(e.x, e.y, e.w, e.h, 0, p == kPanMenu && e.y < 72 ? T.bar : T.bg);
         DrawElem(c, e, st);
+        int* d = pn.dirty;                             // the changed area grows by this element (+1 px for its edge)
+        const int x0 = e.x - 1, y0 = e.y - 1, x1 = e.x + e.w + 2, y1 = e.y + e.h + 2;
+        if (d[2] <= d[0]) { d[0] = x0; d[1] = y0; d[2] = x1; d[3] = y1; }
+        else { d[0] = d[0] < x0 ? d[0] : x0; d[1] = d[1] < y0 ? d[1] : y0; d[2] = d[2] > x1 ? d[2] : x1; d[3] = d[3] > y1 ? d[3] : y1; }
         any = true;
     }
     if (any) Publish(p);
@@ -619,7 +630,7 @@ void VrMenu::DrawElem(MenuCanvas& c, const Elem& e, int st) {
     case eRow: {
         c.Round(e.x, e.y, e.w, e.h, 12, prs ? T.press : e.on ? T.on : hov ? T.hover : T.elem);
         c.Text(e.x + 16, e.y, 200, e.h, e.text, 24, false, e.dim ? T.dim : T.text, DT_LEFT);
-        c.Text(e.x + 210, e.y, e.w - 226, e.h, e.sub, 26, true, e.dim ? T.dim : T.text, DT_RIGHT);
+        c.Text(e.x + 210, e.y, e.w - 226, e.h, e.sub, 26, true, e.dim ? T.dim : T.text, DT_RIGHT, true);
         break;
     }
     case eKey: {
