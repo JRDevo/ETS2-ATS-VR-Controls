@@ -12,7 +12,7 @@ namespace {
 
 constexpr double kPi = 3.14159265358979;
 constexpr double kDeg = kPi / 180.0;
-constexpr int kMenuW = 1000, kMenuH = 800, kKbW = 1600, kKbH = 520;
+constexpr int kMenuW = 1000, kMenuH = 800, kKbW = 1600, kKbH = 448;
 
 // ---- the keyboard (units of one key; x 0..15 main block, 15.5..18.5 navigation, 19..23 number pad)
 struct KeyDef { const char* label; const char* name; float x, y, w, h; };
@@ -478,16 +478,19 @@ void VrMenu::LayoutKb() {
         e.kind = kind; e.arg = arg; e.x = x; e.y = y; e.w = w; e.h = h; e.text = t; e.on = on;
         el.push_back(e);
     };
-    const bool picking = pickBtn_ >= 0;
-    add(eBar, 0, 0, 0, kKbW, 72, picking ? std::string("Pick the key for: ") + BtnLabel(pickBtn_) : "Keyboard", picking);
-    add(eSmaller, 0, 1312, 11, 64, 50, "\xE2\x88\x92");
-    add(eBigger, 0, 1384, 11, 64, 50, "+");
-    add(eClose, 0, 1524, 11, 64, 50, "\xC3\x97");
-    const double u = 67.0, x0 = (kKbW - 23 * u) / 2, y0 = 86;
+    // one flat block, no title bar: - / + / x sit in the empty space above the number pad (move it with the grip anywhere).
+    // Picking a key for a button: the whole keyboard gets an accent frame (the menu's bar says which button).
+    const double u = (kKbW - 16) / 23.0, x0 = 8, y0 = 8;   // 23 key units wide, 2 px of gap on each side of a key
+    auto at = [&](int kind, int arg, double kx, double ky, double kw, double kh, const std::string& t, bool on = false) {
+        add(kind, arg, (int)(x0 + kx * u + 2), (int)(y0 + ky * u + 2), (int)(kw * u - 4), (int)(kh * u - 4), t, on);
+    };
+    at(eSmaller, 0, 19, 0, 1, 1, "\xE2\x88\x92");
+    at(eBigger, 0, 20, 0, 1, 1, "+");
+    at(eClose, 0, 22, 0, 1, 1, "\xC3\x97");
     for (int k = 0; k < kKeyCount; ++k) {
         const KeyDef& d = kKeys[k];
         const int m = ModOf(d.name);
-        add(eKey, k, (int)(x0 + d.x * u + 3), (int)(y0 + d.y * u + 3), (int)(d.w * u - 6), (int)(d.h * u - 6), d.label, m >= 0 && latch_[m]);
+        at(eKey, k, d.x, d.y, d.w, d.h, d.label, m >= 0 && latch_[m]);
     }
 }
 
@@ -497,7 +500,8 @@ void VrMenu::Draw(int p) {
     if (!cv_[p]) cv_[p] = std::make_unique<MenuCanvas>(pn.pw, pn.ph);
     MenuCanvas& c = *cv_[p];
     if (!c.Ok()) return;
-    c.Round(0, 0, pn.pw, pn.ph, 0, T.bg);
+    c.Round(0, 0, pn.pw, pn.ph, 0, p == kPanKb && pickBtn_ >= 0 ? T.accent : T.bg);   // (picking: an accent frame)
+    if (p == kPanKb && pickBtn_ >= 0) c.Round(5, 5, pn.pw - 11, pn.ph - 11, 0, T.bg);
     elState_[p].assign(pn.el.size(), 0);
     for (size_t i = 0; i < pn.el.size(); ++i) {
         elState_[p][i] = (uint8_t)ElemState(p, pn.el[i]);
@@ -529,7 +533,7 @@ bool VrMenu::DrawChanged(int p) {
         if (st == elState_[p][i]) continue;
         if (e.kind == eBar) return false;            // the bar lies under its buttons: all again
         elState_[p][i] = (uint8_t)st;
-        c.Round(e.x, e.y, e.w, e.h, 0, e.y < 72 ? T.bar : T.bg);
+        c.Round(e.x, e.y, e.w, e.h, 0, p == kPanMenu && e.y < 72 ? T.bar : T.bg);
         DrawElem(c, e, st);
         any = true;
     }
@@ -570,7 +574,7 @@ void VrMenu::DrawElem(MenuCanvas& c, const Elem& e, int st) {
         break;
     }
     case eKey: {
-        c.Round(e.x, e.y, e.w, e.h, 10, prs ? T.press : e.on ? T.on : hov ? T.hover : T.elem);
+        c.Round(e.x, e.y, e.w, e.h, 8, prs ? T.press : e.on ? T.on : hov ? T.hover : T.elem);
         const bool one = e.text.size() == 1 || (unsigned char)e.text[0] >= 0x80;   // a letter / digit / arrow: bigger
         c.Text(e.x, e.y, e.w, e.h, e.text, one ? 30 : 21, true, T.text, DT_CENTER);
         break;
@@ -600,7 +604,9 @@ bool VrMenu::Hit(const VrPad::Frame&, int h, Ref* r, double* uo, double* vo) {
         r->pan = p; r->kind = eNone; r->arg = 0;
         *uo = u; *vo = v;
         const int x = (int)(u * pn.pw), y = (int)(v * pn.ph);
-        if (hov_[h].pan == p && hov_[h].kind != eNone) {   // the hovered element keeps the pointer up to 8 px outside it
+        // the hovered element keeps the pointer up to 8 px outside it -- not the menu's top bar: it lies under its own
+        // buttons, and keeping it made - / + / Keyboard / x on it unreachable
+        if (hov_[h].pan == p && hov_[h].kind != eNone && hov_[h].kind != eBar) {
             const Elem* e = Find(p, hov_[h].kind, hov_[h].arg);
             if (e && x >= e->x - 8 && y >= e->y - 8 && x < e->x + e->w + 8 && y < e->y + e->h + 8) {
                 r->kind = e->kind;

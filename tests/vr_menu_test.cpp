@@ -302,6 +302,21 @@ int main(int argc, char** argv) {
     }
     WriteBmp(dir + L"\\menu.bmp", m.Pan(VrMenu::kPanMenu));
     WriteBmp(dir + L"\\keyboard.bmp", m.Pan(VrMenu::kPanKb));
+    // the pointer on the top bar first, then onto a button on the bar: the button gets it (the bar used to keep it)
+    {
+        V3 bar, minus;
+        m.ElemCentre(VrMenu::kPanMenu, VrMenu::eBar, 0, &bar);
+        m.ElemCentre(VrMenu::kPanMenu, VrMenu::eSmaller, 0, &minus);
+        const double wm = m.Pan(VrMenu::kPanMenu).width;
+        for (int i = 0; i < 3; ++i) { VrPad::Frame f = Aim(1, bar, 0.0f); upd(f); }
+        VrPad::Frame f = Aim(1, minus, 0.0f);
+        upd(f);
+        f = Aim(1, minus, 1.0f);
+        upd(f);
+        f = Aim(1, minus, 0.0f);
+        upd(f);
+        CHECK(m.Pan(VrMenu::kPanMenu).width < wm * 0.95, "from the bar onto its - button: pressed (%.3f -> %.3f m)", wm, m.Pan(VrMenu::kPanMenu).width);
+    }
     // close: the menu's x; the keyboard STAYS (it is its own panel)
     click(1, VrMenu::kPanMenu, VrMenu::eClose, 0);
     CHECK(!m.Pan(VrMenu::kPanMenu).show && m.Pan(VrMenu::kPanKb).show, "menu closed, the keyboard stays");

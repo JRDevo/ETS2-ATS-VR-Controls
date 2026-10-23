@@ -8,7 +8,8 @@
 //     points at a panel, its trigger reaches neither the game nor the trigger's mapping (PadInput hides it).
 //   * Menu panel: tabs Buttons (every controller button and what it sends: point at one, then pick a key on the keyboard or a
 //     mouse button / none from the bar), Mouse (stick mouse, air mouse hold / toggle, speeds), Panels (sizes, bring here).
-//   * Keyboard panel: a full-size keyboard (main block, F-keys, arrows / navigation, number pad). A key goes down on the
+//   * Keyboard panel: a full-size keyboard (main block, F-keys, arrows / navigation, number pad) as one flat block (no title
+//     bar: its - / + / x are above the number pad). A key goes down on the
 //     trigger and up when it is let go. Shift / Ctrl / Alt latch: they go with the next key. While a button is being set, the
 //     keyboard picks its key instead (with the latched modifiers: shift+f).
 //   * Move: point at a panel and hold the GRIP (or the trigger on its top bar) and move the controller: it hangs on the
