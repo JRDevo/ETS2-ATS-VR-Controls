@@ -149,6 +149,31 @@ Config ParseConfig(const std::string& text) {
             (key == "menu_place" ? c.menuPlace : c.kbPlace) = p;
             continue;
         }
+        if (key == "modifier") {
+            if (lv == "off" || lv == "none" || lv == "0") { c.pad.modBtn = -1; continue; }
+            const int b = VrPad::BtnOfName(lv.c_str());
+            if (b < 0 || b >= VrPad::kLUp) { bad("a button name such as rgrip, or off"); continue; }
+            c.pad.modBtn = b;
+            continue;
+        }
+        if (key == "modifier_keys") {                  // "rtrigger:mouse_right | a:shift+f" (all of them; none = no entries)
+            for (VrPad::Out& o : c.pad.modMap) o = VrPad::Out();
+            if (lv == "none" || lv.empty()) continue;
+            size_t a = 0;
+            while (a <= val.size()) {
+                size_t bar = val.find('|', a);
+                if (bar == std::string::npos) bar = val.size();
+                const std::string item = Trim(val.substr(a, bar - a));
+                a = bar + 1;
+                if (item.empty()) continue;
+                const size_t colon = item.find(':');
+                const int b = colon == std::string::npos ? -1 : VrPad::BtnOfName(Lower(Trim(item.substr(0, colon))).c_str());
+                VrPad::Out o;
+                if (b < 0 || !VrPad::ParseOut(item.substr(colon + 1).c_str(), &o)) { bad(("'" + item + "': button:key").c_str()); continue; }
+                c.pad.modMap[b] = o;
+            }
+            continue;
+        }
         if (key == "air_mouse") {
             if (lv == "off" || lv == "none" || lv == "0") { c.pad.airBtn = -1; continue; }
             const int b = VrPad::BtnOfName(lv.c_str());
@@ -211,6 +236,14 @@ std::vector<std::pair<std::string, std::string>> MenuValues(const VrPad::Config&
     kv.push_back({ "deadzone", b });
     kv.push_back({ "air_mouse", p.airBtn >= 0 ? VrPad::BtnNames()[p.airBtn] : "off" });
     kv.push_back({ "air_mode", p.airToggle ? "toggle" : "hold" });
+    kv.push_back({ "modifier", p.modBtn >= 0 ? VrPad::BtnNames()[p.modBtn] : "off" });
+    std::string mk;
+    for (int i = 0; i < VrPad::kBtnCount; ++i) {
+        if (p.modMap[i].kind == VrPad::kNone) continue;
+        VrPad::OutToString(p.modMap[i], b, sizeof(b));
+        mk += (mk.empty() ? "" : " | ") + std::string(VrPad::BtnNames()[i]) + ":" + b;
+    }
+    kv.push_back({ "modifier_keys", mk.empty() ? "none" : mk });
     snprintf(b, sizeof(b), "%.0f", (double)p.airGain);
     kv.push_back({ "air_speed", b });
     if (menu.set) kv.push_back({ "menu_place", PlaceString(menu) });
@@ -312,7 +345,14 @@ std::string DescribePad(const VrPad::Config& p) {
              p.mouseStick == 1 ? "left" : p.mouseStick == 2 ? "right" : "off", (double)p.mouseSpeed, (double)p.deadzone,
              p.airBtn >= 0 ? VrPad::BtnNames()[p.airBtn] : "off", (double)p.airGain);
     if (p.airToggle) strncat_s(tail, sizeof(tail), " (toggle)", _TRUNCATE);
-    return s + tail;
+    std::string mod = p.modBtn >= 0 ? std::string(" | modifier ") + VrPad::BtnNames()[p.modBtn] + ":" : std::string(" | no modifier");
+    for (int b = 0; p.modBtn >= 0 && b < VrPad::kBtnCount; ++b) {
+        if (p.modMap[b].kind == VrPad::kNone) continue;
+        char v[48];
+        VrPad::OutToString(p.modMap[b], v, sizeof(v));
+        mod += std::string(" ") + VrPad::BtnNames()[b] + "=" + v;
+    }
+    return s + tail + mod;
 }
 
 }  // namespace ck

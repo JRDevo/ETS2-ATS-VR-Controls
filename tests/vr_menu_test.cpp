@@ -350,6 +350,28 @@ int main(int argc, char** argv) {
         upd(f);
         CHECK(m.Pan(VrMenu::kPanMenu).width < wm * 0.95, "from the bar onto its - button: pressed (%.3f -> %.3f m)", wm, m.Pan(VrMenu::kPanMenu).width);
     }
+    // Buttons tab, "With modifier": set modifier + Y = F5 on the keyboard; the modifier button cycles; back to Normal
+    {
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 0), "Buttons tab");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 121), "With modifier shown");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kY), "row Y (modifier layer)");
+        CHECK(click(1, VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("f5")), "F5 on the keyboard");
+        char o1[64], o2[64];
+        VrPad::OutToString(m.Pad().modMap[VrPad::kY], o1, sizeof(o1));
+        VrPad::OutToString(m.Pad().map[VrPad::kY], o2, sizeof(o2));
+        CHECK(std::string(o1) == "f5" && std::string(o2) == "]", "modifier + Y = f5, Y alone still ] (%s / %s)", o1, o2);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kRGrip), "row right grip (the modifier)");
+        CHECK(!m.Pan(VrMenu::kPanKb).show || m.Describe().find("picking -") != std::string::npos, "the modifier's own row picks nothing");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 122), "modifier button shown");
+        CHECK(m.Pad().modBtn == VrPad::kLGrip, "the modifier cycles: right grip -> left grip");
+        click(1, VrMenu::kPanMenu, VrMenu::eSet, 122);
+        click(1, VrMenu::kPanMenu, VrMenu::eSet, 122);
+        for (int i = 0; i < 8 && m.Pad().modBtn != VrPad::kRGrip; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 122);
+        CHECK(m.Pad().modBtn == VrPad::kRGrip, "... round to the right grip again (via off)");
+        for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
+        WriteBmp(dir + L"\\menu_modifier.bmp", m, VrMenu::kPanMenu);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 120), "Normal shown");
+    }
     // Panels tab: the keyboard compact (main keys only, - / + / x in a column next to Enter), same key size, then full again
     {
         click(1, VrMenu::kPanMenu, VrMenu::eTab, 2);
@@ -501,6 +523,10 @@ int main(int argc, char** argv) {
             WriteBmp(shots + L"\\" + kTab[t] + L".bmp", ms, VrMenu::kPanMenu);
         }
         press(VrMenu::kPanMenu, VrMenu::eTab, 0);
+        press(VrMenu::kPanMenu, VrMenu::eSet, 121);         // the modifier layer (default: right grip + right trigger = right click)
+        settle(away);
+        WriteBmp(shots + L"\\menu-modifier.bmp", ms, VrMenu::kPanMenu);
+        press(VrMenu::kPanMenu, VrMenu::eSet, 120);
         press(VrMenu::kPanMenu, VrMenu::eRow, VrPad::kA);   // picking a key for A: the keyboard opens with its frame
         settle(away);
         WriteBmp(shots + L"\\menu-pick.bmp", ms, VrMenu::kPanMenu);

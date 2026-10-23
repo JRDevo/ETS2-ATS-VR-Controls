@@ -263,8 +263,8 @@ if (-not $Only -or $Only -eq 'menusmall') {
     $r = RunCase 'menusmall' 'fake_game.exe' @('--d3d11') 3.5 @{ VRC_MOCK_INPUT = $s; VRC_MOCK_DUMP = $d } "menu_place = 0, -0.104, -0.743, 0, -8, 0.3`n"
     Check 'menusmall' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
     Check 'menusmall' ($r.log -match 'menu shown at 683 x 546 \(68 % of its 1000 x 800 picture') 'log: the menu shrunk to its size in the headset'
-    Check 'menusmall' ($r.mock -match 'swapchain 683x546 mips 1') 'the swapchain has the shrunk size (one level)'
-    Check 'menusmall' (Test-Path (Join-Path $d 'quad_683x546.bmp')) 'the shrunk picture reached the swapchain'
+    Check 'menusmall' (($r.mock -match 'swapchain 1000x800 mips 1') -and ($r.mock -notmatch 'swapchain 683x546')) 'the swapchain keeps the full size (the picture uses its top-left part)'
+    Check 'menusmall' (Test-Path (Join-Path $d 'quad_1000x800.bmp')) 'the shrunk picture reached the swapchain'
     Check 'menusmall' ($r.mock -notmatch 'endframe REFUSED|REFUSED \(quad') 'every frame accepted'
 }
 # ---- touch

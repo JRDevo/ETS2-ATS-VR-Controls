@@ -7,7 +7,9 @@
 //     channel order (Rgba). So the game's xrEndFrame only copies: the changed area (QuadIn::dirty, e.g. two keys under a moving
 //     pointer) via UpdateSubresource with a box on the device's immediate context -- into each of the swapchain's images (they
 //     rotate) the area changed since that image was last written (Sc::pending). Nothing changed: no call at all; the runtime
-//     keeps showing the last released image. A new size = a new swapchain (one level, no mipmaps).
+//     keeps showing the last released image. Each swapchain has the panel's FULL picture size (QuadIn::cw / ch) and a smaller
+//     picture uses its top-left part (the layer's imageRect): a new shrink step costs no new swapchain in a frame (one did,
+//     ~5 ms on Virtual Desktop); only another full size (the keyboard full <-> compact) makes a new one. One level, no mips.
 //   * Any failure (create / acquire / wait / release, or the runtime refusing the frame with our layers): the pictures are off
 //     for this session (logged); PadInput then re-sends the game's frame unchanged.
 #pragma once
@@ -38,7 +40,8 @@ struct QuadIn {
     int             slot = 0;          // swapchain: 0 menu, 1 keyboard, 2 pointer dot (both dots share it)
     Pose            pose;              // in `space`
     double          w = 0, h = 0;      // metres
-    int             pw = 0, ph = 0;    // pixels
+    int             pw = 0, ph = 0;    // pixels (the picture)
+    int             cw = 0, ch = 0;    // the swapchain's size (the largest picture of this slot; 0 = pw / ph)
     const uint32_t* px = nullptr;      // premultiplied, top-down, the swapchain's channel order (Rgba)
     uint64_t        version = 0;       // uploaded again when it changes
     int             dirty[4] = {};     // x0, y0, x1, y1 of px changed since the last call (empty: x1 <= x0)
@@ -64,6 +67,7 @@ private:
         int w = 0, h = 0;
         std::vector<ID3D11Texture2D*> img;
         std::vector<std::array<int, 4>> pending; // per swapchain image: the area not yet written into it
+        int iw = 0, ih = 0;            // the picture in it now (top-left part)
         uint64_t uploaded = ~0ull;
         bool released = false;         // an image was released once (it may be shown)
     };

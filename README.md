@@ -42,6 +42,9 @@ Only one OpenXR runtime is active at a time; the last one you set wins.
 - One stick moves the mouse pointer (the left stick by default).
 - **Air mouse**: hold the right grip and turn the controller. The pointer follows, like a laser pointer. (Or set it to
   toggle: one press on, the next press off.)
+- **Modifier**: while you hold the modifier button (right grip), buttons can send something else. Default: **right grip +
+  right trigger = right click** -- so one controller does everything: hold the grip (the pointer follows), pull the trigger
+  to right-click (drag the map). Set any button's modified key in the VR menu.
 - **VR menu + keyboard**: hold both grips + the left stick click for 1 second. A menu opens in front of you. See [The VR menu](#the-vr-menu).
 - The game's own VR controls (the trigger and the left menu button) still work.
 - It only works in the games named in `config.ini`. In every other VR program it does nothing.
@@ -56,7 +59,8 @@ works next to the ETS2 / ATS DLAA mod, VR EyeCapture, Virtual Desktop, OpenXR To
 |---|---|---|
 | Right trigger | left mouse click | click |
 | Left trigger | right mouse click | |
-| Right grip (hold) | air mouse | |
+| Right grip (hold) | air mouse, and the **modifier** | |
+| Right grip + right trigger | right mouse click | drag the map with one controller |
 | A | Enter | |
 | B | Esc | menu / back |
 | X | `[` | left indicator |
@@ -106,6 +110,8 @@ a laser pointer. A **white dot** appears where you point, and the key under it l
   While you point at the menu, the game does not get that trigger.
 - **Buttons** tab: every controller button and what it sends. Point at one, pull the trigger, then press a key on the
   keyboard (or pick Mouse L / Mouse R / Wheel / None at the bottom). For Shift + F: press Shift, then F.
+  **Normal / With modifier** at the top: "With modifier" shows and sets what each button sends while the modifier is held
+  ("as normal" = no entry). **Modifier: ...** picks the modifier button (each press: the next button, or off).
 - **Mouse** tab: which stick moves the mouse, its speed and dead zone, the air mouse button, hold or toggle, its speed.
 - **Panels** tab: menu size, keyboard size, show / hide the keyboard, bring both in front of you.
 - **Panels** tab also: the distance of each panel (Closer / Farther).
@@ -124,9 +130,13 @@ ETS2 / ATS DLAA mod's menu (`Delete`). The menu and keyboard float in the room: 
 
 ### Screenshots
 
-| Buttons tab: picking a key | Mouse tab | The keyboard |
+| Buttons tab: picking a key | Buttons tab: with the modifier | Mouse tab |
 |---|---|---|
-| ![The Buttons tab while a key is picked](docs/images/menu-buttons.png) | ![The Mouse tab](docs/images/menu-mouse.png) | ![The on-screen keyboard](docs/images/keyboard.png) |
+| ![The Buttons tab while a key is picked](docs/images/menu-pick.png) | ![The Buttons tab, with modifier](docs/images/menu-modifier.png) | ![The Mouse tab](docs/images/menu-mouse.png) |
+
+| Panels tab | Look tab | The keyboard |
+|---|---|---|
+| ![The Panels tab](docs/images/menu-panels.png) | ![The Look tab](docs/images/menu-look.png) | ![The on-screen keyboard](docs/images/keyboard.png) |
 
 The compact keyboard (Panels tab > Compact):
 

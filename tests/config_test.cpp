@@ -71,6 +71,21 @@ int main(int argc, char** argv) {
     CHECK(md.menuCombo == d.menuCombo && md.notes.size() == 3, "bad combos / air_mode noted");
     const Config me = ParseConfig("menu_combo = lgrip+rgrip+x+y\nmenu_combo = a+b+x+y+lstick\n");
     CHECK(me.menuCombo.size() == 4 && me.notes.size() == 1, "4 buttons ok, 5 noted");
+    // the modifier: shipped = the defaults (right grip; rtrigger:mouse_right), parsing, the menu's write read back
+    CHECK(c.pad.modBtn == d.pad.modBtn && d.pad.modBtn == VrPad::kRGrip, "shipped modifier = rgrip");
+    for (int b = 0; b < VrPad::kBtnCount; ++b) CHECK(SameOut(c.pad.modMap[b], d.pad.modMap[b]), "modifier key %s differs", VrPad::BtnNames()[b]);
+    CHECK(d.pad.modMap[VrPad::kRTrig].kind == VrPad::kMouseR, "default: modifier + right trigger = right click");
+    const Config mo = ParseConfig("modifier = lgrip\nmodifier_keys = a:shift+f | ltrigger:mouse_right | x:,\n");
+    CHECK(mo.pad.modBtn == VrPad::kLGrip && mo.pad.modMap[VrPad::kA].n == 2 && mo.pad.modMap[VrPad::kLTrig].kind == VrPad::kMouseR &&
+          mo.pad.modMap[VrPad::kX].kind == VrPad::kKeys && mo.pad.modMap[VrPad::kRTrig].kind == VrPad::kNone && mo.notes.empty(),
+          "modifier = lgrip, 3 pairs (the , key too), the default pair replaced (%zu notes)", mo.notes.size());
+    const Config mb = ParseConfig("modifier = lup\nmodifier_keys = a:nokey | b\nmodifier = off\n");
+    CHECK(mb.pad.modBtn == -1 && mb.notes.size() == 3, "bad modifier / pairs noted, off works (%zu notes)", mb.notes.size());
+    std::string w;
+    for (const auto& kv : MenuValues(mo.pad, PanelPlace(), PanelPlace(), MenuLook())) w += kv.first + " = " + kv.second + "\n";
+    const Config mr = ParseConfig(w);
+    CHECK(mr.pad.modBtn == VrPad::kLGrip && SameOut(mr.pad.modMap[VrPad::kA], mo.pad.modMap[VrPad::kA]) &&
+          SameOut(mr.pad.modMap[VrPad::kX], mo.pad.modMap[VrPad::kX]) && mr.notes.empty(), "the menu's modifier lines read back the same");
     // OutToString is the inverse of ParseOut (the menu writes what it read)
     for (const char* t : { "shift+f", "mouse_left", "wheel_down", "none", "num7", "f12", "[", "\\", "ctrl+alt+delete", "rctrl" }) {
         VrPad::Out a1, a2;

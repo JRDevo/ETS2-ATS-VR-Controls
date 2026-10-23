@@ -57,6 +57,43 @@ int main() {
     CHECK(BtnOfName("RGRIP") == kRGrip && BtnOfName("menu") == kMenu && BtnOfName("zz") == -1, "button names");
 
     printf("(2) mapper\n");
+    {   // the modifier (default: right grip + right trigger = right click; the grip stays the air mouse)
+        Config c = DefaultConfig();
+        ParseOut("f1", &c.modMap[kA]);
+        Mapper m; Rec r; Frame f;
+        f.hand[0] = f.hand[1] = true;
+        f.trig[1] = 1.0f;
+        m.Step(f, true, 0.011, c, r);
+        f.trig[1] = 0.0f;
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "m0v m0^", "trigger alone: left click");
+        f.grip[1] = 1.0f;                              // the modifier (also the air mouse button: sends nothing itself)
+        m.Step(f, true, 0.011, c, r);
+        f.trig[1] = 1.0f;
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "m1v", "grip held + trigger: right click down");
+        f.grip[1] = 0.0f;                              // the grip let go first: the trigger still releases what it pressed
+        m.Step(f, true, 0.011, c, r);
+        f.trig[1] = 0.0f;
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "m1^", "released as pressed (right), whatever the modifier does meanwhile");
+        f.grip[1] = 1.0f; f.prim[1] = true;            // A with the modifier: its own entry
+        m.Step(f, true, 0.011, c, r);
+        f.prim[1] = false; f.grip[1] = 0.0f;
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "k03bv k03b^", "grip + A = F1 (modifier_keys)");
+        f.grip[1] = 1.0f; f.sec[1] = true;             // B has no entry: as normal (Esc)
+        m.Step(f, true, 0.011, c, r);
+        f.sec[1] = false; f.grip[1] = 0.0f;
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "k001v k001^", "grip + B without an entry = B as normal");
+        c.modBtn = -1;                                 // no modifier: the grip changes nothing
+        f.grip[1] = 1.0f; f.trig[1] = 1.0f;
+        m.Step(f, true, 0.011, c, r);
+        f.grip[1] = 0.0f; f.trig[1] = 0.0f;
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "m0v m0^", "modifier off: the trigger is the left click");
+    }
     {   // edges, hysteresis, the hold button, combos
         Config c = DefaultConfig();
         ParseOut("shift+f", &c.map[kX]);

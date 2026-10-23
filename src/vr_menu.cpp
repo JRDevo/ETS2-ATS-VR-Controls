@@ -643,7 +643,9 @@ void VrMenu::LayoutMenu() {
         el.push_back(e);
     };
     const bool picking = pickBtn_ >= 0;
-    add(eBar, 0, 0, 0, kMenuW, 72, picking ? std::string("Set ") + BtnLabel(pickBtn_) + ": pick a key" : "ETS2 ATS VR Controls", picking);
+    const std::string what = picking ? (pickMod_ && pad_.modBtn >= 0 ? std::string(BtnLabel(pad_.modBtn)) + " + " : std::string()) + BtnLabel(pickBtn_)
+                                     : std::string();
+    add(eBar, 0, 0, 0, kMenuW, 72, picking ? "Set " + what + ": pick a key" : "ETS2 ATS VR Controls", picking);
     add(eSmaller, 0, 600, 11, 64, 50, "\xE2\x88\x92");
     add(eBigger, 0, 672, 11, 64, 50, "+");
     add(eKbBtn, 0, 744, 11, 170, 50, "Keyboard", pan_[kPanKb].show);
@@ -656,17 +658,23 @@ void VrMenu::LayoutMenu() {
                                        VrPad::kLUp, VrPad::kLDown, VrPad::kLLeft, VrPad::kLRight };
         static const int kRight[9] = { VrPad::kRTrig, VrPad::kRGrip, VrPad::kA, VrPad::kB, VrPad::kRStick, VrPad::kRUp,
                                        VrPad::kRDown, VrPad::kRLeft, VrPad::kRRight };
+        // Normal / With modifier: which mapping the rows show and set; the modifier button itself (a click cycles it)
+        add(eSet, 120, 24, 150, 230, 44, "Normal", layer_ == 0);
+        add(eSet, 121, 264, 150, 230, 44, "With modifier", layer_ == 1);
+        add(eSet, 122, 504, 150, 472, 44, pad_.modBtn >= 0 ? std::string("Modifier: ") + BtnLabel(pad_.modBtn) : "Modifier: off");
         for (int col = 0; col < 2; ++col)
             for (int i = 0; i < (col ? 9 : 10); ++i) {
                 const int btn = col ? kRight[i] : kLeft[i];
-                std::string val = Pretty(pad_.map[btn]);
+                std::string val = Pretty(layer_ ? pad_.modMap[btn] : pad_.map[btn]);
                 bool dim = false;
-                if (btn == pad_.airBtn) { val = "air mouse"; dim = true; }
+                if (layer_ && btn == pad_.modBtn) { val = "the modifier"; dim = true; }
+                else if (btn == pad_.airBtn) { val = "air mouse"; dim = true; }
                 else if (btn >= VrPad::kLUp && pad_.mouseStick == (btn >= VrPad::kRUp ? 2 : 1)) { val = "moves the mouse"; dim = true; }
+                else if (layer_ && (pad_.modBtn < 0 || pad_.modMap[btn].kind == VrPad::kNone)) { val = "as normal"; dim = true; }
                 bool combo = false;
                 for (int cb : gate_.btns) combo = combo || cb == btn;
-                add(eRow, btn, col ? 508 : 24, 156 + i * 54, 468, 50, BtnLabel(btn), pickBtn_ == btn, dim,
-                    combo ? val + "  (+menu)" : val);
+                add(eRow, btn, col ? 508 : 24, 202 + i * 49, 468, 45, BtnLabel(btn), pickBtn_ == btn, dim,
+                    combo && !layer_ ? val + "  (+menu)" : val);
             }
         if (picking) {
             static const int kOuts[6] = { VrPad::kMouseL, VrPad::kMouseR, VrPad::kMouseM, VrPad::kWheelUp, VrPad::kWheelDown, VrPad::kNone };
@@ -674,7 +682,8 @@ void VrMenu::LayoutMenu() {
             for (int i = 0; i < 6; ++i) add(ePickOut, kOuts[i], 24 + i * 138, 716, 130, 64, kOutNames[i]);
             add(ePickCancel, 0, 852, 716, 124, 64, "Cancel");
         } else {
-            add(eInfo, 0, 24, 716, 952, 64, status_.empty() ? "Point at a button, pull the trigger, then pick its key." : status_);
+            add(eInfo, 0, 24, 716, 952, 64, !status_.empty() ? status_
+                : layer_ ? "While the modifier is held, these buttons send this instead." : "Point at a button, pull the trigger, then pick its key.");
         }
     } else if (tab_ == 1) {
         auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 162 + r * 88, 440, 70, label); };
@@ -1009,9 +1018,16 @@ void VrMenu::SavePlaces() {
 
 void VrMenu::Pick(const VrPad::Out& o) {
     if (pickBtn_ < 0) return;
-    pad_.map[pickBtn_] = o;
-    status_ = std::string("Set: ") + BtnLabel(pickBtn_) + " = " + Pretty(o);
-    LOGI("VR menu: %s = %s", VrPad::BtnNames()[pickBtn_], Pretty(o).c_str());
+    if (pickMod_) {                                     // the entry for while the modifier is held (None = as normal)
+        pad_.modMap[pickBtn_] = o;
+        status_ = std::string("Set: ") + (pad_.modBtn >= 0 ? BtnLabel(pad_.modBtn) : "Modifier") + " + " + BtnLabel(pickBtn_) + " = " +
+                  (o.kind == VrPad::kNone ? std::string("as normal") : Pretty(o));
+        LOGI("VR menu: modifier + %s = %s", VrPad::BtnNames()[pickBtn_], Pretty(o).c_str());
+    } else {
+        pad_.map[pickBtn_] = o;
+        status_ = std::string("Set: ") + BtnLabel(pickBtn_) + " = " + Pretty(o);
+        LOGI("VR menu: %s = %s", VrPad::BtnNames()[pickBtn_], Pretty(o).c_str());
+    }
     pickBtn_ = -1;
     for (bool& l : latch_) l = false;
     Save();
@@ -1044,6 +1060,17 @@ void VrMenu::SetValue(int arg) {
         break;
     }
     case 100: case 101: case 102: case 103: case 104: case 105: look_.theme = arg - 100; needRedraw_ = true; break;
+    case 120: case 121: layer_ = arg - 120; pickBtn_ = -1; status_.clear(); return;
+    case 122: {                                         // the modifier button: the next of these (off at the end)
+        static const int kChoices[] = { VrPad::kRGrip, VrPad::kLGrip, VrPad::kA, VrPad::kB, VrPad::kX, VrPad::kY, VrPad::kRStick,
+                                        VrPad::kLStick, VrPad::kMenu, -1 };
+        constexpr int n = (int)(sizeof(kChoices) / sizeof(kChoices[0]));
+        int i = 0;
+        while (i < n && kChoices[i] != pad_.modBtn) ++i;
+        pad_.modBtn = kChoices[(i + 1) % n];
+        pickBtn_ = -1;
+        break;
+    }
     case 110: case 111: case 112: case 113: look_.smoothing = arg - 110; break;
     case 60: case 61: case 70: case 71: {
         Panel& pn = pan_[arg < 70 ? kPanMenu : kPanKb];
@@ -1089,12 +1116,15 @@ void VrMenu::Activate(int h, const Ref& r, const VrPad::Frame&, VrPad::Sink& sin
         break;
     case eTab: tab_ = r.arg; status_.clear(); break;
     case eRow:
+        if (layer_ && pad_.modBtn < 0) { status_ = "Choose a modifier button first (the button above)."; break; }
+        if (layer_ && r.arg == pad_.modBtn) { status_ = std::string(BtnLabel(r.arg)) + " is the modifier."; break; }
         if (r.arg == pad_.airBtn) { status_ = std::string(BtnLabel(r.arg)) + " is the air mouse button (Mouse tab)."; break; }
         if (r.arg >= VrPad::kLUp && pad_.mouseStick == (r.arg >= VrPad::kRUp ? 2 : 1)) {
             status_ = "That stick moves the mouse (Mouse tab).";
             break;
         }
-        pickBtn_ = pickBtn_ == r.arg ? -1 : r.arg;
+        pickBtn_ = pickBtn_ == r.arg && pickMod_ == (layer_ == 1) ? -1 : r.arg;
+        pickMod_ = layer_ == 1;
         for (bool& l : latch_) l = false;
         if (pickBtn_ >= 0 && !pan_[kPanKb].show) ShowKb(true);
         break;
@@ -1245,8 +1275,8 @@ std::string VrMenu::ContentKey(int p) const {
         return b;
     }
     // the menu: everything its tabs show (not whether it is shown itself)
-    snprintf(b, sizeof(b), "%d|%d|%d|%.3f,%.3f|%d|%.2f|%.2f|%d|%d|", pan_[1].show, tab_, pickBtn_, pan_[0].width, pan_[1].width,
-             look_.theme, look_.menuOpacity, look_.kbOpacity, look_.smoothing, look_.kbCompact);
+    snprintf(b, sizeof(b), "%d|%d|%d|%d%d|%.3f,%.3f|%d|%.2f|%.2f|%d|%d|", pan_[1].show, tab_, pickBtn_, pickMod_, layer_, pan_[0].width,
+             pan_[1].width, look_.theme, look_.menuOpacity, look_.kbOpacity, look_.smoothing, look_.kbCompact);
     return std::string(b) + status_ + "|" + DescribePad(pad_);
 }
 

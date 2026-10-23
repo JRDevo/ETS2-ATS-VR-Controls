@@ -666,6 +666,7 @@ bool PadInput::EndFrame(XrSession s, const XrFrameEndInfo* in, XrFrameEndInfo* o
             if (pic.px.empty()) continue;
             QuadIn q = panel[p];
             q.pw = pic.w; q.ph = pic.h; q.px = pic.px.data(); q.version = pic.version;
+            q.cw = menu_->Pan(p).pw; q.ch = menu_->Pan(p).ph;           // (the swapchain: the full size)
             for (int i = 0; i < 4; ++i) { q.dirty[i] = pic.dirty[i]; pic.dirty[i] = 0; }
             if (show[p]) quads.insert(quads.begin(), q);
             else warmQ.push_back(q);

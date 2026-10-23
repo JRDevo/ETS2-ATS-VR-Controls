@@ -101,8 +101,11 @@ bool Overlay::Create(int slot, int w, int h) {
 
 bool Overlay::Upload(int slot, const QuadIn& q) {
     Sc& c = sc_[slot];
-    // the changed area goes into every image's "still to write"; the next image gets its own (they rotate)
+    // the changed area goes into every image's "still to write"; the next image gets its own (they rotate). A picture of
+    // another size (a shrink step): all of it, in every image
+    int all[4] = { 0, 0, q.pw, q.ph };
     const int* d = q.dirty;
+    if (c.iw != q.pw || c.ih != q.ph) { c.iw = q.pw; c.ih = q.ph; d = all; }
     if (d[2] > d[0] && d[3] > d[1])
         for (auto& pd : c.pending) {
             if (pd[2] <= pd[0] || pd[3] <= pd[1]) { pd = { d[0], d[1], d[2], d[3] }; continue; }
@@ -123,6 +126,8 @@ bool Overlay::Upload(int slot, const QuadIn& q) {
     if (r != XR_SUCCESS) { Kill("xrWaitSwapchainImage failed or timed out"); return false; }   // (an image we may not release)
     if (idx < c.img.size() && c.img[idx]) {
         std::array<int, 4>& pd = c.pending[idx];
+        pd[2] = pd[2] > q.pw ? q.pw : pd[2];             // (only the picture: the swapchain may be bigger)
+        pd[3] = pd[3] > q.ph ? q.ph : pd[3];
         if (pd[2] > pd[0] && pd[3] > pd[1]) {
             ID3D11DeviceContext* ctx = nullptr;
             dev_->GetImmediateContext(&ctx);
@@ -150,12 +155,14 @@ void Overlay::Frame(const std::vector<QuadIn>& quads, XrSpace space, std::vector
     for (const QuadIn& q : quads) {
         if (q.slot < 0 || q.slot >= kSlots || !q.px || q.pw < 1 || q.ph < 1) continue;
         Sc& c = sc_[q.slot];
-        if (c.sc != XR_NULL_HANDLE && (c.w != q.pw || c.h != q.ph)) {   // a new size (a shrink step, the keyboard full <-> compact)
+        const int cw = q.cw > 0 ? q.cw : q.pw, ch = q.ch > 0 ? q.ch : q.ph;
+        if (q.pw > cw || q.ph > ch) continue;
+        if (c.sc != XR_NULL_HANDLE && (c.w != cw || c.h != ch)) {   // another full size (the keyboard full <-> compact)
             d_.DestroySwapchain(c.sc);
             c = Sc();
         }
-        if (c.sc == XR_NULL_HANDLE && !Create(q.slot, q.pw, q.ph)) return;
-        if ((c.uploaded != q.version || !c.released) && !Upload(q.slot, q)) return;
+        if (c.sc == XR_NULL_HANDLE && !Create(q.slot, cw, ch)) return;
+        if ((c.uploaded != q.version || !c.released || c.iw != q.pw || c.ih != q.ph) && !Upload(q.slot, q)) return;
         if (!c.released || !submit) continue;
         XrCompositionLayerQuad l{XR_TYPE_COMPOSITION_LAYER_QUAD};
         l.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;   // premultiplied alpha
@@ -163,7 +170,7 @@ void Overlay::Frame(const std::vector<QuadIn>& quads, XrSpace space, std::vector
         l.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
         l.subImage.swapchain = c.sc;
         l.subImage.imageRect.offset = { 0, 0 };
-        l.subImage.imageRect.extent = { c.w, c.h };
+        l.subImage.imageRect.extent = { c.iw, c.ih };   // (the picture: the top-left part)
         l.subImage.imageArrayIndex = 0;
         l.pose.orientation = { (float)q.pose.q.x, (float)q.pose.q.y, (float)q.pose.q.z, (float)q.pose.q.w };
         l.pose.position = { (float)q.pose.p.x, (float)q.pose.p.y, (float)q.pose.p.z };

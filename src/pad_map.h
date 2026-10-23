@@ -152,6 +152,11 @@ struct Config {
     int   airHand = 1;                                 // the hand whose aim moves the mouse (follows airBtn's hand)
     float airGain = 25.0f;                             // pixels per degree of aim turn
     bool  airToggle = false;                           // false: air mouse while airBtn is held; true: one press on, the next off
+    // the modifier: while modBtn is held, a button that has a modMap entry sends that instead of its map (e.g. right grip +
+    // right trigger = right click, so one controller does both clicks). -1 = no modifier. The modifier button keeps its own
+    // job (the air mouse on the right grip). What a press sends is decided when it goes down (and released the same way).
+    int   modBtn = kRGrip;
+    Out   modMap[kBtnCount];
 };
 inline Config DefaultConfig() {
     Config c;
@@ -168,6 +173,7 @@ inline Config DefaultConfig() {
     ParseOut("down", &c.map[kRDown]);
     ParseOut("left", &c.map[kRLeft]);
     ParseOut("right", &c.map[kRRight]);
+    ParseOut("mouse_right", &c.modMap[kRTrig]);        // right grip (air mouse) + right trigger = right click: map dragging
     return c;
 }
 inline int HandOfBtn(int b) {
@@ -214,6 +220,7 @@ public:
     void Step(const Frame& f, bool active, double dt, const Config& c, Sink& s) {
         bool want[kBtnCount] = {};
         if (active) Want(f, c, want);
+        const bool modOn = c.modBtn >= 0 && c.modBtn < kBtnCount && want[c.modBtn];
         for (int b = 0; b < kBtnCount; ++b) {
             if (want[b] == down_[b]) continue;
             down_[b] = want[b];
@@ -221,7 +228,12 @@ public:
                 if (want[b]) airLatch_ = !airLatch_;   // (toggle mode: each press switches)
                 continue;
             }
-            Send(c.map[b], want[b], s);
+            if (want[b]) {                             // the modifier held: its entry for this button, if it has one
+                sent_[b] = modOn && b != c.modBtn && c.modMap[b].kind != kNone ? c.modMap[b] : c.map[b];
+                Send(sent_[b], true, s);
+            } else {
+                Send(sent_[b], false, s);              // (released as it was pressed, whatever the modifier does now)
+            }
         }
         if (!active || !c.airToggle) airLatch_ = false;
         // air mouse
@@ -298,6 +310,7 @@ private:
         }
     }
     bool   down_[kBtnCount] = {};
+    Out    sent_[kBtnCount];                           // what each held button sent when it went down
     bool   airOn_ = false;
     bool   airLatch_ = false;                          // toggle mode: the air mouse is switched on
     double yaw_ = 0.0, pitch_ = 0.0;
