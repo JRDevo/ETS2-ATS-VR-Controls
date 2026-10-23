@@ -191,7 +191,8 @@ a laser pointer. A **white dot** appears where you point, and the key under it l
   press asks "Sure?"). Only that tab changes. On the Panels tab it also brings the menu (and the keyboard, if it is shown) in front of you.
 - **Keyboard** (button at the top of the menu): a full keyboard with F-keys, arrows and number pad. A key goes down when
   you pull the trigger and up when you let go. Shift, Ctrl and Alt stay on for the next key.
-  The keyboard **stays** when the menu closes, also at the next game start (put it at the side of your cab). Its x hides it.
+  **A button for the keyboard:** Buttons tab, point at a button, pick **Keyboard** in the bottom bar. Then that button
+  shows / hides the keyboard (`y = keyboard` in `config.ini`). The keyboard **stays** when the menu closes, also at the next game start (put it at the side of your cab). Its x hides it.
   **Full or Compact** (Panels tab): Compact has only the main keys (Esc / F-keys down to Enter, Shift, Ctrl), with its
   only an x (above Backspace) to hide it: about 30 % narrower. Its size: Panels tab > Keyboard size.
 - **Move** a panel: point at it, **hold the grip** and move the controller. While you hold it, push that controller's stick
@@ -285,7 +286,7 @@ in Notepad (the VR menu's changes work at once).
 
 Button names: `ltrigger rtrigger lgrip rgrip x y a b lstick rstick menu lup ldown lleft lright rup rdown rleft rright`.
 Values: a key (`h`, `f1`, `space`, `[`), up to 3 keys with `+` (`shift+f`), `mouse_left`, `mouse_right`, `mouse_middle`,
-`wheel_up`, `wheel_down`, `gas`, `brake` (driving) or `none`.
+`wheel_up`, `wheel_down`, `gas`, `brake` (driving), `keyboard` (shows / hides the VR keyboard) or `none`.
 
 ## Problems
 

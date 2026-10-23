@@ -353,6 +353,21 @@ int main() {
         mr.Step(k, true, 0.011, rs, rr);
         CHECK(rr.drv[0] == -1.0f && rr.mx == 0 && rr.Take().empty(), "steer = right: the right stick steers");
     }
+    {   // a button set to "keyboard": each press is one show / hide of the VR keyboard (PadInput asks the Mapper)
+        Config c = DefaultConfig();
+        CHECK(ParseOut("keyboard", &c.map[kY]) && c.map[kY].kind == kKeyboard, "keyboard parses");
+        char ob[32];
+        OutToString(c.map[kY], ob, sizeof(ob));
+        CHECK(!strcmp(ob, "keyboard"), "keyboard written back (%s)", ob);
+        Mapper mp; Rec r; Frame f;
+        f.hand[0] = true;
+        for (int i = 0; i < 2; ++i) {
+            f.sec[0] = true; mp.Step(f, true, 0.011, c, r);
+            f.sec[0] = false; mp.Step(f, true, 0.011, c, r);
+        }
+        CHECK(mp.TakeKeyboardToggles() == 2 && mp.TakeKeyboardToggles() == 0 && r.Take().empty() && r.drives == 0,
+              "Y pressed twice: 2 toggles, no key");
+    }
     {   // drive = 0 (the menu's switch): nothing driven, the gas trigger is quiet, the steering stick's left / right are keys
         Config c = DefaultConfig();
         c.drive = false;

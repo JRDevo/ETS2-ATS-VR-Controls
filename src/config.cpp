@@ -206,7 +206,7 @@ Config ParseConfig(const std::string& text) {
         if (b >= 0) {
             VrPad::Out o;
             if (VrPad::ParseOut(val.c_str(), &o)) c.pad.map[b] = o;
-            else bad("not a key name / mouse_left / mouse_right / mouse_middle / wheel_up / wheel_down / gas / brake / none");
+            else bad("not a key name / mouse_left / mouse_right / mouse_middle / wheel_up / wheel_down / gas / brake / keyboard / none");
             continue;
         }
         c.notes.push_back("line " + std::to_string(lineNo) + ": unknown key '" + key + "' -- ignored");
@@ -371,6 +371,7 @@ std::string DescribePad(const VrPad::Config& p) {
         case VrPad::kWheelDown: snprintf(v, sizeof(v), "wheel_down"); break;
         case VrPad::kGas: snprintf(v, sizeof(v), "gas"); break;
         case VrPad::kBrake: snprintf(v, sizeof(v), "brake"); break;
+        case VrPad::kKeyboard: snprintf(v, sizeof(v), "keyboard"); break;
         default: {
             int k = snprintf(v, sizeof(v), "scan");
             for (int i = 0; i < o.n && k > 0 && k < (int)sizeof(v); ++i) k += snprintf(v + k, sizeof(v) - k, "%s%03x", i ? "+" : " ", o.code[i]);

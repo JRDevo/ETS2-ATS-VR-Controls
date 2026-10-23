@@ -380,6 +380,13 @@ int main(int argc, char** argv) {
               "Reset pressed once: nothing reset yet");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 120) && click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) &&
               m.Pad().map[VrPad::kLGrip].kind == VrPad::kMouseR, "another press in between: Reset armed again only");
+        {                                                // a "keyboard" button: show / hide (and back)
+            const bool kb0 = m.Pan(VrMenu::kPanKb).show;
+            m.ToggleKeyboard();
+            const bool kb1 = m.Pan(VrMenu::kPanKb).show;
+            m.ToggleKeyboard();
+            CHECK(kb1 != kb0 && m.Pan(VrMenu::kPanKb).show == kb0, "ToggleKeyboard shows / hides the keyboard");
+        }
         m.Close();                                       // closing the menu disarms it
         m.Open(true, head);
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kMouseR,

@@ -610,6 +610,8 @@ void PadInput::BeginFrame(XrSession s) {
     {
         Part pm(meas, &split_[1]);
         sd.mapper.Step(f, live, dt, cfg_.pad, Sink());   // (not live = everything held is released)
+        const int kb = sd.mapper.TakeKeyboardToggles();  // a button set to "keyboard": show / hide the VR keyboard
+        if (menu_ && (kb & 1)) menu_->ToggleKeyboard();
     }
     if (meas) {                                          // (SendInput ran inside the menu / the mapper: counted apart)
         split_[2] = Sink().TakeSendTime();

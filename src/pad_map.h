@@ -38,7 +38,8 @@ constexpr float kPressAt = 0.75f, kReleaseAt = 0.55f;   // trigger / grip / stic
 constexpr uint16_t kExt = 0x100;
 // kGas / kBrake: driving pedals -- not a key: how far the button is pressed (a trigger / grip / stick direction: analog, any
 // other button: full) goes to the game as the gas / brake pedal (Sink::Drive, scs_input.h)
-enum OutKind : uint8_t { kNone, kKeys, kMouseL, kMouseR, kMouseM, kWheelUp, kWheelDown, kGas, kBrake };
+// kKeyboard: a press shows / hides the VR keyboard (vr_menu.h; Mapper::TakeKeyboardToggles)
+enum OutKind : uint8_t { kNone, kKeys, kMouseL, kMouseR, kMouseM, kWheelUp, kWheelDown, kGas, kBrake, kKeyboard };
 struct Out { uint8_t kind = kNone; uint8_t n = 0; uint16_t code[3] = {}; };
 
 // scan code of one key name (case-insensitive); 0 = unknown
@@ -99,6 +100,7 @@ inline bool ParseOut(const char* in, Out* o) {
     if (!_stricmp(buf, "wheel_down")) { o->kind = kWheelDown; return true; }
     if (!_stricmp(buf, "gas") || !_stricmp(buf, "throttle") || !_stricmp(buf, "accelerate")) { o->kind = kGas; return true; }
     if (!_stricmp(buf, "brake")) { o->kind = kBrake; return true; }
+    if (!_stricmp(buf, "keyboard")) { o->kind = kKeyboard; return true; }
     Out r;
     r.kind = kKeys;
     char* part = buf;
@@ -140,6 +142,7 @@ inline void OutToString(const Out& o, char* buf, size_t cap) {
     case kWheelDown: strncpy_s(buf, cap, "wheel_down", _TRUNCATE); return;
     case kGas: strncpy_s(buf, cap, "gas", _TRUNCATE); return;
     case kBrake: strncpy_s(buf, cap, "brake", _TRUNCATE); return;
+    case kKeyboard: strncpy_s(buf, cap, "keyboard", _TRUNCATE); return;
     case kKeys: break;
     default: strncpy_s(buf, cap, "none", _TRUNCATE); return;
     }
@@ -280,6 +283,7 @@ public:
             if (want[b]) {                             // the modifier held: its entry for this button, if it has one
                 sent_[b] = modOn && b != c.modBtn && c.modMap[b].kind != kNone ? c.modMap[b] : c.map[b];
                 notPedal_[b] = sent_[b].kind != kGas && sent_[b].kind != kBrake;   // (a click: no gas until let go)
+                if (sent_[b].kind == kKeyboard) ++kbToggles_;
                 Send(sent_[b], true, s);
             } else {
                 Send(sent_[b], false, s);              // (released as it was pressed, whatever the modifier does now)
@@ -368,6 +372,7 @@ public:
     bool Down(int b) const { return b >= 0 && b < kBtnCount && down_[b]; }
     bool AirOn() const { return airOn_; }
     float Driving(int i) const { return i >= 0 && i < 3 ? drive_[i] : 0.0f; }   // the last steer / gas / brake sent
+    int TakeKeyboardToggles() { const int n = kbToggles_; kbToggles_ = 0; return n; }   // "keyboard" presses since the last call
 
 private:
     void Want(const Frame& f, const Config& c, bool* w) const {
@@ -427,7 +432,8 @@ private:
         }
     }
     bool   down_[kBtnCount] = {};
-    bool   notPedal_[kBtnCount] = {};                  // pressed as a key / click: not a pedal until fully let go
+    bool   notPedal_[kBtnCount] = {};
+    int    kbToggles_ = 0;                  // pressed as a key / click: not a pedal until fully let go
     Out    sent_[kBtnCount];                           // what each held button sent when it went down
     bool   airOn_ = false;
     bool   airLatch_ = false;                          // toggle mode: the air mouse is switched on

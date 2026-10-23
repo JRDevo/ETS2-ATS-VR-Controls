@@ -19,6 +19,7 @@
       drive      driving: the fake game first loads the layer's DLL as the game's input plugin (--scs, like
                  ETS2 / ATS), the left stick steers and the left trigger is the throttle -- the game gets the analog values from
                  the plugin device (one module for both sides), the left trigger / stick send no keys or mouse
+      kbkey      a button set to "keyboard" (Y): the first press shows the VR keyboard, the second hides it (no key sent)
       menu       a D3D11 game with VR EyeCapture's set (both stick clicks, shared): both grips + the left stick click held 1 s open the VR menu (quad layers on D3D11 swapchains), the right hand
                  points at the Mouse tab and at "air mouse: toggled on" (written to config.ini), the game never sees those
                  trigger pulls, a short stick click alone is still the horn (at once), the combo again closes it
@@ -300,6 +301,18 @@ if (-not $Only -or $Only -eq 'noinput') {
     Check 'noinput' ($r.mock -match 'profile /interaction_profiles/oculus/touch_controller') 'Touch picked from our own suggestions'
     Check 'noinput' ((Buttons $r.events) -match 'mouse 0 down \| mouse 0 up \| key 01c down \| key 01c up') 'trigger + A work'
 }
+# ---- kbkey: a button set to "keyboard" shows / hides the VR keyboard (Y at 1.0 s and at 2.0 s)
+if (-not $Only -or $Only -eq 'kbkey') {
+    $d = Join-Path $work 'kbkey'
+    $s = '1.0-1.2:/user/hand/left/input/y/click=1;2.0-2.2:/user/hand/left/input/y/click=1'
+    $r = RunCase 'kbkey' 'fake_game.exe' @('--d3d11') 3 @{ VRC_MOCK_INPUT = $s } "y = keyboard`n"
+    $cfgText = Get-Content (Join-Path $d 'config.ini') -Raw
+    Check 'kbkey' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
+    Check 'kbkey' ($r.mock -match 'endframe quads 0[\s\S]*endframe quads [1-3][\s\S]*endframe quads 0') 'the keyboard appears at the first Y, goes at the second'
+    Check 'kbkey' ((Buttons $r.events) -eq '') "Y sends no key ($(Buttons $r.events))"
+    Check 'kbkey' ($cfgText -match 'keyboard_show = 0') 'config.ini: keyboard_show = 0 again after the second Y'
+}
+
 # ---- drive
 if (-not $Only -or $Only -eq 'drive') {
     # left stick 0.55 right 1.0-1.5 (0.5 after the dead zone: 0.5^2 = 0.25), full left 1.6-2.0; left trigger (gas) 0.525 (half)

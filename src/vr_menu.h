@@ -95,6 +95,7 @@ public:
     void ReleaseAll(VrPad::Sink& sink);           // let go of a held keyboard key / a held panel
 
     const VrPad::Config& Pad() const { return pad_; }   // the mapping in use (the menu edits it)
+    void ToggleKeyboard() { ShowKb(!pan_[kPanKb].show); }   // a button set to "keyboard" (pad_map.h kKeyboard)
     bool AnyShown() const { return pan_[0].show || pan_[1].show; }
     bool HandOnPanel(int h) const { return h >= 0 && h < 2 && (hov_[h].pan >= 0 || press_[h].pan >= 0 || grab_[h].pan >= 0 || own_[h]); }
     bool Pending() const { return kbPending_; }  // the keyboard waits for the head pose to be placed

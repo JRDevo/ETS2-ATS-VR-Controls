@@ -684,10 +684,11 @@ void VrMenu::LayoutMenu() {
                     combo && !layer_ ? val + "  (+menu)" : val);
             }
         if (picking) {
-            static const int kOuts[8] = { VrPad::kMouseL, VrPad::kMouseR, VrPad::kMouseM, VrPad::kWheelUp, VrPad::kWheelDown,
-                                          VrPad::kGas, VrPad::kBrake, VrPad::kNone };
-            static const char* const kOutNames[8] = { "Mouse L", "Mouse R", "Mouse M", "Wheel up", "Wheel dn", "Gas", "Brake", "None" };
-            for (int i = 0; i < 8; ++i) add(ePickOut, kOuts[i], 24 + i * 103, 704, 97, 54, kOutNames[i]);
+            static const int kOuts[9] = { VrPad::kMouseL, VrPad::kMouseR, VrPad::kMouseM, VrPad::kWheelUp, VrPad::kWheelDown,
+                                          VrPad::kGas, VrPad::kBrake, VrPad::kKeyboard, VrPad::kNone };
+            static const char* const kOutNames[9] = { "Mouse L", "Mouse R", "Mouse M", "Wheel up", "Wheel dn", "Gas", "Brake",
+                                                      "Keyboard", "None" };
+            for (int i = 0; i < 9; ++i) add(ePickOut, kOuts[i], 24 + i * 92, 704, 86, 54, kOutNames[i]);
             add(ePickCancel, 0, 852, 704, 124, 54, "Cancel");
         } else {
             add(eInfo, 0, 24, 704, 742, 54, !status_.empty() ? status_
