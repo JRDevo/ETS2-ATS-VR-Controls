@@ -89,6 +89,41 @@ ETS2 / ATS DLAA mod's menu (`Delete`). The menu and keyboard float in the room: 
 
 Uninstall: run `uninstall.ps1` the same way. Then you can delete the folder.
 
+### What `install.ps1` does, and why there is one
+
+**Why a script?** This mod is not a game mod (`.scs` file) and does not go into the game folder. It is an *OpenXR API
+layer*: a small add-on that the VR system (OpenXR) loads into the game when the game starts VR. OpenXR finds add-ons through
+**one entry in the Windows registry**. The script writes that one entry for you, so you do not have to edit the registry
+by hand.
+
+**What it installs:** nothing is copied into Windows or into the game. It writes exactly one registry value:
+
+| Where | Name | Value |
+|---|---|---|
+| `HKEY_LOCAL_MACHINE\SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit` | the full path of `XR_APILAYER_JRDEVO_ets2_ats_vr_controls.json` in your mod folder | `0` (= switched on) |
+
+The `.json` file tells OpenXR the add-on's name and where `ets2_ats_vr_controls.dll` is (next to it). That is why the folder
+must stay where you unzipped it: the registry points to it.
+
+**How it works, step by step:**
+
+1. It stops if ETS2 or ATS is running (the DLL would be in use).
+2. It removes an old per-user entry of this mod, if there is one (that would load the mod twice).
+3. It asks for admin rights: you see one Windows prompt (UAC). This is needed because the entry is under
+   `HKEY_LOCAL_MACHINE` (for all users): the OpenXR loader built into ETS2 / ATS only looks there.
+4. It removes an older entry of this mod from another folder (if you moved the folder), then writes the new one.
+5. Done. The next time the game starts VR, OpenXR loads the mod. In every other VR game the mod does nothing (see `apps`
+   in `config.ini`).
+
+`uninstall.ps1` removes that registry entry again (also with one admin prompt). Your files and `config.ini` stay; delete
+the folder yourself if you like. You can check the entry yourself with `regedit` at the path above.
+
+**"Run with PowerShell" is not there, or Windows blocks the script?** Open PowerShell in the mod folder and run:
+
+```
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
 ## Settings
 
 Use the VR menu, or open `config.ini` in Notepad. Every setting is explained in the file. Restart the game after a change
