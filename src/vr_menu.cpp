@@ -686,10 +686,10 @@ void VrMenu::LayoutMenu() {
             static const int kOuts[8] = { VrPad::kMouseL, VrPad::kMouseR, VrPad::kMouseM, VrPad::kWheelUp, VrPad::kWheelDown,
                                           VrPad::kGas, VrPad::kBrake, VrPad::kNone };
             static const char* const kOutNames[8] = { "Mouse L", "Mouse R", "Mouse M", "Wheel up", "Wheel dn", "Gas", "Brake", "None" };
-            for (int i = 0; i < 8; ++i) add(ePickOut, kOuts[i], 24 + i * 103, 716, 97, 64, kOutNames[i]);
-            add(ePickCancel, 0, 852, 716, 124, 64, "Cancel");
+            for (int i = 0; i < 8; ++i) add(ePickOut, kOuts[i], 24 + i * 103, 704, 97, 54, kOutNames[i]);
+            add(ePickCancel, 0, 852, 704, 124, 54, "Cancel");
         } else {
-            add(eInfo, 0, 24, 716, 742, 64, !status_.empty() ? status_
+            add(eInfo, 0, 24, 704, 742, 54, !status_.empty() ? status_
                 : layer_ ? "While the modifier is held, these buttons send this instead." : "Point at a button, pull the trigger, pick its key.");
         }
     } else if (tab_ == 1) {
@@ -719,7 +719,7 @@ void VrMenu::LayoutMenu() {
         row(5, "Air mouse speed");
         snprintf(b, sizeof(b), "%.0f px/deg", (double)pad_.airGain);
         plusMinus(5, 50, b);
-        add(eInfo, 0, 24, 716, 742, 64, status_.empty() ? "Changes work at once and are saved." : status_);
+        add(eInfo, 0, 24, 704, 742, 54, status_.empty() ? "Changes work at once and are saved." : status_);
     } else if (tab_ == 2) {
         auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 156 + r * 76, 440, 64, label); };
         auto plusMinus = [&](int r, int base, const std::string& value, const char* minus, const char* plus) {
@@ -753,7 +753,7 @@ void VrMenu::LayoutMenu() {
         snprintf(b, sizeof(b), " for %.1f s", gate_.hold);
         add(eInfo, 300, 24, 612, 952, 46, "Menu open / close: hold " + combo + b);
         add(eInfo, 301, 24, 656, 952, 46, "Move: point at a panel, hold the grip, move. Its stick: farther / closer.");
-        add(eInfo, 0, 24, 716, 742, 64, status_.empty() ? "The keyboard stays when the menu closes (its x hides it)." : status_);
+        add(eInfo, 0, 24, 704, 742, 54, status_.empty() ? "The keyboard stays when the menu closes (its x hides it)." : status_);
     } else if (tab_ == 3) {
         auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 162 + r * 88, 440, 70, label); };
         row(0, "Colours");
@@ -773,7 +773,7 @@ void VrMenu::LayoutMenu() {
         static const char* const kSm[4] = { "Off", "Low", "Medium", "High" };
         for (int i = 0; i < 4; ++i) add(eSet, 110 + i, 470 + i * 129, 514, 119, 70, kSm[i], look_.smoothing == i);
         add(eInfo, 302, 24, 596, 952, 56, "Smoothing calms a shaky hand (menu pointer and air mouse).");
-        add(eInfo, 0, 24, 716, 742, 64, status_.empty() ? "- = more see-through, + = more solid." : status_);
+        add(eInfo, 0, 24, 704, 742, 54, status_.empty() ? "- = more see-through, + = more solid." : status_);
     } else {                                            // Driving (scs_input.h): steering here, gas / brake on any button
         auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 156 + r * 68, 440, 60, label); };
         auto opts = [&](int r, int base, std::initializer_list<const char*> names, int cur) {
@@ -815,11 +815,15 @@ void VrMenu::LayoutMenu() {
             else snprintf(b, sizeof(b), "%.2g s to full", 1.0 / (double)pad_.steerSpeed);
             plusMinus(6, 139, b);
         }
-        add(eInfo, 0, 24, 716, 742, 64, !status_.empty() ? status_ : !pad_.drive ? "Driving off: no steering, gas or brake."
+        add(eInfo, 0, 24, 704, 742, 54, !status_.empty() ? status_ : !pad_.drive ? "Driving off: no steering, gas or brake."
                                         : rate ? "Push a little = turn slowly, all the way = fast." : "The stick's place = the wheel's place.");
     }
     if (!(tab_ == 0 && picking))                        // every tab: back to the defaults (a second press does it)
-        add(eSet, kResetArg, 776, 716, 200, 64, resetArm_ == tab_ ? "Sure? Reset" : "Reset tab", resetArm_ == tab_);
+        add(eSet, kResetArg, 776, 704, 200, 54, resetArm_ == tab_ ? "Sure? Reset" : "Reset tab", resetArm_ == tab_);
+    // the project, the copyright and the licence (as the DLAA mod and VR EyeCapture show them; text only: a link would open a
+    // browser on the desktop and take the focus from the game)
+    add(eInfo, kFootArg, 24, 764, 952, 30,
+        "github.com/JRDevo/ETS2-ATS-VR-Controls  \xC2\xB7  (c) 2026 JRDevo  \xC2\xB7  License: PolyForm Noncommercial");
 }
 
 void VrMenu::LayoutKb() {
@@ -957,9 +961,9 @@ void VrMenu::DrawElem(MenuCanvas& c, int theme, const Elem& e, int st) {
         c.Text(e.x + 24, e.y, e.w - 24, e.h, e.text, 34, true, e.on ? T.accent : T.text, DT_LEFT);
         break;
     case eInfo: {
-        const bool label = e.arg >= 100 && e.arg < 200, value = e.arg >= 200 && e.arg < 300;
-        c.Text(e.x + (value ? 0 : 4), e.y, e.w, e.h, e.text, label ? 28 : value ? 30 : 26, value, label || value ? T.text : T.dim,
-               value ? DT_CENTER : DT_LEFT);
+        const bool label = e.arg >= 100 && e.arg < 200, value = e.arg >= 200 && e.arg < 300, foot = e.arg == kFootArg;
+        c.Text(e.x + (value || foot ? 0 : 4), e.y, e.w, e.h, e.text, foot ? 19 : label ? 28 : value ? 30 : 26, value,
+               label || value ? T.text : T.dim, value || foot ? DT_CENTER : DT_LEFT);
         break;
     }
     case eRow: {

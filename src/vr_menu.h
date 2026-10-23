@@ -119,6 +119,7 @@ public:
     std::string Describe() const;
     // element kinds (public for the tests)
     enum Kind { eNone, eBar, eClose, eSmaller, eBigger, eKbBtn, eTab, eRow, ePickOut, ePickCancel, eSet, eKey, eHere, eInfo };
+    static constexpr int kFootArg = 400;          // eInfo arg of the bottom line (project, copyright, licence)
     static constexpr int kResetArg = 150;         // eSet arg of every tab's Reset button (tests)
     void Open(bool headOk, const Pose& head);     // as the combo does (tests)
     static int KeyIndex(const char* name);        // tests: the eKey arg of a keyboard key ("f1", "shift"); -1 = none
