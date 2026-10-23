@@ -148,6 +148,21 @@ the folder yourself if you like. You can check the entry yourself with `regedit`
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
+## What runs when / privacy
+
+- **Nothing runs in the background.** No service, no tray icon, no startup entry. With no VR game running, Task Manager
+  shows nothing from this mod.
+- **It only starts with a VR game.** The game's own VR system (OpenXR) loads it when the game starts VR, the same way it
+  loads OpenXR Toolkit or other VR add-ons. When the game closes, the mod is gone too.
+- **Other VR games:** it checks the game's name once at start (less than a millisecond), then switches itself off for the
+  rest of that game: no work, no log, no buttons. (The small DLL stays in that game's memory until it closes.)
+- **No internet.** It never connects anywhere.
+- **Only its own files:** it reads `config.ini` and writes its own log and the settings you change in its menu.
+- **Keys only to the game:** it sends keys / mouse only while the game window is in front. It does not look at other
+  programs or at what you type outside the game.
+- **One install, both games:** the registry entry is for the whole PC, so it works in ETS2 and ATS (the `apps` line in
+  `config.ini` lists both). All of the source code is in this repository.
+
 ## Settings
 
 Use the VR menu, or open `config.ini` in Notepad. Every setting is explained in the file. Restart the game after a change
