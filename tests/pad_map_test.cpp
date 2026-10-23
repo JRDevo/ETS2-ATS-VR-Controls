@@ -545,8 +545,22 @@ int main() {
         float lc = 0.0f, ls = 0.0f;
         tap(false, &lc);
         tap(true, &ls);
-        CHECK(ls == lc && ls >= 0.0f, "a slip past the middle on let go: the same as a clean let go, never past straight (%.4f, %.4f)",
-              (double)lc, (double)ls);
+        CHECK(lc >= 0.0f && ls >= 0.0f, "a slip past the middle on let go: never past straight (%.4f, %.4f)", (double)lc, (double)ls);
+    }
+    {   // THE STALL (drive log 20:55, centre time 0.5 s, 86 km/h): the wheel a hair left, the stick pushed right -- the wheel
+        // must turn right at once, not creep to straight for a second
+        Config c = DefaultConfig();
+        c.steerCenterTime = 0.5f;
+        Mapper mp; Rec r; Frame f;
+        f.hand[0] = true; f.sx[0] = -0.5f;
+        mp.SetSpeed(86.0f);
+        for (int i = 0; i < 30; ++i) mp.Step(f, true, 0.011, c, r);   // (about -0.01, as in the log)
+        const float before = r.drv[0];
+        f.sx[0] = 0.92f;
+        for (int i = 0; i < 9; ++i) mp.Step(f, true, 0.011, c, r);   // 0.1 s
+        CHECK(before < 0.0f && r.drv[0] > 0.0f, "a hair left (%.4f), pushed right: right within 0.1 s (%.4f)", (double)before, (double)r.drv[0]);
+        for (int i = 0; i < 90; ++i) mp.Step(f, true, 0.011, c, r);  // 1 s more
+        CHECK(r.drv[0] > 0.15f, "... and well into the turn after 1 s (%.3f)", (double)r.drv[0]);
     }
     {   // odd frame times, the dead zone edge, steer_max, at once, inactive
         Config c = DefaultConfig();

@@ -174,8 +174,11 @@ struct Config {
     //     holds, and a wobbling thumb near the edge is smoothed (the user's drive log 2026-10-23 19:57: holds at ~0.9 wobble
     //     0.1-0.25 per 0.1 s; an unsmoothed ease made every wobble a twitch);
     //   - let go: back to straight at steerCenterTime (default 0 = at the wheel speed limit: the user's choice, "more
-    //     realistic"). The stick on the OTHER side counts as let go until the wheel is straight, then it turns out: a thumb
-    //     slipping past the middle as it lets go never throws the wheel past straight;
+    //     realistic");
+    //   - the stick on the OTHER side: straight first, at the speed limit times the push (no glide: with a centre time a
+    //     small angle crept to straight for over a second while the stick was pushed the other way -- the user's drive log
+    //     2026-10-23 20:55: "the buttons weren't steering"), then out the other way. A thumb slipping past the middle as it
+    //     lets go never throws the wheel past straight;
     //   - never faster than steerRate full turns (centre -> full lock) per second, times the push while held (at least
     //     0.3): a small push turns slowly, a full push fast (the user's thumb is mostly 0 or ~0.9: taps);
     //   - times longer and the limit lower at speed (/ and * sqrt(speed factor)): calmer on the highway.
@@ -397,9 +400,10 @@ public:
             }
             holdSign_ = shape;
             float tgt = shape * c.steerMax * range_;
-            if (tgt * cur < 0.0f) tgt = 0.0f;          // the other side: straight first (see Config)
-            const bool letGo = tgt == 0.0f;
-            const float tau = (letGo ? c.steerCenterTime : c.steerFollowTime) / rf;
+            const bool other = tgt * cur < 0.0f;       // the other side: straight first, no glide (see Config)
+            if (other) tgt = 0.0f;
+            const bool letGo = tgt == 0.0f && !other;
+            const float tau = other ? 0.0f : (letGo ? c.steerCenterTime : c.steerFollowTime) / rf;
             const float a = t <= 0.0f ? 0.0f : tau > 0.0f ? t / (tau + t) : 1.0f;   // first order, stable for any step
             float step = (tgt - cur) * a;
             if (c.steerRate > 0.0f) {
