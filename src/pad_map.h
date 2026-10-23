@@ -170,10 +170,14 @@ struct Config {
     // driving -- analog values for the game's own input plugin door (scs_input.h), not keys. Steering: steerStick's x (its
     // left / right directions are then not buttons, and a mouse on that stick is off). The stick (dead zone, curve, times
     // steerMax and the speed factor) is the wheel's TARGET place; the wheel glides there (Mapper::Step):
-    //   - out (further from the middle, or across it): time constant steerFollowTime -- a big move goes fast, a small
-    //     correction slowly, and thumb jitter is smoothed;
-    //   - in (the stick eased or let go): time constant steerCenterTime, longer at speed (/ sqrt(speed factor)) -- easing
-    //     the stick = a smaller angle that holds; let go = a calm return to straight, calmer on the highway;
+    //   - out (further from the middle on the wheel's side, or from straight): time constant steerFollowTime -- a big move
+    //     goes fast, a small correction slowly, and thumb jitter is smoothed;
+    //   - in (the stick eased, let go, or pushed to the other side): time constant steerCenterTime -- easing the stick = a
+    //     smaller angle that holds; let go = a calm return to straight. The other side counts as "in" until the wheel is
+    //     past the middle: a thumb that slips past the middle as it lets go must not throw the wheel back (the user's
+    //     drive log 2026-10-23 18:19: every tap ended in a quick drop, then a slow creep); a hard push the other way still
+    //     comes back faster (the target is further away);
+    //   - both times longer at speed (/ sqrt(speed factor)): calmer on the highway;
     //   - never faster than steerRate full turns (centre -> full lock) per second (* sqrt(speed factor)): a flick does not
     //     throw the wheel.
     // (2026-10-23, Fable's design: the old "turn speed" style kept turning while the stick was eased, and only the dead zone
@@ -340,6 +344,7 @@ public:
             const int sh = c.steerStick - 1;
             float x = (sh == 0 || sh == 1) && f.hand[sh] ? f.sx[sh] : 0.0f;
             if (!(x == x)) x = 0.0f;                   // (a NaN stick would stay in the wheel for good)
+            stickX_ = x;
             const float t = (float)(dt > 0.0 ? (dt < 0.1 ? dt : 0.1) : 0.0);   // (a hitch = one bounded step)
             const float cur = drive_[0], acur = cur < 0.0f ? -cur : cur;
             // faster = less wheel (the target range times sf), and a calmer return / rate limit (times sqrt(sf): the user's
@@ -357,8 +362,8 @@ public:
             holdSign_ = shape;
             const float tgt = shape * c.steerMax * range_;
             const float atgt = tgt < 0.0f ? -tgt : tgt;
-            const bool in = tgt == 0.0f || (tgt * cur > 0.0f && atgt < acur);   // eased / let go (across the middle = out)
-            const float tau = in ? c.steerCenterTime / rf : c.steerFollowTime;
+            const bool out = tgt != 0.0f && (cur == 0.0f || (tgt * cur > 0.0f && atgt > acur));   // (see Config: in / out)
+            const float tau = (out ? c.steerFollowTime : c.steerCenterTime) / rf;
             const float a = t <= 0.0f ? 0.0f : tau > 0.0f ? t / (tau + t) : 1.0f;   // first order, stable for any step
             float step = (tgt - cur) * a;
             if (c.steerRate > 0.0f) {
@@ -395,6 +400,7 @@ public:
     bool AirOn() const { return airOn_; }
     float Driving(int i) const { return i >= 0 && i < 3 ? drive_[i] : 0.0f; }   // the last steer / gas / brake sent
     void SetSpeed(float kmh) { speed_ = kmh; }          // the truck's speed (km/h, < 0 = not known): speed-sensitive steering
+    float StickX() const { return stickX_; }            // the steering stick's x at the last Step (log = 1: the drive line)
     int TakeKeyboardToggles() { const int n = kbToggles_; kbToggles_ = 0; return n; }   // "keyboard" presses since the last call
 
 private:
@@ -464,6 +470,7 @@ private:
     double yaw_ = 0.0, pitch_ = 0.0;
     double accX_ = 0.0, accY_ = 0.0;
     float  drive_[3] = {};                             // steer, throttle, brake last sent
+    float  stickX_ = 0.0f;                             // the steering stick's x (StickX)
     float  range_ = 0.0f;                              // steering: the speed range of the bend held now (see Step)
     float  holdPeak_ = 0.0f, holdSign_ = 0.0f;         // ... the most push in it, and its side
 };

@@ -73,7 +73,8 @@ std::atomic<bool> g_tmOn{false};                            // (main thread writ
 std::atomic<float> g_cab[6], g_headOff[6], g_truck[3], g_vrHead[7];   // vrHead: x y z, then the orientation's x y z w
 bool   g_logDrive = false;
 double g_lastDriveLog = 0;
-float  g_lastLogged[3] = { NAN, NAN, NAN }, g_lastCab = NAN;
+float  g_lastLogged[3] = { NAN, NAN, NAN }, g_lastCab = NAN, g_lastStick = NAN;
+std::atomic<float> g_stick;                                  // the steering stick's x (DriveStickSet; log = 1)
 int    g_driveLogs = 0;
 
 double NowSec() {
@@ -91,16 +92,20 @@ void LogDrive() {
     if (now - g_lastDriveLog < 0.1) return;
     const float in = g_tm[0].load(std::memory_order_relaxed), eff = g_tm[1].load(std::memory_order_relaxed);
     const float cabP = g_cab[4].load(std::memory_order_relaxed);
-    if (g_now[0] == g_lastLogged[0] && in == g_lastLogged[1] && eff == g_lastLogged[2] && cabP == g_lastCab) return;
+    const float stick = g_stick.load(std::memory_order_relaxed);
+    if (g_now[0] == g_lastLogged[0] && in == g_lastLogged[1] && eff == g_lastLogged[2] && cabP == g_lastCab && stick == g_lastStick) return;
     g_lastCab = cabP;
+    g_lastStick = stick;
     g_lastDriveLog = now;
     g_lastLogged[0] = g_now[0]; g_lastLogged[1] = in; g_lastLogged[2] = eff;
     ++g_driveLogs;
     if (g_tmOn)
-        LOGI("drive: sent steer %+.3f gas %.2f brake %.2f | game input steer %+.3f, used %+.3f | %.0f km/h%s", g_now[0], g_now[1],
-             g_now[2], -in, -eff, g_tm[2].load(std::memory_order_relaxed) * 3.6f, g_driveLogs == 3000 ? " (no more of these lines)" : "");
+        LOGI("drive: stick %+.2f sent steer %+.3f gas %.2f brake %.2f | game input steer %+.3f, used %+.3f | %.0f km/h%s", stick,
+             g_now[0], g_now[1], g_now[2], -in, -eff, g_tm[2].load(std::memory_order_relaxed) * 3.6f,
+             g_driveLogs == 3000 ? " (no more of these lines)" : "");
     else
-        LOGI("drive: sent steer %+.3f gas %.2f brake %.2f%s", g_now[0], g_now[1], g_now[2], g_driveLogs == 3000 ? " (no more of these lines)" : "");
+        LOGI("drive: stick %+.2f sent steer %+.3f gas %.2f brake %.2f%s", stick, g_now[0], g_now[1], g_now[2],
+             g_driveLogs == 3000 ? " (no more of these lines)" : "");
     if (g_tmOn) {                                       // the cab line (same moment)
         float c[6], h[6], t[3], v[7];
         for (int i = 0; i < 6; ++i) { c[i] = g_cab[i].load(std::memory_order_relaxed); h[i] = g_headOff[i].load(std::memory_order_relaxed); }
@@ -151,6 +156,7 @@ void __stdcall OnPlacement(const char*, uint32_t, const ScsValue* v, void* conte
     }
 }
 
+void DriveStickSet(float x) { if (g_logDrive) g_stick.store(x, std::memory_order_relaxed); }
 void DriveSet(float steer, float throttle, float brake) {
     g_val[0].store(steer, std::memory_order_relaxed);
     g_val[1].store(throttle, std::memory_order_relaxed);

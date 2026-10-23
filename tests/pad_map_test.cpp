@@ -472,15 +472,37 @@ int main() {
         run(mp, f, 8.0, c, r);
         CHECK(r.drv[0] == 0.0f, "a NaN stick counts as let go (the wheel is not stuck at NaN)");
     }
-    {   // across the middle (counter-steer) is "out": the quick follow time, not the slow return
+    {   // the other side counts as "in" (the return time) until the wheel is past the middle, then "out"
         Config c = DefaultConfig();
         c.steerDeadzone = 0.0f; c.steerRate = 0.0f;
         Mapper mp; Rec r; Frame f;
         f.hand[0] = true; f.sx[0] = 0.5f;
         run(mp, f, 3.0, c, r);
         f.sx[0] = -1.0f;
-        run(mp, f, 0.15, c, r);
-        CHECK(r.drv[0] < 0.0f, "+0.5 -> full left: across the middle in 0.15 s (%.3f)", (double)r.drv[0]);
+        run(mp, f, 0.22, c, r);
+        const float early = r.drv[0];
+        run(mp, f, 0.2, c, r);
+        CHECK(early > 0.0f && r.drv[0] < 0.0f, "+0.5 -> full left: past the middle after ~0.32 s, not at once (%.3f, %.3f)",
+              (double)early, (double)r.drv[0]);
+        run(mp, f, 1.0, c, r);
+        CHECK(r.drv[0] < -0.95f, "... then out at the follow time: full left soon (%.3f)", (double)r.drv[0]);
+    }
+    {   // THE SLIP (drive log 18:19): at 90 km/h a tap to 0.1, the thumb slips past the middle for 0.2 s as it lets go --
+        // the wheel comes back only a little faster than a clean let go, no quick drop
+        Config c = DefaultConfig();
+        c.steerDeadzone = 0.0f;
+        auto tap = [&](bool slip) {
+            Mapper mp; Rec r; Frame f;
+            f.hand[0] = true; f.sx[0] = 1.0f / 3.0f;
+            mp.SetSpeed(90.0f);
+            for (int i = 0; i < 400; ++i) mp.Step(f, true, 0.011, c, r);
+            f.sx[0] = slip ? -0.4f : 0.0f;
+            for (int i = 0; i < 18; ++i) mp.Step(f, true, 0.011, c, r);
+            return r.drv[0];
+        };
+        const float clean = tap(false), slipped = tap(true);
+        CHECK(clean > 0.085f && slipped > 0.06f && slipped < clean, "0.2 s after a let go: clean %.3f, slipped %.3f (was ~0.03)",
+              (double)clean, (double)slipped);
     }
     {   // odd frame times, the dead zone edge, steer_max, at once, inactive
         Config c = DefaultConfig();

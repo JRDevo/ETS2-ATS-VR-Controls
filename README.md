@@ -125,8 +125,8 @@ real truck.
 | Steering dead zone (`steer_deadzone`) | how far the stick must move before the wheel turns | 0.10 |
 | Steering curve (`steer_curve`) | 1 = straight. More = small pushes much gentler | 1.00 |
 | Full stick turns the wheel (`steer_max`) | how far the wheel turns with the stick all the way | 100 % |
-| Wheel follows the stick (`steer_follow_time`) | how quickly the wheel goes to the stick's place, in seconds. More = calmer. 0 = at once | 0.25 s |
-| Let go: back to the middle (`steer_center_time`) | how quickly the wheel comes back when you ease or let go, in seconds (when standing; calmer at speed by itself). 0 = at once | 0.8 s |
+| Wheel follows the stick (`steer_follow_time`) | how quickly the wheel goes to the stick's place, in seconds (when standing; calmer at speed by itself). More = calmer. 0 = at once | 0.25 s |
+| Let go: back to the middle (`steer_center_time`) | how quickly the wheel comes back when you ease, let go or push the other way, in seconds (when standing; calmer at speed by itself). If your thumb slips past the middle as you let go, the wheel does not jump: it still comes back calmly. 0 = at once | 0.8 s |
 | Wheel speed at most (`steer_max_speed`) | the wheel never turns faster than this: seconds from the middle to full lock (in config.ini: full turns per second, 0.6 = 1.7 s). Slower at speed too | 1.7 s |
 | At 90 km/h (`steer_speed_sens`, `steer_at_speed`) | **speed-sensitive steering**, On / Off: up to 10 km/h the stick steers fully; at 90 km/h and faster full stick turns the wheel only this much (30 %), so small moves are fine. A bend you hold while you speed up stays | On, 30 % |
 
