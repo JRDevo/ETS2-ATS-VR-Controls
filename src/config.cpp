@@ -87,17 +87,17 @@ Config ParseConfig(const std::string& text) {
             continue;
         }
         if (key == "drive") { c.pad.drive = lv != "0" && lv != "off" && lv != "no"; continue; }
-        if (key == "steer_mode") {
-            if (lv == "wheel") c.pad.steerMode = 0;
-            else if (lv == "rate" || lv == "turn" || lv == "speed") c.pad.steerMode = 1;
-            else bad("wheel or rate");
+        // (the steering styles before 2026-10-23: no longer used -- a note, so a user's old tuning is not lost without a word)
+        if (key == "steer_mode" || key == "steer_turn_time" || key == "steer_return_time" || key == "steer_speed") {
+            bad("no longer used (2026-10-23: the wheel glides to the stick's place; see steer_follow_time, steer_center_time, "
+                "steer_max_speed)");
             continue;
         }
         if (key == "steer_speed_sens") { c.pad.steerSpeedSens = lv != "0" && lv != "off" && lv != "no"; continue; }
         if (key == "steer_at_speed") { if (Num(val, 0.1, 1, &d)) c.pad.steerAtSpeed = (float)d; else bad("0.1 .. 1 (1 = off)"); continue; }
-        if (key == "steer_turn_time") { if (Num(val, 0.5, 20, &d)) c.pad.steerTurnTime = (float)d; else bad("seconds 0.5 .. 20"); continue; }
-        if (key == "steer_return_time") { if (Num(val, 0.5, 20, &d)) c.pad.steerReturnTime = (float)d; else bad("seconds 0.5 .. 20"); continue; }
-        if (key == "steer_speed") { if (Num(val, 0, 10, &d)) c.pad.steerSpeed = (float)d; else bad("a number 0 .. 10 (0 = at once)"); continue; }
+        if (key == "steer_follow_time") { if (Num(val, 0, 2, &d)) c.pad.steerFollowTime = (float)d; else bad("seconds 0 .. 2 (0 = at once)"); continue; }
+        if (key == "steer_center_time") { if (Num(val, 0, 10, &d)) c.pad.steerCenterTime = (float)d; else bad("seconds 0 .. 10 (0 = at once)"); continue; }
+        if (key == "steer_max_speed") { if (Num(val, 0, 10, &d)) c.pad.steerRate = (float)d; else bad("full turns per second 0 .. 10 (0 = no limit)"); continue; }
         if (key == "steer_deadzone") { if (Num(val, 0, 0.5, &d)) c.pad.steerDeadzone = (float)d; else bad("a number 0 .. 0.5"); continue; }
         if (key == "steer_curve") { if (Num(val, 1, 3, &d)) c.pad.steerCurve = (float)d; else bad("a number 1 .. 3"); continue; }
         if (key == "steer_max")   { if (Num(val, 0.2, 1, &d)) c.pad.steerMax = (float)d; else bad("a number 0.2 .. 1"); continue; }
@@ -276,13 +276,12 @@ std::vector<std::pair<std::string, std::string>> MenuValues(const VrPad::Config&
     kv.push_back({ "steer_curve", b });
     snprintf(b, sizeof(b), "%.2f", (double)p.steerMax);
     kv.push_back({ "steer_max", b });
-    snprintf(b, sizeof(b), "%.2f", (double)p.steerSpeed);
-    kv.push_back({ "steer_speed", b });
-    kv.push_back({ "steer_mode", p.steerMode == 1 ? "rate" : "wheel" });
-    snprintf(b, sizeof(b), "%.1f", (double)p.steerTurnTime);
-    kv.push_back({ "steer_turn_time", b });
-    snprintf(b, sizeof(b), "%.1f", (double)p.steerReturnTime);
-    kv.push_back({ "steer_return_time", b });
+    snprintf(b, sizeof(b), "%.2f", (double)p.steerFollowTime);
+    kv.push_back({ "steer_follow_time", b });
+    snprintf(b, sizeof(b), "%.2f", (double)p.steerCenterTime);
+    kv.push_back({ "steer_center_time", b });
+    snprintf(b, sizeof(b), "%.2f", (double)p.steerRate);
+    kv.push_back({ "steer_max_speed", b });
     snprintf(b, sizeof(b), "%.2f", (double)p.steerAtSpeed);
     kv.push_back({ "steer_at_speed", b });
     kv.push_back({ "steer_speed_sens", p.steerSpeedSens ? "1" : "0" });
@@ -399,11 +398,10 @@ std::string DescribePad(const VrPad::Config& p) {
     char dr[200] = " | no steering";
     if (!p.drive) snprintf(dr, sizeof(dr), " | driving off");
     else if (p.steerStick)
-        snprintf(dr, sizeof(dr), " | driving: %s stick steers, %s (dead zone %.2f, curve %.2f, max %.2f, %s %.2f, back to the middle %.1f s, at 90 km/h %.2f%s)",
-                 p.steerStick == 1 ? "left" : "right", p.steerMode == 1 ? "rate" : "wheel", (double)p.steerDeadzone,
-                 (double)p.steerCurve, (double)p.steerMax, p.steerMode == 1 ? "full turn s" : "speed / s",
-                 (double)(p.steerMode == 1 ? p.steerTurnTime : p.steerSpeed), (double)p.steerReturnTime,
-                 (double)p.steerAtSpeed, p.steerSpeedSens ? "" : " off");
+        snprintf(dr, sizeof(dr), " | driving: %s stick steers (dead zone %.2f, curve %.2f, max %.2f, follow %.2f s, back to the middle %.2f s, at most %.2f turns / s, at 90 km/h %.2f%s)",
+                 p.steerStick == 1 ? "left" : "right", (double)p.steerDeadzone, (double)p.steerCurve, (double)p.steerMax,
+                 (double)p.steerFollowTime, (double)p.steerCenterTime, (double)p.steerRate, (double)p.steerAtSpeed,
+                 p.steerSpeedSens ? "" : " off");
     return s + tail + mod + dr;
 }
 

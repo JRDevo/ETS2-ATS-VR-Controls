@@ -21,6 +21,8 @@
                  the plugin device (one module for both sides), the left trigger / stick send no keys or mouse
       kbkey      a button set to "keyboard" (Y): the first press shows the VR keyboard, the second hides it (no key sent)
       drivespeed speed-sensitive steering: the fake game's telemetry says 90 km/h, full stick sends 0.3 of the wheel
+      driveglide the default steering glide: full stick 1.5 s, let go -- the wheel rises smoothly (at most 0.6 turns / s),
+                 then glides back to exactly straight
       menu       a D3D11 game with VR EyeCapture's set (both stick clicks, shared): both grips + the left stick click held 1 s open the VR menu (quad layers on D3D11 swapchains), the right hand
                  points at the Mouse tab and at "air mouse: toggled on" (written to config.ini), the game never sees those
                  trigger pulls, a short stick click alone is still the horn (at once), the combo again closes it
@@ -319,7 +321,7 @@ if (-not $Only -or $Only -eq 'drivespeed') {
     $s = '1.0-1.5:/user/hand/left/input/thumbstick=1,0'
     $dll = Join-Path $layerDir 'ets2_ats_vr_controls.dll'
     $r = RunCase 'drivespeed' 'fake_game.exe' @('--scs', "`"$dll`"", '--scs-speed', '90') 2.5 @{ VRC_MOCK_INPUT = $s } `
-        "steer = left`nsteer_mode = wheel`nsteer_speed = 0`nsteer_deadzone = 0`n"
+        "steer = left`nsteer_follow_time = 0`nsteer_center_time = 0`nsteer_max_speed = 0`nsteer_deadzone = 0`n"
     $drv = @($r.events | Where-Object { $_ -match '^drive ' }) -join ' | '
     Write-Host "  sent: $drv"
     Check 'drivespeed' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
@@ -328,16 +330,38 @@ if (-not $Only -or $Only -eq 'drivespeed') {
     Check 'drivespeed' ($r.log -match 'driving: telemetry \(truck speed, steering\) 3 of 3 channels') 'log: telemetry'
 }
 
+# ---- driveglide: the default steering (pad_map.h): the stick = the target, the wheel glides there and back
+if (-not $Only -or $Only -eq 'driveglide') {
+    $s = '1.0-2.5:/user/hand/left/input/thumbstick=1,0'
+    $dll = Join-Path $layerDir 'ets2_ats_vr_controls.dll'
+    $r = RunCase 'driveglide' 'fake_game.exe' @('--scs', "`"$dll`"") 8.0 @{ VRC_MOCK_INPUT = $s } "steer = left`nsteer_deadzone = 0`n"
+    $st = @($r.events | Where-Object { $_ -match '^drive ' } | ForEach-Object { [double]::Parse(($_ -split ' ')[1], [Globalization.CultureInfo]::InvariantCulture) })
+    $peak = 0; $pi = 0
+    for ($i = 0; $i -lt $st.Count; $i++) { if ($st[$i] -gt $peak) { $peak = $st[$i]; $pi = $i } }
+    $up = $true; $down = $true; $jump = 0
+    for ($i = 1; $i -lt $st.Count; $i++) {
+        if ($i -le $pi -and $st[$i] -lt $st[$i - 1]) { $up = $false }
+        if ($i -gt $pi -and $st[$i] -gt $st[$i - 1]) { $down = $false }
+        $d = [math]::Abs($st[$i] - $st[$i - 1]); if ($d -gt $jump) { $jump = $d }
+    }
+    Write-Host ("  {0} steering values, first {1}, peak {2}, last {3}, biggest step {4:0.000}" -f $st.Count, $st[0], $peak, $st[-1], $jump)
+    Check 'driveglide' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
+    Check 'driveglide' ($st.Count -gt 50 -and $st[0] -gt 0 -and $st[0] -lt 0.07) 'starts small (no jump to full)'
+    Check 'driveglide' ($up -and $down -and $peak -gt 0.5 -and $peak -le 0.95) "rises to the peak, then only comes back (peak $peak)"
+    Check 'driveglide' ($jump -le 0.061) "no jumps: at most 0.6 turns / s * 0.1 s per frame (biggest $jump)"
+    Check 'driveglide' ($st[-2] -lt 0.003 -and $st[-1] -eq 0) "glides to exactly straight by itself (before the end: $($st[-2]))"
+}
+
 # ---- drive
 if (-not $Only -or $Only -eq 'drive') {
     # left stick 0.55 right 1.0-1.5 (0.5 after the dead zone: 0.5^2 = 0.25), full left 1.6-2.0; left trigger (gas) 0.525 (half)
-    # 2.2-2.6; right trigger 2.8-3.0 (its own mapping, a left click); left grip (brake) 0.62 3.0-3.2 (0.6). steer_speed = 0:
-    # exact values (the speed: pad_map_test)
+    # 2.2-2.6; right trigger 2.8-3.0 (its own mapping, a left click); left grip (brake) 0.62 3.0-3.2 (0.6).
+    # steer_follow_time / steer_center_time / steer_max_speed = 0: exact values (the glide: pad_map_test, e2e driveglide)
     $s = '1.0-1.5:/user/hand/left/input/thumbstick=0.55,0;1.6-2.0:/user/hand/left/input/thumbstick=-1,0;' +
          '2.2-2.6:/user/hand/left/input/trigger/value=0.525;2.8-3.0:/user/hand/right/input/trigger/value=0.9;' +
          '3.0-3.2:/user/hand/left/input/squeeze/value=0.62'
     $dll = Join-Path $layerDir 'ets2_ats_vr_controls.dll'
-    $r = RunCase 'drive' 'fake_game.exe' @('--scs', "`"$dll`"") 3.5 @{ VRC_MOCK_INPUT = $s } "steer = left`nsteer_mode = wheel`nsteer_speed = 0`nsteer_curve = 2`nmouse_stick = right`nltrigger = gas`nlgrip = brake`n"
+    $r = RunCase 'drive' 'fake_game.exe' @('--scs', "`"$dll`"") 3.5 @{ VRC_MOCK_INPUT = $s } "steer = left`nsteer_follow_time = 0`nsteer_center_time = 0`nsteer_max_speed = 0`nsteer_curve = 2`nmouse_stick = right`nltrigger = gas`nlgrip = brake`n"
     $b = Buttons @($r.events | Where-Object { $_ -notmatch '^drive ' })
     Write-Host "  events: $b"
     Check 'drive' ((@($r.events | Where-Object { $_ -match '^drive ' }) -join ' | ') -eq ('drive 0.250 0.000 0.000 | drive 0.000 0.000 0.000 | ' +

@@ -168,25 +168,28 @@ struct Config {
     int   modBtn = kRGrip;
     Out   modMap[kBtnCount];
     // driving -- analog values for the game's own input plugin door (scs_input.h), not keys. Steering: steerStick's x (its
-    // left / right directions are then not buttons, and a mouse on that stick is off), in one of two styles (steerMode):
-    //   wheel (0): the stick's position is the wheel's position; the wheel follows it at most steerSpeed full turns (centre ->
-    //              full lock) per second, so a flick does not throw the wheel.
-    //   rate  (1): the stick's push is how fast the wheel turns -- a little = slowly, full = full lock in steerTurnTime s;
-    //              let go: the wheel goes back to the middle (full lock -> straight in steerReturnTime s).
-    // Both: dead zone + curve on the stick, the wheel never past steerMax. Gas / brake: any button mapped to "gas" / "brake"
-    // (map or modMap), see kGas.
+    // left / right directions are then not buttons, and a mouse on that stick is off). The stick (dead zone, curve, times
+    // steerMax and the speed factor) is the wheel's TARGET place; the wheel glides there (Mapper::Step):
+    //   - out (further from the middle, or across it): time constant steerFollowTime -- a big move goes fast, a small
+    //     correction slowly, and thumb jitter is smoothed;
+    //   - in (the stick eased or let go): time constant steerCenterTime, longer at speed (/ sqrt(speed factor)) -- easing
+    //     the stick = a smaller angle that holds; let go = a calm return to straight, calmer on the highway;
+    //   - never faster than steerRate full turns (centre -> full lock) per second (* sqrt(speed factor)): a flick does not
+    //     throw the wheel.
+    // (2026-10-23, Fable's design: the old "turn speed" style kept turning while the stick was eased, and only the dead zone
+    //  brought it back.) Gas / brake: any button mapped to "gas" / "brake" (map or modMap), see kGas.
     bool  drive = true;                                // off: no steering, gas / brake buttons send nothing, the steering
                                                        //   stick's left / right are buttons again (the menu's one switch)
     int   steerStick = 1;                              // 0 off, 1 left stick, 2 right stick
     float steerDeadzone = 0.10f;                       // stick, before steering starts
     float steerCurve = 1.0f;                           // 1 = straight; more = finer near the centre
     float steerMax = 1.0f;                             // full stick = this much of the wheel (0.2 .. 1)
-    float steerSpeed = 0.5f;                           // wheel: centre -> full lock per second at most (0 = at once)
-    int   steerMode = 1;                               // 0 wheel, 1 rate
-    float steerTurnTime = 5.0f;                        // rate: full stick turns centre -> full lock in this many seconds
-    float steerReturnTime = 3.0f;                      // rate: let go, full lock -> straight in this many seconds
+    float steerFollowTime = 0.25f;                     // s, out toward the stick (0 = at once)
+    float steerCenterTime = 0.8f;                      // s, in toward the middle when standing (0 = at once)
+    float steerRate = 0.6f;                            // full turns per second at most (0 = no limit)
     // speed-sensitive steering (the truck's speed from the game, SetSpeed): up to 10 km/h the stick steers fully; at 90 km/h
-    // and faster the wheel turns at most steerAtSpeed of that, and turns / goes back sqrt(steerAtSpeed) as fast. 1 = off.
+    // and faster the wheel turns at most steerAtSpeed of that; the return and the rate limit go sqrt(steerAtSpeed) as fast.
+    // 1 = off.
     float steerAtSpeed = 0.3f;
     bool  steerSpeedSens = true;                       // the switch (the Driving tab's On / Off)
 };
@@ -257,7 +260,7 @@ inline float SpeedFactor(float kmh, const Config& c) {   // 1 slow .. steerAtSpe
     return 1.0f + (c.steerAtSpeed - 1.0f) * t;
 }
 inline int SteerStickOf(const Config& c) { return c.drive ? c.steerStick : 0; }   // the stick that steers now (0 none)
-inline float SteerOf(float x, const Config& c) { return StickShape(x, c) * c.steerMax; }   // wheel style: the wheel position
+inline float SteerOf(float x, const Config& c) { return StickShape(x, c) * c.steerMax; }   // the target at low speed
 inline float PedalOf(float t) {
     constexpr float kRest = 0.05f;                     // a resting finger: no throttle
     if (t <= kRest) return 0.0f;
@@ -335,34 +338,35 @@ public:
         float dv[3] = {};
         if (active && c.drive) {
             const int sh = c.steerStick - 1;
-            const float x = (sh == 0 || sh == 1) && f.hand[sh] ? f.sx[sh] : 0.0f;
-            const float t = (float)(dt > 0.0 && dt < 0.25 ? dt : 0.011);
-            const float cur = drive_[0];
-            // faster = less wheel (the range times sf) and a calmer wheel (turning / going back times sqrt(sf): the user's
-            // drive log corrected at ~0.25 / s at 85 km/h; the full sf would make that 2 s)
+            float x = (sh == 0 || sh == 1) && f.hand[sh] ? f.sx[sh] : 0.0f;
+            if (!(x == x)) x = 0.0f;                   // (a NaN stick would stay in the wheel for good)
+            const float t = (float)(dt > 0.0 ? (dt < 0.1 ? dt : 0.1) : 0.0);   // (a hitch = one bounded step)
+            const float cur = drive_[0], acur = cur < 0.0f ? -cur : cur;
+            // faster = less wheel (the target range times sf), and a calmer return / rate limit (times sqrt(sf): the user's
+            // drive logs moved the wheel at most ~0.13 / s at 85-92 km/h). Speeding up in a bend with the stick held keeps
+            // the range the bend began with (range_), so the bend stays; easing the stick (past a little thumb jitter),
+            // letting go or steering the other way takes the range of the speed now, and the wheel glides in.
             const float sf = SpeedFactor(speed_, c), rf = std::sqrt(sf);
-            const float most = c.steerMax * sf;
-            float st;
-            if (c.steerMode == 1) {                    // rate: the push turns the wheel; let go = back to the middle
-                const float r = StickShape(x, c);
-                if (r != 0.0f) {
-                    st = cur + r * rf * t / (c.steerTurnTime > 0.1f ? c.steerTurnTime : 0.1f);
-                } else {
-                    const float step = rf * t / (c.steerReturnTime > 0.1f ? c.steerReturnTime : 0.1f);
-                    st = cur > step ? cur - step : cur < -step ? cur + step : 0.0f;
-                }
-                if (st > most || st < -most) {        // (faster than when it was turned: back inside, not at once)
-                    const float lim = (cur > 0 ? cur : -cur) - rf * t / (c.steerReturnTime > 0.1f ? c.steerReturnTime : 0.1f);
-                    const float m = lim > most ? lim : most;
-                    st = st > m ? m : st < -m ? -m : st;
-                }
-            } else {                                   // wheel: the stick's position, reached at most steerSpeed / s
-                st = SteerOf(x, c) * sf;
-                if (c.steerSpeed > 0.0f) {
-                    const float step = c.steerSpeed * rf * t;
-                    st = st > cur + step ? cur + step : st < cur - step ? cur - step : st;
-                }
+            const float shape = StickShape(x, c), ash = shape < 0.0f ? -shape : shape;
+            if (shape == 0.0f || shape * holdSign_ < 0.0f || sf >= range_ || ash < holdPeak_ - 0.03f) {
+                range_ = sf;
+                holdPeak_ = ash;
+            } else if (ash > holdPeak_) {
+                holdPeak_ = ash;
             }
+            holdSign_ = shape;
+            const float tgt = shape * c.steerMax * range_;
+            const float atgt = tgt < 0.0f ? -tgt : tgt;
+            const bool in = tgt == 0.0f || (tgt * cur > 0.0f && atgt < acur);   // eased / let go (across the middle = out)
+            const float tau = in ? c.steerCenterTime / rf : c.steerFollowTime;
+            const float a = t <= 0.0f ? 0.0f : tau > 0.0f ? t / (tau + t) : 1.0f;   // first order, stable for any step
+            float step = (tgt - cur) * a;
+            if (c.steerRate > 0.0f) {
+                const float m = c.steerRate * rf * t;
+                step = step > m ? m : step < -m ? -m : step;
+            }
+            float st = cur + step;
+            if (tgt == 0.0f && st < 0.002f && st > -0.002f) st = 0.0f;   // (the glide's tail: exactly straight)
             dv[0] = sh == 0 || sh == 1 ? st : 0.0f;
             for (int b = 0; b < kBtnCount; ++b) {      // gas / brake: the most pressed button mapped to each
                 if (b == c.airBtn) continue;
@@ -378,6 +382,7 @@ public:
             }
         }
         if (!active) for (bool& n : notPedal_) n = false;
+        if (!active || !c.drive) { range_ = 0.0f; holdPeak_ = holdSign_ = 0.0f; }   // (the next push takes the speed's range)
         if (dv[0] != drive_[0] || dv[1] != drive_[1] || dv[2] != drive_[2]) {
             for (int i = 0; i < 3; ++i) drive_[i] = dv[i];
             s.Drive(dv[0], dv[1], dv[2]);
@@ -459,6 +464,8 @@ private:
     double yaw_ = 0.0, pitch_ = 0.0;
     double accX_ = 0.0, accY_ = 0.0;
     float  drive_[3] = {};                             // steer, throttle, brake last sent
+    float  range_ = 0.0f;                              // steering: the speed range of the bend held now (see Step)
+    float  holdPeak_ = 0.0f, holdSign_ = 0.0f;         // ... the most push in it, and its side
 };
 
 }  // namespace VrPad

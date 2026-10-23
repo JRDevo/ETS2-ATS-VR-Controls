@@ -342,36 +342,35 @@ int main(int argc, char** argv) {
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 130) && m.Pad().steerStick == 1, "steer: left again");
         CHECK(m.Pad().drive && click(1, VrMenu::kPanMenu, VrMenu::eSet, 148) && !m.Pad().drive, "Driving: Off");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 147) && m.Pad().drive, "Driving: On");
-        CHECK(m.Pad().steerMode == 1 && m.Pad().steerTurnTime == 5.0f && m.Pad().steerReturnTime == 3.0f,
-              "default style: turn speed, full turn 5 s, back in 3 s");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 144) && m.Pad().steerTurnTime == 7.0f, "full turn 5 -> 7 s (slower)");
+        CHECK(m.Pad().steerFollowTime == 0.25f && m.Pad().steerCenterTime == 0.8f && m.Pad().steerRate == 0.6f,
+              "defaults: follow 0.25 s, back to the middle 0.8 s, at most 0.6 turns / s");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 144) && m.Pad().steerFollowTime == 0.35f, "follow 0.25 -> 0.35 s (calmer)");
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 143);
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 143) && m.Pad().steerTurnTime == 4.0f, "full turn -> 4 s");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 146) && m.Pad().steerReturnTime == 4.0f, "back 3 -> 4 s");
-        click(1, VrMenu::kPanMenu, VrMenu::eSet, 144);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 143) && m.Pad().steerFollowTime == 0.15f, "follow -> 0.15 s");
+        for (int i = 0; i < 4; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 143);
+        CHECK(m.Pad().steerFollowTime == 0.0f, "the quickest: at once");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 146) && m.Pad().steerCenterTime == 1.2f, "back 0.8 -> 1.2 s");
+        for (int i = 0; i < 3; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 144);
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 145);
-        CHECK(m.Pad().steerTurnTime == 5.0f && m.Pad().steerReturnTime == 3.0f, "times back");
-        CHECK(!click(1, VrMenu::kPanMenu, VrMenu::eSet, 139), "turn speed style: no wheel speed row");
+        CHECK(m.Pad().steerFollowTime == 0.25f && m.Pad().steerCenterTime == 0.8f, "times back");
         CHECK(m.Pad().steerAtSpeed == 0.3f && click(1, VrMenu::kPanMenu, VrMenu::eSet, 152) &&
               std::fabs(m.Pad().steerAtSpeed - 0.25f) < 1e-4f, "at 90 km/h: 30 -> 25 %%");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 153) && std::fabs(m.Pad().steerAtSpeed - 0.3f) < 1e-4f, "... and back to 30 %%");
         CHECK(m.Pad().steerSpeedSens && click(1, VrMenu::kPanMenu, VrMenu::eSet, 154) && !m.Pad().steerSpeedSens, "speed-sensitive: Off");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 154) && m.Pad().steerSpeedSens, "speed-sensitive: On again");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 142) && m.Pad().steerMode == 0, "style: wheel");
-        CHECK(!click(1, VrMenu::kPanMenu, VrMenu::eSet, 143), "wheel style: no full-turn row");
+        CHECK(!click(1, VrMenu::kPanMenu, VrMenu::eSet, 141) && !click(1, VrMenu::kPanMenu, VrMenu::eSet, 142), "no style row any more");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 136) && std::fabs(m.Pad().steerCurve - 1.25f) < 0.01f, "curve 1 -> 1.25");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 137) && std::fabs(m.Pad().steerMax - 0.9f) < 0.01f, "full stick 100 -> 90 %%");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 139) && m.Pad().steerSpeed == 0.35f, "speed 0.5 -> 0.35 (slower)");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 139) && m.Pad().steerRate == 0.5f, "wheel speed 0.6 -> 0.5 (slower)");
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 139);
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 139) && m.Pad().steerSpeed == 0.25f, "the slowest: 0.25");
-        for (int i = 0; i < 9; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 140);
-        CHECK(m.Pad().steerSpeed == 0.0f, "fastest step: at once (%.2f)", (double)m.Pad().steerSpeed);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 139) && m.Pad().steerRate == 0.25f, "the slowest: 0.25");
+        for (int i = 0; i < 10; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 140);
+        CHECK(m.Pad().steerRate == 0.0f, "fastest step: no limit (%.2f)", (double)m.Pad().steerRate);
         for (int i = 0; i < 7; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 139);
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 135);
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 138);
-        CHECK(m.Pad().steerSpeed == 0.5f && std::fabs(m.Pad().steerCurve - 1.0f) < 0.01f && std::fabs(m.Pad().steerMax - 1.0f) < 0.01f,
-              "driving settings back (speed %.2f)", (double)m.Pad().steerSpeed);
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 141) && m.Pad().steerMode == 1, "style: turn speed again");
+        CHECK(m.Pad().steerRate == 0.6f && std::fabs(m.Pad().steerCurve - 1.0f) < 0.01f && std::fabs(m.Pad().steerMax - 1.0f) < 0.01f,
+              "driving settings back (wheel speed %.2f)", (double)m.Pad().steerRate);
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 0) && click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kLGrip) &&
               click(1, VrMenu::kPanMenu, VrMenu::ePickOut, VrPad::kBrake) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kBrake,
               "Buttons tab: left grip = Brake (picked from the bar)");
@@ -403,12 +402,13 @@ int main(int argc, char** argv) {
               click(1, VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("f")) && m.Pad().map[VrPad::kA].n == 2,
               "A = Shift + F again (as the config.ini checks below expect)");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 4) && click(1, VrMenu::kPanMenu, VrMenu::eSet, 144) &&
-              click(1, VrMenu::kPanMenu, VrMenu::eSet, 131) && click(1, VrMenu::kPanMenu, VrMenu::eSet, 142) &&
+              click(1, VrMenu::kPanMenu, VrMenu::eSet, 131) && click(1, VrMenu::kPanMenu, VrMenu::eSet, 146) &&
               click(1, VrMenu::kPanMenu, VrMenu::eSet, 148) &&
-              m.Pad().steerTurnTime == 7.0f && m.Pad().steerStick == 2 && m.Pad().steerMode == 0 && !m.Pad().drive, "Driving changed");
+              m.Pad().steerFollowTime == 0.35f && m.Pad().steerStick == 2 && m.Pad().steerCenterTime == 1.2f && !m.Pad().drive,
+              "Driving changed");
         const float mouseSpeed = m.Pad().mouseSpeed;
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) && click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) &&
-              m.Pad().steerTurnTime == 5.0f && m.Pad().steerMode == 1 && m.Pad().steerStick == 1 && m.Pad().drive &&
+              m.Pad().steerFollowTime == 0.25f && m.Pad().steerCenterTime == 0.8f && m.Pad().steerStick == 1 && m.Pad().drive &&
               m.Pad().mouseSpeed == mouseSpeed,
               "Driving tab reset (the Mouse tab untouched)");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 3), "Look tab again");

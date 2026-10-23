@@ -71,7 +71,7 @@ steering, right trigger = gas, left trigger = brake.
 | Right grip + right trigger | left mouse click | click while the air mouse aims |
 | Right trigger | **gas pedal** (press harder = more gas, let go = roll) | |
 | B | Esc | menu / back |
-| Left stick left / right | **steering** (push more = turn faster; let go = straight again) | see [Driving](#driving-with-one-controller) |
+| Left stick left / right | **steering** (stick half left = wheel half left; let go = straight again) | see [Driving](#driving-with-one-controller) |
 | Left trigger | **brake** (press harder = more brake) | |
 | X | `[` | left indicator |
 | Y | `]` | right indicator |
@@ -98,7 +98,7 @@ By default:
 
 | Controller | Does |
 |---|---|
-| Left stick left / right | steering. Push a little = turn slowly, all the way = fast. Let go: the wheel goes straight again. |
+| Left stick left / right | steering. The wheel glides to where the stick is: a little push = a little turn, all the way = full turn. Ease the stick = less turn. Let go: the wheel glides back to straight. |
 | Right trigger | gas pedal. Press a little = a little gas. Let go = the truck rolls (no gas). |
 | Left trigger | brake. Press a little = a little brake. |
 | Right grip + right trigger | left mouse click (not gas): hold the grip to aim with the air mouse, pull the trigger to click |
@@ -113,25 +113,25 @@ By default:
 - The steering stick: left, right or off (Driving tab, or `steer = left / right / off`). That stick's left / right then
   steer; its up / down are still free buttons (for example gas and brake).
 
-**Two steering styles** (Driving tab > Steering style, or `steer_mode`):
-
-- **Turn speed** (`rate`, the default): how far you push the stick = how fast the wheel turns. Push a little: the wheel
-  turns slowly and gently. Push all the way: it turns fast. Let go: the wheel goes back to the middle by itself.
-- **Wheel** (`wheel`): where the stick is = where the wheel is. Stick half left = wheel half left.
+**How the wheel moves:** the stick's place is where the wheel goes (stick half left = wheel half left). The wheel does not
+jump there: it glides. A big push moves it fast, a small correction gently. Ease the stick a bit (the next bend needs less):
+the wheel comes back to the new place and stays there. Let go: the wheel glides back to straight -- calmer at speed, like a
+real truck.
 
 **Steering feel** (Driving tab, or `config.ini`):
 
 | Setting | What it does | Default |
 |---|---|---|
 | Steering dead zone (`steer_deadzone`) | how far the stick must move before the wheel turns | 0.10 |
-| Steering curve (`steer_curve`) | 1 = straight. More = small pushes much gentler (both styles) | 1.00 |
-| Wheel turns at most (`steer_max`) | how far the wheel can turn | 100 % |
-| Full stick: full turn in (`steer_turn_time`, turn speed) | seconds from the middle to full lock with the stick all the way. More = calmer | 5 s |
-| Let go: straight again in (`steer_return_time`, turn speed) | seconds from full lock back to straight after you let go | 3 s |
-| At 90 km/h (`steer_speed_sens`, `steer_at_speed`) | **speed-sensitive steering**, On / Off: up to 10 km/h the stick steers fully; at 90 km/h and faster the wheel turns at most this much (30 %), and turns and goes back a bit more slowly (about half as fast at 30 %) | On, 30 % |
-| Steering speed (`steer_speed`, wheel) | how fast the wheel follows the stick, in full turns per second. 0.5 = 2 seconds to full lock. 0 = at once (twitchy) | 0.50 |
+| Steering curve (`steer_curve`) | 1 = straight. More = small pushes much gentler | 1.00 |
+| Full stick turns the wheel (`steer_max`) | how far the wheel turns with the stick all the way | 100 % |
+| Wheel follows the stick (`steer_follow_time`) | how quickly the wheel goes to the stick's place, in seconds. More = calmer. 0 = at once | 0.25 s |
+| Let go: back to the middle (`steer_center_time`) | how quickly the wheel comes back when you ease or let go, in seconds (when standing; calmer at speed by itself). 0 = at once | 0.8 s |
+| Wheel speed at most (`steer_max_speed`) | the wheel never turns faster than this: seconds from the middle to full lock (in config.ini: full turns per second, 0.6 = 1.7 s). Slower at speed too | 1.7 s |
+| At 90 km/h (`steer_speed_sens`, `steer_at_speed`) | **speed-sensitive steering**, On / Off: up to 10 km/h the stick steers fully; at 90 km/h and faster full stick turns the wheel only this much (30 %), so small moves are fine. A bend you hold while you speed up stays | On, 30 % |
 
-Too twitchy at speed? Lower "At 90 km/h". Too twitchy everywhere? Make the curve bigger, or the full turn slower.
+Too twitchy at speed? Lower "At 90 km/h". Too twitchy everywhere? Make the curve bigger, or "Wheel follows the stick"
+slower. The wheel comes back too fast or too slowly? Change "Let go: back to the middle".
 
 **Switch driving off:** Driving tab > Driving: **Off** (or `drive = 0`). Then nothing steers, the gas / brake buttons do
 nothing, and the steering stick's left / right send their keys again. **On** brings it all back.
@@ -184,8 +184,8 @@ a laser pointer. A **white dot** appears where you point, and the key under it l
 - **Mouse** tab: which stick moves the mouse, its speed and dead zone, the air mouse button, hold or toggle, its speed.
 - **Panels** tab: menu size, keyboard size, show / hide the keyboard, bring both in front of you.
 - **Panels** tab also: the distance of each panel (Closer / Farther).
-- **Driving** tab: driving on / off, the steering style (turn speed / wheel), the stick that steers (left / right / off), the dead zone,
-  curve, how far the wheel turns, and the times of the style. Gas and brake: any button, Buttons tab. See [Driving](#driving-with-one-controller).
+- **Driving** tab: driving on / off, the stick that steers (left / right / off), the dead zone, curve, how far the wheel
+  turns, how quickly it follows the stick and comes back, its top speed, and speed-sensitive steering. Gas and brake: any button, Buttons tab. See [Driving](#driving-with-one-controller).
 - **Look** tab: colours (Dark, Blue, Grey, Light, Black, Green), how see-through the menu and the keyboard are, and
   **pointer smoothing** (Off / Low / Medium / High): calms a shaky hand, for the menu pointer and the air mouse.
 - **Reset tab** (bottom right of every tab): puts that tab's settings back to the defaults. Press it twice (the first
