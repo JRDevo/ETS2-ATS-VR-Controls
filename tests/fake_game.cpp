@@ -12,6 +12,8 @@
 //     --stall       no sync from t0 to t1 seconds (a loading screen / hitch)
 //     --no-destroy-session  ends with xrDestroyInstance only (no xrEndSession / xrDestroySession)
 //     --d3d11       a D3D11 session (WARP device, XR_KHR_D3D11_enable) like ETS2 / ATS: the VR menu can draw
+//     --eyecapture  also what VR EyeCapture's layer (above ours) adds: action set "eyecapture_vr_hotkey" with both stick clicks,
+//                   suggested on Touch, attached with the game's set
 // Exit code 0 = every OpenXR call the game made succeeded.
 #include <windows.h>
 #include <d3d11.h>
@@ -34,7 +36,7 @@ static double Now() {
 
 int main(int argc, char** argv) {
     const double seconds = argc > 1 ? atof(argv[1]) : 5.0;
-    bool noInput = false, noSync = false, touch = false, noDestroySession = false, d3d = false;
+    bool noInput = false, noSync = false, touch = false, noDestroySession = false, d3d = false, eyecap = false;
     int syncEvery = 1;
     double stall0 = -1, stall1 = -1;
     for (int i = 2; i < argc; ++i) {
@@ -43,6 +45,7 @@ int main(int argc, char** argv) {
         if (!strcmp(argv[i], "--touch")) touch = true;
         if (!strcmp(argv[i], "--no-destroy-session")) noDestroySession = true;
         if (!strcmp(argv[i], "--d3d11")) d3d = true;
+        if (!strcmp(argv[i], "--eyecapture")) eyecap = true;
         if (!strcmp(argv[i], "--sync-every") && i + 1 < argc) syncEvery = atoi(argv[++i]) > 0 ? atoi(argv[i]) : 1;
         if (!strcmp(argv[i], "--stall") && i + 1 < argc) sscanf_s(argv[++i], "%lf-%lf", &stall0, &stall1);
     }
@@ -66,7 +69,7 @@ int main(int argc, char** argv) {
     XrPath hands[2] = {};
     CK(xrStringToPath(inst, "/user/hand/left", &hands[0]));
     CK(xrStringToPath(inst, "/user/hand/right", &hands[1]));
-    XrActionSet set = XR_NULL_HANDLE;
+    XrActionSet set = XR_NULL_HANDLE, ecSet = XR_NULL_HANDLE;
     XrAction select = XR_NULL_HANDLE, menu = XR_NULL_HANDLE;
     if (!noInput) {
         XrActionSetCreateInfo sc{XR_TYPE_ACTION_SET_CREATE_INFO};
@@ -100,6 +103,31 @@ int main(int argc, char** argv) {
             CK(xrSuggestInteractionProfileBindings(inst, &ip));
         }
     }
+    if (eyecap) {                                          // VR EyeCapture's layer (it runs above ours, so we see it like the game)
+        XrActionSetCreateInfo sc{XR_TYPE_ACTION_SET_CREATE_INFO};
+        strcpy_s(sc.actionSetName, "eyecapture_vr_hotkey");
+        strcpy_s(sc.localizedActionSetName, "EyeCapture");
+        CK(xrCreateActionSet(inst, &sc, &ecSet));
+        XrAction b0 = XR_NULL_HANDLE, b1 = XR_NULL_HANDLE;
+        XrActionCreateInfo ac{XR_TYPE_ACTION_CREATE_INFO};
+        ac.actionType = XR_ACTION_TYPE_BOOLEAN_INPUT;
+        strcpy_s(ac.actionName, "b0");
+        strcpy_s(ac.localizedActionName, "b0");
+        CK(xrCreateAction(ecSet, &ac, &b0));
+        strcpy_s(ac.actionName, "b1");
+        strcpy_s(ac.localizedActionName, "b1");
+        CK(xrCreateAction(ecSet, &ac, &b1));
+        auto path = [&](const char* s) { XrPath p = 0; CK(xrStringToPath(inst, s, &p)); return p; };
+        // like the real one: its own two clicks + the game's simple_controller bindings translated (select -> trigger, menu)
+        XrActionSuggestedBinding eb[5] = { {b0, path("/user/hand/left/input/thumbstick/click")}, {b1, path("/user/hand/right/input/thumbstick/click")},
+                                           {select, path("/user/hand/left/input/trigger/value")}, {select, path("/user/hand/right/input/trigger/value")},
+                                           {menu, path("/user/hand/left/input/menu/click")} };
+        XrInteractionProfileSuggestedBinding ip{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
+        ip.interactionProfile = path("/interaction_profiles/oculus/touch_controller");
+        ip.countSuggestedBindings = noInput ? 2 : 5;
+        ip.suggestedBindings = eb;
+        CK(xrSuggestInteractionProfileBindings(inst, &ip));
+    }
     XrSessionCreateInfo sci{XR_TYPE_SESSION_CREATE_INFO};
     sci.systemId = sys;
     ID3D11Device* dev = nullptr;
@@ -116,8 +144,9 @@ int main(int argc, char** argv) {
     CK(xrCreateSession(inst, &sci, &ses));
     if (!noInput) {
         XrSessionActionSetsAttachInfo ai{XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO};
-        ai.countActionSets = 1;
-        ai.actionSets = &set;
+        const XrActionSet both[2] = { set, ecSet };
+        ai.countActionSets = eyecap ? 2 : 1;
+        ai.actionSets = both;
         CK(xrAttachSessionActionSets(ses, &ai));
     }
     const double t0 = Now();

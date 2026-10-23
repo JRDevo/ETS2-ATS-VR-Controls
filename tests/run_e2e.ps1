@@ -16,7 +16,7 @@
       vive       Vive wands: the game's right menu = our B, left to the game with a warning
       unfocus    the session leaves FOCUSED while the trigger is held: released at once, pressed again after
       restore    the runtime refuses our bindings merged into the game's Touch suggestion: the game's own is put back
-      menu       a D3D11 game: both grips + the left stick click held 1 s open the VR menu (quad layers on D3D11 swapchains), the right hand
+      menu       a D3D11 game with VR EyeCapture's set (both stick clicks, shared): both grips + the left stick click held 1 s open the VR menu (quad layers on D3D11 swapchains), the right hand
                  points at the Mouse tab and at "air mouse: toggled on" (written to config.ini), the game never sees those
                  trigger pulls, a short stick click alone is still the horn (at once), the combo again closes it
     Also checked: the layer never syncs alone while the game syncs (mock "solo" syncs = 0); own sync only after 2 s of FOCUSED.
@@ -219,11 +219,13 @@ if (-not $Only -or $Only -eq 'menu') {
                   '5.5-7.0:/user/hand/left/input/squeeze/value=1;5.5-7.0:/user/hand/right/input/squeeze/value=1;' +
                   '5.6-7.0:/user/hand/left/input/thumbstick/click=1'
     $d = Join-Path $work 'menu'
-    $r = RunCase 'menu' 'fake_game.exe' @('--d3d11') 7.5 @{ VRC_MOCK_INPUT = $menuScript; VRC_MOCK_DUMP = $d }
+    $r = RunCase 'menu' 'fake_game.exe' @('--d3d11', '--eyecapture') 7.5 @{ VRC_MOCK_INPUT = $menuScript; VRC_MOCK_DUMP = $d }
     $b = Buttons $r.events
     Write-Host "  events: $b"
     $cfgText = Get-Content (Join-Path $d 'config.ini') -Raw
     Check 'menu' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
+    Check 'menu' ($r.log -match 'eyecapture_vr_hotkey'' is another layer''s') 'log: VR EyeCapture''s set seen as shared'
+    Check 'menu' ($r.log -notmatch 'config\.ini lstick') 'the left stick click is not lost to VR EyeCapture''s binding'
     Check 'menu' ($r.log -match 'VR menu open') 'log: the combo opened the menu'
     Check 'menu' ($r.log -match 'right hand presses menu tab 1') 'log: Mouse tab pressed'
     Check 'menu' ($r.log -match 'right hand presses menu setting 41') 'log: air mouse "toggled on" pressed'
