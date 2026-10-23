@@ -22,11 +22,12 @@
 //     has input (a sync without the game's sets would make them inactive until its next sync). A game that has attached but not
 //     synced yet gets 2 s of FOCUSED before that. A game with no input at all: ours alone. Input is sent only while the session
 //     is FOCUSED and the game window is in front; otherwise (and when the session or instance ends) everything held is released.
-//   * A button the game itself uses on a profile is left to the game: ETS2 / ATS's menu = the left menu everywhere, B AND Y on
-//     Index (b/click), the right menu (= our B) on Vive / WMR. One press never does two things; a config.ini mapping that is lost
-//     this way is logged as a warning. Shared triggers and poses are kept (both see them). Action sets of OTHER API layers above
-//     ours look like the game's (their calls reach our hooks too) but share their buttons on purpose: their bindings never take
-//     a button away (kSharedSets: VR EyeCapture's record combo = both stick clicks, which the VR menu combo needs one of).
+//   * Only the game's MENU button is left to the game (one press must not both open the game's menu and send a key): every
+//     action anyone suggested on a menu input (".../input/menu/click") is a menu action, and wherever such an action is bound
+//     on a profile (ETS2 / ATS: the left menu everywhere, B AND Y on Index = b/click, the right menu = our B on Vive / WMR) our
+//     button is left out; a config.ini mapping lost this way is logged as a warning. EVERY other button is shared (both see
+//     it): the game's trigger, and whatever other OpenXR layers above ours bind -- their calls reach our hooks like the game's,
+//     so who made a binding cannot be told apart (VR EyeCapture's both stick clicks, any other mod's buttons).
 //   * Phase 2, the VR menu + keyboard (vr_menu.h): fed every frame with the controllers (aim poses with positions) and the head
 //     (our VIEW space), before the Mapper; it takes what it uses out of the frame and may change the mapping (the Mapper then
 //     uses the menu's). Its pictures go out at the game's xrEndFrame (EndFrame: overlay.h quad layers after the game's). While a
@@ -141,7 +142,6 @@ private:
     // the game's input (this instance)
     std::map<XrActionSet, uint32_t> appSets_;                                // priority
     std::map<XrAction, XrActionSet> appActions_;
-    std::set<XrActionSet> sharedSets_;                                          // another layer's set (kSharedSets)
     std::map<XrPath, std::vector<XrActionSuggestedBinding>> appSuggest_;      // the game's latest suggestion per profile
     std::map<XrPath, std::string> pathNames_;
     bool frozen_ = false;             // some session of the instance has attached: no more suggestions

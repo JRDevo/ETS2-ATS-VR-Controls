@@ -11,8 +11,10 @@ namespace {
 const char* const kSetName = "ets2_ats_vr_controls";
 const char* const kSetLocalized = "ETS2 ATS VR Controls";
 const char* const kSimple = "/interaction_profiles/khr/simple_controller";
-// action sets that other OpenXR API layers above ours add next to the game's: they share their buttons (both see them)
-const char* const kSharedSets[] = { "eyecapture_vr_hotkey" };   // VR EyeCapture: both stick clicks held = record
+bool IsMenuInput(const std::string& p) {
+    const size_t at = p.find("/input/menu");
+    return at != std::string::npos && (p.size() == at + 11 || p.compare(at + 11, std::string::npos, "/click") == 0);
+}
 }  // namespace
 
 double NowS() {
@@ -122,11 +124,6 @@ void PadInput::SessionState(XrSession s, XrSessionState st) {
 void PadInput::ActionSetCreated(XrActionSet set, const XrActionSetCreateInfo* ci) {
     std::lock_guard<std::mutex> lk(m_);
     appSets_[set] = ci ? ci->priority : 0;
-    for (const char* n : kSharedSets)
-        if (ci && !strcmp(ci->actionSetName, n)) {
-            sharedSets_.insert(set);
-            LOGI("action set '%s' is another layer's (it shares its buttons): its bindings never take a button from the layer", n);
-        }
     LOGI("the game creates action set '%s' (priority %u)", ci ? ci->actionSetName : "?", ci ? ci->priority : 0);
     bool self = false;
     for (auto& kv : sessions_) self = self || kv.second.self;
@@ -223,6 +220,10 @@ bool PadInput::PrepareLocked(const std::vector<XrActionSet>& appSets) {
     } else {
         for (const char* k : KnownProfiles()) profiles.push_back(k);
     }
+    // the menu actions: any action suggested on a menu input, on any profile (by the game or by another layer passing it on)
+    std::set<XrAction> menuActs;
+    for (const auto& kv : appSuggest_)
+        for (const XrActionSuggestedBinding& g : kv.second) if (IsMenuInput(PathString(g.binding))) menuActs.insert(g.action);
     int ok = 0;
     std::string summary;
     for (const std::string& prof : profiles) {
@@ -233,8 +234,8 @@ bool PadInput::PrepareLocked(const std::vector<XrActionSet>& appSets) {
             const std::string gp = PathString(g.binding);
             if (gp.find("/input/trigger") != std::string::npos || gp.find("/input/select") != std::string::npos) gameTrig_.insert(g.action);
         }
-        // a button the game itself uses on this profile is left to the game (Index: its menu is b/click; Vive / WMR: the right
-        // menu) -- one press must not do two things. The trigger and the aim pose are shared (both see them).
+        // the game's menu button on this profile is left to it (Index: b/click; Vive / WMR: the right menu) -- one press must not
+        // do two things. Every other button is shared (both see it), whoever bound it.
         std::vector<XrActionSuggestedBinding> ours;
         std::string left, lost;                      // lost: config.ini buttons that do something and are dropped here
         for (int a = 0; a < kActCount; ++a)
@@ -243,12 +244,8 @@ bool PadInput::PrepareLocked(const std::vector<XrActionSet>& appSets) {
                 if (!ActPath(prof, a, h, p)) continue;
                 bool taken = false;
                 if (a != kActTrig && a != kActAim)
-                    for (const XrActionSuggestedBinding& g : all) {
-                        if (taken) break;
-                        auto sa = appActions_.find(g.action);
-                        if (sa != appActions_.end() && sharedSets_.count(sa->second)) continue;   // another layer's: shared
-                        taken = SameInput(PathString(g.binding), p);
-                    }
+                    for (const XrActionSuggestedBinding& g : all)
+                        taken = taken || (menuActs.count(g.action) && SameInput(PathString(g.binding), p));
                 if (!taken) { ours.push_back({acts_[a], Path(p)}); continue; }
                 left += (left.empty() ? "" : ", ") + p;
                 std::vector<int> btns;               // the config.ini buttons this action + hand stands for
@@ -268,9 +265,9 @@ bool PadInput::PrepareLocked(const std::vector<XrActionSet>& appSets) {
                     if (b == cfg_.pad.airBtn || cfg_.pad.map[b].kind != VrPad::kNone)
                         lost += (lost.empty() ? "" : ", ") + std::string(VrPad::BtnNames()[b]) + (b == cfg_.pad.airBtn ? " (air mouse)" : "");
             }
-        if (!left.empty()) LOGI("%s: %s used by the game itself -- left to the game (no mod key there)", ShortProfile(prof).c_str(), left.c_str());
+        if (!left.empty()) LOGI("%s: %s is the game's menu button -- left to the game (no mod key there)", ShortProfile(prof).c_str(), left.c_str());
         if (!lost.empty())
-            LOGW("%s: config.ini %s will do nothing on this controller -- the game uses that button itself", ShortProfile(prof).c_str(), lost.c_str());
+            LOGW("%s: config.ini %s will do nothing on this controller -- it is the game's menu button", ShortProfile(prof).c_str(), lost.c_str());
         const XrPath pp = Path(prof);
         auto it = appSuggest_.find(pp);
         const size_t nApp = all.size();

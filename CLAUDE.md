@@ -28,6 +28,8 @@ Read `README.md` and the header comments of `src/pad_input.h`, `src/layer.cpp`, 
 ## Facts
 - ETS2 / ATS: action set "input", suggest ONLY khr/simple_controller (select + menu). The layer translates that onto the real
   profiles (Touch, Index, Vive, WMR, HP) + ours, so the runtime picks the real controller.
+- Only the game's MENU button is left to the game; every other button is shared. Other API layers above ours (VR
+  EyeCapture ...) reach our hooks like the game, so never key a rule on "the game binds it" (that dropped the stick clicks once).
 - User: Quest 3 via Virtual Desktop (VDXR). Also installed: the DLAA mod (dinput8.dll, hooks OpenXR at the runtime too),
   VR EyeCapture (implicit layer), VectorXR.
 

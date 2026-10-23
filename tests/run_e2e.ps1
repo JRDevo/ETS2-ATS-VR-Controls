@@ -193,7 +193,7 @@ if (-not $Only -or $Only -eq 'index') {
     Check 'index' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
     Check 'index' ($r.mock -match 'profile /interaction_profiles/valve/index_controller') 'the runtime picked Index'
     Check 'index' ($r.mock -match 'suggest /interaction_profiles/valve/index_controller \d+:.*menu=/user/hand/right/input/b/click') "Index carries the game's menu on B"
-    Check 'index' ($r.log -match 'valve/index_controller: .*b/click.* left to the game') 'log: our B left to the game'
+    Check 'index' ($r.log -match 'valve/index_controller: .*b/click.* the game''s menu button') 'log: our B left to the game'
     Check 'index' ($b -notmatch 'key 02a') 'B sends no mod key (the game''s menu only)'
     Check 'index' ($b -match 'mouse 0 down \| mouse 0 up \| key 01c down \| key 01c up') 'trigger + A still work'
 }
@@ -224,8 +224,8 @@ if (-not $Only -or $Only -eq 'menu') {
     Write-Host "  events: $b"
     $cfgText = Get-Content (Join-Path $d 'config.ini') -Raw
     Check 'menu' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
-    Check 'menu' ($r.log -match 'eyecapture_vr_hotkey'' is another layer''s') 'log: VR EyeCapture''s set seen as shared'
-    Check 'menu' ($r.log -notmatch 'config\.ini lstick') 'the left stick click is not lost to VR EyeCapture''s binding'
+    Check 'menu' ($r.log -notmatch 'thumbstick/click is the game''s menu') 'the stick clicks are shared with VR EyeCapture''s binding'
+    Check 'menu' ($r.log -match 'oculus/touch_controller: /user/hand/left/input/menu/click is the game''s menu button') 'only the game''s menu left to it'
     Check 'menu' ($r.log -match 'VR menu open') 'log: the combo opened the menu'
     Check 'menu' ($r.log -match 'right hand presses menu tab 1') 'log: Mouse tab pressed'
     Check 'menu' ($r.log -match 'right hand presses menu setting 41') 'log: air mouse "toggled on" pressed'

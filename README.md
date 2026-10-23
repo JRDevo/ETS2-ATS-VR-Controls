@@ -43,6 +43,9 @@ Change them in `config.ini`. If you changed the game's key bindings, change `con
 The game keeps its own menu button: the left menu button on every controller, B and Y on Valve Index, B on Vive and Windows
 Mixed Reality. A key set for that button does nothing (the log says so).
 
+Every other button is shared with other VR mods that watch it (for example VR EyeCapture's record combo, both stick
+clicks): both react. If that is not what you want, set that button to `none` here or in the VR menu.
+
 **Cab buttons:** the game has no clickable buttons in the cab, so pointing at a switch does nothing. Map the key of that
 function to a controller button instead (for example `y = l` for the lights).
 
