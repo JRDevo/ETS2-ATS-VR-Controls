@@ -45,6 +45,8 @@ Only one OpenXR runtime is active at a time; the last one you set wins.
 - **Modifier**: while you hold the modifier button (right grip), buttons can send something else. Default: **right grip +
   A = left click, right grip + B = right click** -- so one controller does everything: hold the grip (the pointer follows),
   press A to click, hold B to right-click (drag the map). Set any button's modified key in the VR menu.
+- **Driving with one controller** (the left one): the left stick steers, the left trigger is the gas pedal. Smooth, like a
+  gamepad, not on / off keys. See [Driving](#driving-with-one-controller).
 - **VR menu + keyboard**: hold both grips + the left stick click for 1 second. A menu opens in front of you. See [The VR menu](#the-vr-menu).
 - The game's own VR controls (the trigger and the left menu button) still work.
 - It only works in the games named in `config.ini`. In every other VR program it does nothing.
@@ -56,7 +58,8 @@ works next to the ETS2 / ATS DLAA mod, VR EyeCapture, Virtual Desktop, OpenXR To
 ## Default buttons
 
 Made so that **one controller (the right one) does the whole mouse**: point with the right stick or the air mouse, A =
-left click, right grip + B = right click. The right trigger is free (none).
+left click, right grip + B = right click. The right trigger is free (none). **The left controller drives**: left stick =
+steering, left trigger = gas.
 
 | Controller | Sends | In ETS2 / ATS (default keys) |
 |---|---|---|
@@ -67,7 +70,8 @@ left click, right grip + B = right click. The right trigger is free (none).
 | Right grip + B | right mouse click | drag the map: hold the grip, aim, hold B |
 | Right trigger | nothing (free) | |
 | B | Esc | menu / back |
-| Left trigger | mouse wheel up | zoom |
+| Left stick left / right | **steering** (let go = straight) | see [Driving](#driving-with-one-controller) |
+| Left trigger | **gas pedal** (press harder = more gas, let go = roll) | |
 | X | `[` | left indicator |
 | Y | `]` | right indicator |
 | Right stick click | H | horn |
@@ -86,6 +90,32 @@ clicks): both react. If that is not what you want, set that button to `none` her
 
 **Cab buttons:** the game has no clickable buttons in the cab, so pointing at a switch does nothing. Map the key of that
 function to a controller button instead (for example `y = l` for the lights).
+
+## Driving with one controller
+
+The **left controller drives** the truck:
+
+| Left controller | Does |
+|---|---|
+| Stick left / right | steering wheel. Let go: the wheel goes straight again. |
+| Trigger | gas pedal. Press a little = a little gas. Let go = the truck rolls (no gas). |
+| Right trigger (off by default) | brake, if you switch it on (`drive_brake = 1`, or the Driving tab). |
+
+It is smooth, like a gamepad: not on / off keys. How: ETS2 and ATS have their own door for input add-ons (the SCS input
+SDK). This mod is also such an add-on, so the game gets the stick and the trigger directly. **No driver**, no fake gamepad,
+no file in the game folder, and **nothing to set in the game's options** (it works next to your wheel, keyboard or gamepad
+settings). `install.ps1` tells the game where the mod is (see [What install.ps1 does](#what-installps1-does-and-why-there-is-one)).
+
+- Settings (Driving tab in the VR menu, or `config.ini`): on / off (`drive`), the stick's dead zone (`steer_deadzone`),
+  the **curve** (`steer_curve`: more = finer steering near the middle), how far full stick turns the wheel (`steer_max`),
+  right trigger = brake (`drive_brake`).
+- While driving is on, the left trigger and the left stick send no keys (their key settings wait until you switch it off).
+- The game may show a short note at start that an SDK add-on is in use. That is this mod. Click OK. (It may show on the
+  flat monitor, not in the headset.)
+- `drive = 0` switches driving off, but the game still loads the add-on (so the VR menu can switch it on again at once).
+  To remove it completely, run `uninstall.ps1`.
+- It works in every OpenXR mode and headset (Virtual Desktop, Link, SteamVR, Windows MR): the driving part does not depend
+  on the headset at all.
 
 ## The VR menu
 
@@ -120,6 +150,8 @@ a laser pointer. A **white dot** appears where you point, and the key under it l
 - **Mouse** tab: which stick moves the mouse, its speed and dead zone, the air mouse button, hold or toggle, its speed.
 - **Panels** tab: menu size, keyboard size, show / hide the keyboard, bring both in front of you.
 - **Panels** tab also: the distance of each panel (Closer / Farther).
+- **Driving** tab: driving with the left controller on / off, the steering dead zone, curve and how far full stick turns
+  the wheel, right trigger = brake. See [Driving](#driving-with-one-controller).
 - **Look** tab: colours (Dark, Blue, Grey, Light, Black, Green), how see-through the menu and the keyboard are, and
   **pointer smoothing** (Off / Low / Medium / High): calms a shaky hand, for the menu pointer and the air mouse.
 - **Keyboard** (button at the top of the menu): a full keyboard with F-keys, arrows and number pad. A key goes down when
@@ -143,9 +175,9 @@ ETS2 / ATS DLAA mod's menu (`Delete`). The menu and keyboard float in the room: 
 |---|---|---|
 | ![The Panels tab](docs/images/menu-panels.png) | ![The Look tab](docs/images/menu-look.png) | ![The on-screen keyboard](docs/images/keyboard.png) |
 
-The compact keyboard (Panels tab > Compact):
-
-![The compact keyboard](docs/images/keyboard-compact.png)
+| Driving tab | The compact keyboard (Panels tab > Compact) |
+|---|---|
+| ![The Driving tab](docs/images/menu-driving.png) | ![The compact keyboard](docs/images/keyboard-compact.png) |
 
 ## Install
 
@@ -161,14 +193,17 @@ Uninstall: run `uninstall.ps1` the same way. Then you can delete the folder.
 
 **Why a script?** This mod is not a game mod (`.scs` file) and does not go into the game folder. It is an *OpenXR API
 layer*: a small add-on that the VR system (OpenXR) loads into the game when the game starts VR. OpenXR finds add-ons through
-**one entry in the Windows registry**. The script writes that one entry for you, so you do not have to edit the registry
-by hand.
+**one entry in the Windows registry**. For driving, the same DLL is also the game's own kind of input add-on, and the game
+finds those through **one registry entry per game**. The script writes these entries for you, so you do not have to edit
+the registry by hand.
 
-**What it installs:** nothing is copied into Windows or into the game. It writes exactly one registry value:
+**What it installs:** nothing is copied into Windows or into the game. It writes three registry values:
 
 | Where | Name | Value |
 |---|---|---|
 | `HKEY_LOCAL_MACHINE\SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit` | the full path of `XR_APILAYER_JRDEVO_ets2_ats_vr_controls.json` in your mod folder | `0` (= switched on) |
+| `HKEY_LOCAL_MACHINE\SOFTWARE\SCS Software\Euro Truck Simulator 2\Plugins` | `ets2_ats_vr_controls` | the full path of `ets2_ats_vr_controls.dll` (driving) |
+| `HKEY_LOCAL_MACHINE\SOFTWARE\SCS Software\American Truck Simulator\Plugins` | `ets2_ats_vr_controls` | the same (driving) |
 
 The `.json` file tells OpenXR the add-on's name and where `ets2_ats_vr_controls.dll` is (next to it). That is why the folder
 must stay where you unzipped it: the registry points to it.
@@ -179,12 +214,13 @@ must stay where you unzipped it: the registry points to it.
 2. It removes an old per-user entry of this mod, if there is one (that would load the mod twice).
 3. It asks for admin rights: you see one Windows prompt (UAC). This is needed because the entry is under
    `HKEY_LOCAL_MACHINE` (for all users): the OpenXR loader built into ETS2 / ATS only looks there.
-4. It removes an older entry of this mod from another folder (if you moved the folder), then writes the new one.
+4. It removes an older entry of this mod from another folder (if you moved the folder), then writes the new one. The same
+   for the two driving entries (the keys are made if they are missing, so a game you install later finds it too).
 5. Done. The next time the game starts VR, OpenXR loads the mod. In every other VR game the mod does nothing (see `apps`
    in `config.ini`).
 
-`uninstall.ps1` removes that registry entry again (also with one admin prompt). Your files and `config.ini` stay; delete
-the folder yourself if you like. You can check the entry yourself with `regedit` at the path above.
+`uninstall.ps1` removes these registry entries again (also with one admin prompt). Your files and `config.ini` stay; delete
+the folder yourself if you like. You can check the entries yourself with `regedit` at the paths above.
 
 **"Run with PowerShell" is not there, or Windows blocks the script?** Open PowerShell in the mod folder and run:
 

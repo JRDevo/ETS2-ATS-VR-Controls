@@ -14,9 +14,14 @@
 //     --d3d11       a D3D11 session (WARP device, XR_KHR_D3D11_enable) like ETS2 / ATS: the VR menu can draw
 //     --eyecapture  also what VR EyeCapture's layer (above ours) adds: action set "eyecapture_vr_hotkey" with both stick clicks,
 //                   suggested on Touch, attached with the game's set
+//     --scs <dll>   what ETS2 / ATS's plugin loader does first: loads <dll> (the layer's file) and calls its scs_input_init with
+//                   a register_device of ours; each frame asks the device for its events (first_in_frame, first_after_activation
+//                   at the first) and prints "scs <input> <value> at <t>" for each; "scs same module" = the OpenXR loader got
+//                   the same module
 // Exit code 0 = every OpenXR call the game made succeeded.
 #include <windows.h>
 #include <d3d11.h>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -26,6 +31,23 @@
 
 static int g_bad = 0;
 #define CK(call) do { XrResult r_ = (call); if (XR_FAILED(r_)) { printf("FAILED %s -> %d\n", #call, (int)r_); ++g_bad; } } while (0)
+
+// the SCS SDK input API, the game's side (layouts as in scssdk_input*.h, x64)
+struct ScsEvent { uint32_t input_index; union { uint8_t value_bool; float value_float; float sizing[6]; }; };
+typedef int32_t (__stdcall* ScsEventCb)(ScsEvent*, uint32_t, void*);
+struct ScsDeviceInput { const char* name; const char* display_name; uint32_t value_type; uint32_t padding; };
+struct ScsDevice { const char* name; const char* display_name; uint32_t type; uint32_t input_count; const ScsDeviceInput* inputs;
+                   void* context; void* active_cb; ScsEventCb event_cb; };
+struct ScsInit { const char* game_name; const char* game_id; uint32_t game_version; uint32_t padding; void* log;
+                 int32_t (__stdcall* register_device)(const ScsDevice*); };
+static ScsDevice g_scsDev = {};
+static const char* g_scsNames[8] = {};
+static int32_t __stdcall ScsRegister(const ScsDevice* d) {
+    g_scsDev = *d;
+    for (uint32_t i = 0; i < d->input_count && i < 8; ++i) g_scsNames[i] = d->inputs[i].name;
+    printf("scs device %s (%s) type %u, %u inputs\n", d->name, d->display_name, d->type, d->input_count);
+    return 0;
+}
 
 static double Now() {
     static LARGE_INTEGER f = [] { LARGE_INTEGER x; QueryPerformanceFrequency(&x); return x; }();
@@ -39,6 +61,7 @@ int main(int argc, char** argv) {
     bool noInput = false, noSync = false, touch = false, noDestroySession = false, d3d = false, eyecap = false;
     int syncEvery = 1;
     double stall0 = -1, stall1 = -1;
+    const char* scsDll = nullptr;
     for (int i = 2; i < argc; ++i) {
         if (!strcmp(argv[i], "--no-input")) noInput = true;
         if (!strcmp(argv[i], "--no-sync")) noSync = true;
@@ -48,10 +71,21 @@ int main(int argc, char** argv) {
         if (!strcmp(argv[i], "--eyecapture")) eyecap = true;
         if (!strcmp(argv[i], "--sync-every") && i + 1 < argc) syncEvery = atoi(argv[++i]) > 0 ? atoi(argv[i]) : 1;
         if (!strcmp(argv[i], "--stall") && i + 1 < argc) sscanf_s(argv[++i], "%lf-%lf", &stall0, &stall1);
+        if (!strcmp(argv[i], "--scs") && i + 1 < argc) scsDll = argv[++i];
     }
+    setvbuf(stdout, nullptr, _IONBF, 0);
+    HMODULE scsMod = nullptr;
+    if (scsDll) {                                        // (before OpenXR, like the game: its plugins load at start)
+        scsMod = LoadLibraryA(scsDll);
+        typedef int32_t (__stdcall* Init)(uint32_t, const void*);
+        Init init = scsMod ? reinterpret_cast<Init>(GetProcAddress(scsMod, "scs_input_init")) : nullptr;
+        ScsInit p = { "Fake Truck Simulator", "fake", (1u << 16), 0, nullptr, ScsRegister };
+        const int32_t r = init ? init((1u << 16), &p) : -99;
+        printf("scs init %s -> %d\n", scsDll, (int)r);
+    }
+    bool scsFirst = true;
     int frame = 0, inactive = 0;
     bool synced = false;
-    setvbuf(stdout, nullptr, _IONBF, 0);
     XrInstanceCreateInfo ic{XR_TYPE_INSTANCE_CREATE_INFO};
     strcpy_s(ic.applicationInfo.applicationName, "fake_game");
     strcpy_s(ic.applicationInfo.engineName, "prism3d-ish");
@@ -61,6 +95,7 @@ int main(int argc, char** argv) {
     XrInstance inst = XR_NULL_HANDLE;
     XrResult r = xrCreateInstance(&ic, &inst);
     if (XR_FAILED(r)) { printf("xrCreateInstance failed %d\n", (int)r); return 2; }
+    if (scsMod) printf("scs same module: %s\n", GetModuleHandleA("ets2_ats_vr_controls.dll") == scsMod ? "yes" : "no");
     XrSystemGetInfo sg{XR_TYPE_SYSTEM_GET_INFO};
     sg.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
     XrSystemId sys = 0;
@@ -192,6 +227,17 @@ int main(int argc, char** argv) {
                 const bool down = st.isActive && st.currentState;
                 if (down != prev[h]) printf("game select %s %s at %.2f\n", h ? "right" : "left", down ? "down" : "up", Now() - t0);
                 prev[h] = down;
+            }
+        }
+        if (g_scsDev.event_cb) {                         // the game's main thread: the device's events of this frame
+            uint32_t flags = 1u | (scsFirst ? 2u : 0u);
+            scsFirst = false;
+            for (int n = 0; n < 16; ++n) {
+                ScsEvent e = {};
+                if (g_scsDev.event_cb(&e, flags, g_scsDev.context) != 0) break;
+                flags = 0;
+                printf("scs %s %.3f at %.2f\n", e.input_index < 8 && g_scsNames[e.input_index] ? g_scsNames[e.input_index] : "?",
+                       (double)e.value_float, Now() - t0);
             }
         }
         XrFrameEndInfo fe{XR_TYPE_FRAME_END_INFO};

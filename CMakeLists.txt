@@ -43,7 +43,8 @@ add_library(ets2_ats_vr_controls SHARED
     src/config.cpp
     src/log.cpp
     src/vr_menu.cpp
-    src/overlay.cpp)
+    src/overlay.cpp
+    src/scs_input.cpp)
 target_include_directories(ets2_ats_vr_controls PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_definitions(ets2_ats_vr_controls PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX
     VRC_VERSION="${PROJECT_VERSION}" VRC_LAYER_NAME="${VRC_LAYER_NAME}")

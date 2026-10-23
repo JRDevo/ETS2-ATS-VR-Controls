@@ -11,6 +11,7 @@
 //   xrAttachSessionActionSets / xrSyncActions   our action set appended to the game's
 //   xrEndFrame                            the VR menu's quad layers after the game's (only while it is shown)
 //   xrGetActionStateBoolean / Float       the game's trigger reads released while it points at the VR menu
+// The same DLL is also the game's input plugin for driving (scs_input.h: scs_input_init / scs_input_shutdown).
 // With log = 1 its own cost is measured (CPU time in our part of xrBeginFrame + xrEndFrame, not the game's or the runtime's)
 // and logged once a minute: "performance: ..." -- so anyone can see in the log how light it is. log = 0 (the default): no log
 // file at all and nothing measured.
@@ -29,6 +30,7 @@
 #include "log.h"
 #include "output.h"
 #include "pad_input.h"
+#include "scs_input.h"
 
 namespace ck {
 namespace {
@@ -440,6 +442,11 @@ XrResult XRAPI_CALL Layer_CreateApiLayerInstance(const XrInstanceCreateInfo* inf
 }
 
 }  // namespace
+
+const Config* GameConfig() {
+    EnsureInit();
+    return g_on ? &g_cfg : nullptr;
+}
 }  // namespace ck
 
 // ------------------------------------------------------------------------------------------------ export

@@ -8,8 +8,9 @@
 //     points at a panel, its trigger reaches neither the game nor the trigger's mapping (PadInput hides it).
 //   * Menu panel: tabs Buttons (every controller button and what it sends: point at one, then pick a key on the keyboard or a
 //     mouse button / none from the bar; "Normal" or "With modifier": what a button sends while the modifier button -- chosen
-//     there, default the right grip -- is held, e.g. right grip + right trigger = right click), Mouse (stick mouse, air mouse
-//     hold / toggle, speeds), Panels (sizes, bring here).
+//     there, default the right grip -- is held, e.g. right grip + B = right click), Mouse (stick mouse, air mouse
+//     hold / toggle, speeds), Panels (sizes, bring here), Driving (the left controller drives: on / off, steering dead zone,
+//     curve, how far full stick turns the wheel, right trigger = brake).
 //   * Keyboard panel: a full-size keyboard (main block, F-keys, arrows / navigation, number pad) as one flat block (no title
 //     bar: its - / + / x are above the number pad), or COMPACT (Panels tab / keyboard_layout): the main block only (Esc /
 //     F-keys down to Enter, Shift, Ctrl) with only its x, above Backspace (its size: Panels tab). Switching keeps the key size (the
@@ -153,7 +154,7 @@ private:
     std::wstring  path_;
     Panel         pan_[kPanCount];
     PanelPlace    place_[kPanCount];
-    int           tab_ = 0;               // 0 Buttons, 1 Mouse, 2 Panels
+    int           tab_ = 0;               // 0 Buttons, 1 Mouse, 2 Panels, 3 Look, 4 Driving
     int           pickBtn_ = -1;          // the button being set (a key / mouse button is picked next)
     bool          pickMod_ = false;       // ... its entry for while the modifier is held
     int           layer_ = 0;             // Buttons tab: 0 normal, 1 with the modifier held

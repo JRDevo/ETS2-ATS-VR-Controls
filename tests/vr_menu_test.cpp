@@ -333,6 +333,22 @@ int main(int argc, char** argv) {
         const uint32_t px0 = m.FullPicture(VrMenu::kPanMenu)[(size_t)400 * 1000 + 10];
         CHECK((px0 >> 24) == 179, "the picture is 70 %% solid (alpha %u)", px0 >> 24);
     }
+    // Driving tab: off / on, the curve one step up, full stick 90 %, the right trigger as the brake (and back)
+    {
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 4), "Driving tab");
+        CHECK(m.Pad().drive, "driving on by default");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 131) && !m.Pad().drive, "driving off");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 130) && m.Pad().drive, "driving on again");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 135) && std::fabs(m.Pad().steerCurve - 1.75f) < 0.01f, "curve 1.5 -> 1.75");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 136) && std::fabs(m.Pad().steerMax - 0.9f) < 0.01f, "full stick 100 -> 90 %%");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 138) && m.Pad().driveBrake, "right trigger = brake");
+        click(1, VrMenu::kPanMenu, VrMenu::eSet, 139);
+        click(1, VrMenu::kPanMenu, VrMenu::eSet, 134);
+        click(1, VrMenu::kPanMenu, VrMenu::eSet, 137);
+        CHECK(!m.Pad().driveBrake && std::fabs(m.Pad().steerCurve - 1.5f) < 0.01f && std::fabs(m.Pad().steerMax - 1.0f) < 0.01f,
+              "driving settings back");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 3), "Look tab again");
+    }
     WriteBmp(dir + L"\\menu.bmp", m, VrMenu::kPanMenu);
     WriteBmp(dir + L"\\keyboard.bmp", m, VrMenu::kPanKb);
     // the pointer on the top bar first, then onto a button on the bar: the button gets it (the bar used to keep it)
@@ -516,8 +532,8 @@ int main(int argc, char** argv) {
         const V3 away{ 0, 3, 0.5 };                     // (pointing away: nothing hovered in the pictures)
         ms.Open(true, head);
         u5(Aim(1, away, 0.0f));
-        static const wchar_t* const kTab[4] = { L"menu-buttons", L"menu-mouse", L"menu-panels", L"menu-look" };
-        for (int t = 0; t < 4; ++t) {
+        static const wchar_t* const kTab[5] = { L"menu-buttons", L"menu-mouse", L"menu-panels", L"menu-look", L"menu-driving" };
+        for (int t = 0; t < 5; ++t) {
             press(VrMenu::kPanMenu, VrMenu::eTab, t);
             settle(away);
             WriteBmp(shots + L"\\" + kTab[t] + L".bmp", ms, VrMenu::kPanMenu);

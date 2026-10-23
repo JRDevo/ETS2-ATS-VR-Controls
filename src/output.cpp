@@ -6,6 +6,7 @@
 #include <thread>
 #include <vector>
 #include "log.h"
+#include "scs_input.h"
 
 namespace ck {
 namespace {
@@ -147,6 +148,15 @@ void InputSink::Wheel(int notches) {
     in.mi.dwFlags = MOUSEEVENTF_WHEEL;
     in.mi.mouseData = (DWORD)(notches * WHEEL_DELTA);
     Queue(in);
+}
+
+void InputSink::Drive(float steer, float throttle, float brake) {
+    DriveSet(steer, throttle, brake);              // (three atomic stores: the game's main thread reads them)
+    if (!test_) return;
+    std::lock_guard<std::mutex> lk(g_m);
+    FILE* f = static_cast<FILE*>(test_);
+    fprintf(f, "drive %.3f %.3f %.3f\n", (double)steer, (double)throttle, (double)brake);
+    fflush(f);
 }
 
 void InputSink::Move(int dx, int dy) {

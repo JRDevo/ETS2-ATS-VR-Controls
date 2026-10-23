@@ -153,10 +153,18 @@ struct Config {
     float airGain = 25.0f;                             // pixels per degree of aim turn
     bool  airToggle = false;                           // false: air mouse while airBtn is held; true: one press on, the next off
     // the modifier: while modBtn is held, a button that has a modMap entry sends that instead of its map (e.g. right grip +
-    // right trigger = right click, so one controller does both clicks). -1 = no modifier. The modifier button keeps its own
+    // A / B = left / right click, so one controller does both clicks). -1 = no modifier. The modifier button keeps its own
     // job (the air mouse on the right grip). What a press sends is decided when it goes down (and released the same way).
     int   modBtn = kRGrip;
     Out   modMap[kBtnCount];
+    // one-controller driving (drive = 1): the left stick's x steers, the left trigger is the throttle -- analog values for the
+    // game's own input plugin door (scs_input.h), not keys. The left trigger's mapping and the left stick's directions are then
+    // not used (and a left stick mouse is off). driveBrake: the right trigger is the brake (its mapping not used).
+    bool  drive = true;
+    float steerDeadzone = 0.10f;                       // stick, before steering starts
+    float steerCurve = 1.5f;                           // 1 = straight; more = finer near the centre
+    float steerMax = 1.0f;                             // full stick = this much of the wheel (0.2 .. 1)
+    bool  driveBrake = false;
 };
 inline Config DefaultConfig() {
     Config c;
@@ -204,8 +212,24 @@ struct Sink {
     virtual void MouseButton(int which, bool down) = 0;   // 0 left, 1 right, 2 middle
     virtual void Wheel(int notches) = 0;                  // + up
     virtual void Move(int dx, int dy) = 0;
+    virtual void Drive(float steer, float throttle, float brake) { (void)steer; (void)throttle; (void)brake; }   // only on change
     virtual ~Sink() {}
 };
+
+// driving: the stick's x (-1 left .. +1 right) as steering after the dead zone and curve; a trigger as a pedal (0 .. 1)
+inline float SteerOf(float x, const Config& c) {
+    const float a = x < 0 ? -x : x;
+    if (a <= c.steerDeadzone || c.steerDeadzone >= 1.0f) return 0.0f;
+    const float k = ((a > 1.0f ? 1.0f : a) - c.steerDeadzone) / (1.0f - c.steerDeadzone);
+    const float v = std::pow(k, c.steerCurve) * c.steerMax;
+    return x < 0 ? -v : v;
+}
+inline float PedalOf(float t) {
+    constexpr float kRest = 0.05f;                     // a resting finger: no throttle
+    if (t <= kRest) return 0.0f;
+    const float v = (t - kRest) / (1.0f - kRest);
+    return v > 1.0f ? 1.0f : v;
+}
 
 // yaw (+ right) and pitch (+ up) in radians of the -z axis of orientation q (OpenXR: -z forward, +x right, +y up)
 inline void YawPitch(const double q[4], double* yaw, double* pitch) {
@@ -258,7 +282,7 @@ public:
             airOn_ = false;
         }
         // stick mouse
-        const int ms = c.mouseStick;
+        const int ms = c.drive && c.mouseStick == 1 ? 0 : c.mouseStick;   // (driving owns the left stick)
         if (active && (ms == 1 || ms == 2) && f.hand[ms - 1] && dt > 0.0 && dt < 0.25) {
             const int h = ms - 1;
             const double x = f.sx[h], y = f.sy[h];
@@ -271,25 +295,34 @@ public:
                 accY_ -= y * sp;
             }
         }
+        // driving: sent only when a value changed (inactive = all 0)
+        float dv[3] = {};
+        if (active && c.drive && f.hand[0]) { dv[0] = SteerOf(f.sx[0], c); dv[1] = PedalOf(f.trig[0]); }
+        if (active && c.drive && c.driveBrake && f.hand[1]) dv[2] = PedalOf(f.trig[1]);
+        if (dv[0] != drive_[0] || dv[1] != drive_[1] || dv[2] != drive_[2]) {
+            for (int i = 0; i < 3; ++i) drive_[i] = dv[i];
+            s.Drive(dv[0], dv[1], dv[2]);
+        }
         if (!active) { accX_ = accY_ = 0.0; return; }
         const int mx = (int)accX_, my = (int)accY_;
         if (mx || my) { s.Move(mx, my); accX_ -= mx; accY_ -= my; }
     }
     bool Down(int b) const { return b >= 0 && b < kBtnCount && down_[b]; }
     bool AirOn() const { return airOn_; }
+    float Driving(int i) const { return i >= 0 && i < 3 ? drive_[i] : 0.0f; }   // the last steer / throttle / brake sent
 
 private:
     void Want(const Frame& f, const Config& c, bool* w) const {
         auto ana = [&](int b, float v) { w[b] = down_[b] ? v > kReleaseAt : v > kPressAt; };
         for (int h = 0; h < 2; ++h) {
             if (!f.hand[h]) continue;
-            ana(h ? kRTrig : kLTrig, f.trig[h]);
+            if (!(c.drive && (h == 0 || c.driveBrake))) ana(h ? kRTrig : kLTrig, f.trig[h]);   // (driving: a pedal)
             ana(h ? kRGrip : kLGrip, f.grip[h]);
             w[h ? kA : kX] = f.prim[h];
             w[h ? kB : kY] = f.sec[h];
             w[h ? kRStick : kLStick] = f.click[h];
             if (!h) w[kMenu] = f.menu[0];
-            if (c.mouseStick != h + 1) {               // that stick is not the mouse: its four directions are buttons
+            if (c.mouseStick != h + 1 && !(h == 0 && c.drive)) {   // that stick is not the mouse (or steering): 4 buttons
                 const int u = h ? kRUp : kLUp;
                 ana(u + 0, f.sy[h]);
                 ana(u + 1, -f.sy[h]);
@@ -318,6 +351,7 @@ private:
     bool   airLatch_ = false;                          // toggle mode: the air mouse is switched on
     double yaw_ = 0.0, pitch_ = 0.0;
     double accX_ = 0.0, accY_ = 0.0;
+    float  drive_[3] = {};                             // steer, throttle, brake last sent
 };
 
 }  // namespace VrPad

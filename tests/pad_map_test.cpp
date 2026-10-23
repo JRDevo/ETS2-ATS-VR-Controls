@@ -1,7 +1,8 @@
 // Unit test: VR CONTROLLERS -> keys / mouse (src/pad_map.h). (1) key names -> scan codes and the output parser
 // (combos, mouse, wheel, junk). (2) the Mapper: press / release edges, trigger hysteresis, combos released in reverse, stick
 // directions vs the mouse stick, stick mouse speed and dead zone, the air mouse (yaw right = +x, pitch up = -y, its hold button
-// sends nothing), everything released when inactive. No game, no Windows input. Build: the pad_map_test target.
+// sends nothing), everything released when inactive, driving (left stick = steering with dead zone / curve / max, left
+// trigger = throttle, the left trigger's mapping and stick directions not used, sent only on change, 0 when inactive). No game, no Windows input. Build: the pad_map_test target.
 // Exit code 0 = every check passed.
 #include <cmath>
 #include <cstdio>
@@ -19,6 +20,9 @@ struct Rec : VrPad::Sink {
     void MouseButton(int w, bool d) override { char b[32]; snprintf(b, sizeof(b), "m%d%s", w, d ? "v" : "^"); ev.push_back(b); }
     void Wheel(int n) override { char b[32]; snprintf(b, sizeof(b), "w%+d", n); ev.push_back(b); }
     void Move(int dx, int dy) override { mx += dx; my += dy; }
+    void Drive(float s, float t, float b) override { drv[0] = s; drv[1] = t; drv[2] = b; ++drives; }
+    float drv[3] = {};
+    int drives = 0;
     std::string Take() { std::string s; for (auto& e : ev) { if (!s.empty()) s += ' '; s += e; } ev.clear(); return s; }
 };
 
@@ -41,6 +45,7 @@ static VrPad::Config OldDefaults() {
     VrPad::ParseOut("enter", &c.map[VrPad::kA]);
     c.mouseStick = 1;
     c.mouseSpeed = 900.0f;
+    c.drive = false;
     c.modMap[VrPad::kA] = c.modMap[VrPad::kB] = VrPad::Out();
     VrPad::ParseOut("mouse_right", &c.modMap[VrPad::kRTrig]);
     return c;
@@ -237,6 +242,56 @@ int main() {
         QuatYawPitch(-40, 25, f.q[1]); YawPitch(f.q[1], &y, &p);
         CHECK(std::abs(y * 57.2957795 + 40) < 0.01 && std::abs(p * 57.2957795 - 25) < 0.01, "YawPitch (%.3f, %.3f)", y * 57.29578, p * 57.29578);
         CHECK(r.Take().empty(), "air mouse sends no buttons");
+    }
+    printf("(3) driving\n");
+    {
+        Config c = DefaultConfig();                    // drive = 1: left stick x = steering, left trigger = throttle
+        CHECK(c.drive && !c.driveBrake, "driving on by default, no brake");
+        CHECK(SteerOf(0.05f, c) == 0.0f && SteerOf(-0.1f, c) == 0.0f, "steering dead zone");
+        CHECK(std::fabs(SteerOf(1.0f, c) - 1.0f) < 1e-5f && std::fabs(SteerOf(-1.0f, c) + 1.0f) < 1e-5f, "full stick = full wheel");
+        CHECK(std::fabs(SteerOf(0.55f, c) - std::pow(0.5f, 1.5f)) < 1e-4f, "half way after the dead zone: 0.5^1.5 (%.4f)", (double)SteerOf(0.55f, c));
+        CHECK(SteerOf(1.4f, c) == 1.0f, "a diagonal over 1 is capped");
+        Config m = c; m.steerMax = 0.5f; m.steerCurve = 1.0f;
+        CHECK(std::fabs(SteerOf(-1.0f, m) + 0.5f) < 1e-5f && std::fabs(SteerOf(0.55f, m) - 0.25f) < 1e-4f, "steer_max / curve 1");
+        CHECK(PedalOf(0.04f) == 0.0f && PedalOf(1.0f) == 1.0f && std::fabs(PedalOf(0.525f) - 0.5f) < 1e-4f, "pedal: rest, full, half");
+        Mapper mp; Rec r; Frame f;
+        f.hand[0] = f.hand[1] = true;
+        mp.Step(f, true, 0.011, c, r);
+        CHECK(r.drives == 0, "nothing sent while nothing moves");
+        f.sx[0] = 1.0f; f.sy[0] = 1.0f; f.trig[0] = 1.0f;
+        mp.Step(f, true, 0.011, c, r);
+        CHECK(r.drives == 1 && r.drv[0] == 1.0f && r.drv[1] == 1.0f && r.drv[2] == 0.0f, "full right + full throttle");
+        CHECK(r.Take().empty() && r.mx == 0 && r.my == 0, "no wheel_up from the left trigger, no up key, no mouse from the left stick");
+        mp.Step(f, true, 0.011, c, r);
+        CHECK(r.drives == 1, "the same values are not sent again");
+        f.sx[0] = 0.0f; f.trig[0] = 0.0f;
+        mp.Step(f, true, 0.011, c, r);
+        CHECK(r.drives == 2 && r.drv[0] == 0.0f && r.drv[1] == 0.0f, "stick let go = straight, trigger let go = coast");
+        f.trig[1] = 1.0f;
+        mp.Step(f, true, 0.011, c, r);
+        CHECK(r.drives == 2 && r.Take().empty(), "right trigger: no brake (drive_brake = 0), its mapping (none)");
+        f.trig[1] = 0.0f; mp.Step(f, true, 0.011, c, r);
+        Config b = c; b.driveBrake = true;
+        ParseOut("mouse_left", &b.map[kRTrig]);
+        f.trig[1] = 1.0f;
+        mp.Step(f, true, 0.011, b, r);
+        CHECK(r.drives == 3 && r.drv[2] == 1.0f && r.Take().empty(), "drive_brake: right trigger = brake, its mapping not sent");
+        f.sx[0] = -0.7f; f.trig[0] = 0.6f;
+        mp.Step(f, true, 0.011, b, r);
+        mp.Step(f, false, 0.011, b, r);
+        CHECK(r.drv[0] == 0.0f && r.drv[1] == 0.0f && r.drv[2] == 0.0f, "inactive (game not in front): all 0");
+        Config off = c; off.drive = false;             // off: the left trigger is a button again, nothing driven
+        Mapper mo; Rec ro; Frame g;
+        g.hand[0] = g.hand[1] = true;
+        g.trig[0] = 1.0f; g.sx[0] = 1.0f;
+        mo.Step(g, true, 0.011, off, ro);
+        CHECK(ro.drives == 0 && ro.Take() == "w+1", "drive = 0: left trigger = wheel up again, no driving");
+        Config ml = c; ml.mouseStick = 1;              // a left stick mouse: driving owns the stick
+        Mapper mm; Rec rm; Frame h;
+        h.hand[0] = true; h.sx[0] = 1.0f;
+        mm.Step(h, true, 0.011, ml, rm);
+        mm.Step(h, true, 0.011, ml, rm);
+        CHECK(rm.mx == 0 && rm.drv[0] == 1.0f, "mouse_stick = left + drive: the stick steers, no mouse");
     }
     printf("%d checks, %d failed\n", g_checks, g_fails);
     return g_fails ? 1 : 0;

@@ -7,11 +7,23 @@
     Then writes  HKLM\SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit\<full path of the json> = DWORD 0  (0 = enabled).
     HKLM only: ETS2 / ATS use their own built-in OpenXR loader, which reads only HKLM. Never also HKCU: the official loader then
     loads the layer twice. Any per-user copy and any older registration of the same json file name elsewhere are removed.
+    Driving (config.ini drive): the same DLL is also the game's input plugin. ETS2 / ATS load plugins named in
+    HKLM\SOFTWARE\SCS Software\<game>\Plugins (a string value = the DLL's full path; the keys are made if missing, so a game
+    installed later finds it too): value 'ets2_ats_vr_controls' for Euro Truck Simulator 2 and American Truck Simulator. An
+    older value pointing at another copy of the DLL is removed (one plugin loaded twice is undefined). Nothing goes into the
+    game folder.
     Elevates itself (one UAC prompt) unless it already runs as administrator. Refuses while ETS2 / ATS run (the DLL is in use).
       powershell -ExecutionPolicy Bypass -File scripts\install.ps1 [-NoCopy]
 #>
 param([switch]$NoCopy, [switch]$Elevated)
 $ErrorActionPreference = 'Stop'
+if ([Environment]::Is64BitOperatingSystem -and -not [Environment]::Is64BitProcess) {   # 32-bit PowerShell: the 64-bit one
+    $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"")      # (32-bit would write Wow6432Node)
+    if ($NoCopy) { $a += '-NoCopy' }
+    if ($Elevated) { $a += '-Elevated' }
+    & "$env:windir\sysnative\WindowsPowerShell\v1.0\powershell.exe" @a
+    exit $LASTEXITCODE
+}
 $jsonName = 'XR_APILAYER_JRDEVO_ets2_ats_vr_controls.json'
 $dllName = 'ets2_ats_vr_controls.dll'
 $regPath = 'HKLM:\SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit'
@@ -67,5 +79,21 @@ foreach ($n in (Get-Item $regPath).GetValueNames()) {
 }
 New-ItemProperty -Path $regPath -Name $json -PropertyType DWord -Value 0 -Force | Out-Null
 Write-Host "registered: $json" -ForegroundColor Green
+# the game's input plugin (driving): the same DLL, by its full path
+$dll = Join-Path $root $dllName
+foreach ($g in 'Euro Truck Simulator 2', 'American Truck Simulator') {
+    $pk = "HKLM:\SOFTWARE\SCS Software\$g\Plugins"
+    if (-not (Test-Path $pk)) { New-Item -Path $pk -Force | Out-Null }
+    $item = Get-Item $pk
+    foreach ($n in $item.GetValueNames()) {
+        $v = [string]$item.GetValue($n)
+        if ((LeafOf $v) -ieq $dllName -and ($n -ne 'ets2_ats_vr_controls' -or $v -ne $dll)) {
+            Remove-ItemProperty -Path $pk -Name $n
+            Write-Host "removed older plugin entry ($g): $n = $v"
+        }
+    }
+    New-ItemProperty -Path $pk -Name 'ets2_ats_vr_controls' -PropertyType String -Value $dll -Force | Out-Null
+    Write-Host "game input plugin ($g): $dll" -ForegroundColor Green
+}
 if ($Elevated) { Start-Sleep -Seconds 2 }
 exit 0

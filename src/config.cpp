@@ -79,6 +79,11 @@ Config ParseConfig(const std::string& text) {
         }
         if (key == "mouse_speed") { if (Num(val, 50, 10000, &d)) c.pad.mouseSpeed = (float)d; else bad("a number (pixels per second)"); continue; }
         if (key == "deadzone")    { if (Num(val, 0, 0.9, &d)) c.pad.deadzone = (float)d; else bad("a number 0 .. 0.9"); continue; }
+        if (key == "drive")       { c.pad.drive = lv == "1" || lv == "on" || lv == "yes"; continue; }
+        if (key == "drive_brake") { c.pad.driveBrake = lv == "1" || lv == "on" || lv == "yes"; continue; }
+        if (key == "steer_deadzone") { if (Num(val, 0, 0.5, &d)) c.pad.steerDeadzone = (float)d; else bad("a number 0 .. 0.5"); continue; }
+        if (key == "steer_curve") { if (Num(val, 1, 3, &d)) c.pad.steerCurve = (float)d; else bad("a number 1 .. 3"); continue; }
+        if (key == "steer_max")   { if (Num(val, 0.2, 1, &d)) c.pad.steerMax = (float)d; else bad("a number 0.2 .. 1"); continue; }
         if (key == "air_speed")   { if (Num(val, 1, 500, &d)) c.pad.airGain = (float)d; else bad("a number (pixels per degree)"); continue; }
         if (key == "air_mode") {
             if (lv == "hold") c.pad.airToggle = false;
@@ -246,6 +251,14 @@ std::vector<std::pair<std::string, std::string>> MenuValues(const VrPad::Config&
     kv.push_back({ "modifier_keys", mk.empty() ? "none" : mk });
     snprintf(b, sizeof(b), "%.0f", (double)p.airGain);
     kv.push_back({ "air_speed", b });
+    kv.push_back({ "drive", p.drive ? "1" : "0" });
+    kv.push_back({ "drive_brake", p.driveBrake ? "1" : "0" });
+    snprintf(b, sizeof(b), "%.2f", (double)p.steerDeadzone);
+    kv.push_back({ "steer_deadzone", b });
+    snprintf(b, sizeof(b), "%.2f", (double)p.steerCurve);
+    kv.push_back({ "steer_curve", b });
+    snprintf(b, sizeof(b), "%.2f", (double)p.steerMax);
+    kv.push_back({ "steer_max", b });
     if (menu.set) kv.push_back({ "menu_place", PlaceString(menu) });
     if (kb.set) kv.push_back({ "keyboard_place", PlaceString(kb) });
     kv.push_back({ "theme", ThemeNames()[look.theme < 0 || look.theme >= kThemeCount ? 0 : look.theme] });
@@ -326,6 +339,7 @@ std::string DescribePad(const VrPad::Config& p) {
         const VrPad::Out& o = p.map[b];
         if (o.kind == VrPad::kNone) continue;
         if ((p.mouseStick == 1 && b >= VrPad::kLUp && b <= VrPad::kLRight) || (p.mouseStick == 2 && b >= VrPad::kRUp)) continue;
+        if (p.drive && (b == VrPad::kLTrig || (b == VrPad::kRTrig && p.driveBrake) || (b >= VrPad::kLUp && b <= VrPad::kLRight))) continue;
         char v[48];
         switch (o.kind) {
         case VrPad::kMouseL: snprintf(v, sizeof(v), "mouse_left"); break;
@@ -352,7 +366,11 @@ std::string DescribePad(const VrPad::Config& p) {
         VrPad::OutToString(p.modMap[b], v, sizeof(v));
         mod += std::string(" ") + VrPad::BtnNames()[b] + "=" + v;
     }
-    return s + tail + mod;
+    char dr[160] = " | no driving";
+    if (p.drive)
+        snprintf(dr, sizeof(dr), " | driving: left stick steers (dead zone %.2f, curve %.2f, max %.2f), left trigger = throttle%s",
+                 (double)p.steerDeadzone, (double)p.steerCurve, (double)p.steerMax, p.driveBrake ? ", right trigger = brake" : "");
+    return s + tail + mod + dr;
 }
 
 }  // namespace ck

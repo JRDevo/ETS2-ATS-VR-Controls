@@ -23,6 +23,7 @@ public:
     void MouseButton(int which, bool down) override;
     void Wheel(int notches) override;
     void Move(int dx, int dy) override;
+    void Drive(float steer, float throttle, float brake) override;   // -> scs_input.h (no SendInput; test mode: a line too)
     bool TestMode() const { return test_ != nullptr; }
     void SetLogEvents(bool on) { logEvents_ = on; }
     void SetMeasure(bool on) { measure_ = on; }
