@@ -333,7 +333,7 @@ int main(int argc, char** argv) {
         const uint32_t px0 = m.FullPicture(VrMenu::kPanMenu)[(size_t)400 * 1000 + 10];
         CHECK((px0 >> 24) == 179, "the picture is 70 %% solid (alpha %u)", px0 >> 24);
     }
-    // Driving tab: the steering stick right / off / left, the curve one step up, full stick 90 %, the speed one step slower
+    // Driving tab: the steering stick right / off / left, small turns one step up, full stick 90 %, the speed one step slower
     {
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 4), "Driving tab");
         CHECK(m.Pad().steerStick == 1, "the left stick steers by default");
@@ -359,7 +359,7 @@ int main(int argc, char** argv) {
         CHECK(m.Pad().steerSpeedSens && click(1, VrMenu::kPanMenu, VrMenu::eSet, 154) && !m.Pad().steerSpeedSens, "speed-sensitive: Off");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 154) && m.Pad().steerSpeedSens, "speed-sensitive: On again");
         CHECK(!click(1, VrMenu::kPanMenu, VrMenu::eSet, 141) && !click(1, VrMenu::kPanMenu, VrMenu::eSet, 142), "no style row any more");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 136) && std::fabs(m.Pad().steerCurve - 1.25f) < 0.01f, "curve 1 -> 1.25");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 136) && std::fabs(m.Pad().steerFine - 0.25f) < 0.001f, "small turns 20 -> 25 %%");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 137) && std::fabs(m.Pad().steerMax - 0.9f) < 0.01f, "full stick 100 -> 90 %%");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 139) && m.Pad().steerRate == 0.35f, "wheel speed 0.5 -> 0.35 (slower)");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 139) && m.Pad().steerRate == 0.25f, "the slowest: 0.25");
@@ -368,7 +368,7 @@ int main(int argc, char** argv) {
         for (int i = 0; i < 8; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 139);
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 135);
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 138);
-        CHECK(m.Pad().steerRate == 0.5f && std::fabs(m.Pad().steerCurve - 1.0f) < 0.01f && std::fabs(m.Pad().steerMax - 1.0f) < 0.01f,
+        CHECK(m.Pad().steerRate == 0.5f && std::fabs(m.Pad().steerFine - 0.2f) < 0.001f && std::fabs(m.Pad().steerMax - 1.0f) < 0.01f,
               "driving settings back (wheel speed %.2f)", (double)m.Pad().steerRate);
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 0) && click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kLGrip) &&
               click(1, VrMenu::kPanMenu, VrMenu::ePickOut, VrPad::kBrake) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kBrake,

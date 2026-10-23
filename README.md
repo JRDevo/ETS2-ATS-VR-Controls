@@ -113,17 +113,19 @@ By default:
 - The steering stick: left, right or off (Driving tab, or `steer = left / right / off`). That stick's left / right then
   steer; its up / down are still free buttons (for example gas and brake).
 
-**How the wheel moves:** the stick's place is where the wheel goes (stick half left = wheel half left). While you hold
-the stick, the wheel glides there: a small push turns it slowly, a full push fast, and a wobbling thumb is smoothed. Ease the
-stick a bit (the next bend needs less): the wheel comes back to the new place and stays there. Let go: the wheel goes back to
-straight. If your thumb slips past the middle as you let go, the wheel only goes straight, never past it.
+**How the wheel moves:** the stick's place is where the wheel goes. The stick's throw is short, so it has two zones:
+most of it (up to 80 % of a push) makes **small, careful turns** -- up to 20 % of the wheel, for following the road --, and
+only the last bit, pushed **all the way to the edge**, makes **hard turns** up to full lock. While you hold the stick, the
+wheel glides there: a small push turns it slowly, a full push fast, and a wobbling thumb is smoothed. Ease the stick a bit:
+the wheel comes back to the new place and stays there. Let go: the wheel goes back to straight. If your thumb slips past the
+middle as you let go, the wheel only goes straight, never past it.
 
 **Steering feel** (Driving tab, or `config.ini`):
 
 | Setting | What it does | Default |
 |---|---|---|
 | Steering dead zone (`steer_deadzone`) | how far the stick must move before the wheel turns | 0.10 |
-| Steering curve (`steer_curve`) | 1 = even all the way (the best for most). More = finer near the middle, but much touchier near the edge of the stick | 1.00 |
+| Small turns (most of the stick) (`steer_fine`, `steer_fine_zone`) | the stick's throw is short, so it has two zones. Most of it (the first 80 % of a push) makes small, careful turns for following the road: up to this much of the wheel. Only the last bit, at the edge, turns hard, up to full lock. Set it to "even (off)" for one even zone. 95 % of a push already counts as all the way (`steer_full_at`; many sticks stop there) | 20 % |
 | Full stick turns the wheel (`steer_max`) | how far the wheel turns with the stick all the way | 100 % |
 | Wheel follows the stick (`steer_follow_time`) | smoothing while you hold the stick: how quickly the wheel goes to the stick's place, in seconds (when standing; calmer at speed by itself). More = smoother and calmer | 0.4 s |
 | Let go: back to the middle (`steer_center_time`) | how the wheel comes back when you let go. At once = at the wheel speed below (the default). More = a slow glide, in seconds | at once |
@@ -131,7 +133,7 @@ straight. If your thumb slips past the middle as you let go, the wheel only goes
 | At 90 km/h (`steer_speed_sens`, `steer_at_speed`) | **speed-sensitive steering**, On / Off: up to 10 km/h the stick steers fully; at 90 km/h and faster full stick turns the wheel only this much (30 %), so small moves are fine. A bend you hold while you speed up stays | On, 30 % |
 
 Too twitchy at speed? Lower "At 90 km/h". Too twitchy everywhere? Make "Wheel follows the stick" slower (more seconds) or
-"Wheel speed at most" slower. Touchy when you hold the stick far out? Set the curve back to 1. The wheel comes back too fast?
+"Wheel speed at most" slower. Small turns too big or too small? Change "Small turns". The wheel comes back too fast?
 Give "Let go: back to the middle" some seconds.
 
 **Not sure what a setting does?** In the VR menu, point at it (or at its name): the line at the bottom of the menu says what
@@ -188,7 +190,7 @@ a laser pointer. A **white dot** appears where you point, and the key under it l
 - **Mouse** tab: which stick moves the mouse, its speed and dead zone, the air mouse button, hold or toggle, its speed.
 - **Panels** tab: menu size, keyboard size, show / hide the keyboard, bring both in front of you.
 - **Panels** tab also: the distance of each panel (Closer / Farther).
-- **Driving** tab: driving on / off, the stick that steers (left / right / off), the dead zone, curve, how far the wheel
+- **Driving** tab: driving on / off, the stick that steers (left / right / off), the dead zone, small turns, how far the wheel
   turns, how quickly it follows the stick and comes back, its top speed, and speed-sensitive steering. Gas and brake: any button, Buttons tab. See [Driving](#driving-with-one-controller).
 - **Look** tab: colours (Dark, Blue, Grey, Light, Black, Green), how see-through the menu and the keyboard are, and
   **pointer smoothing** (Off / Low / Medium / High): calms a shaky hand, for the menu pointer and the air mouse.

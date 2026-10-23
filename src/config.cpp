@@ -99,7 +99,10 @@ Config ParseConfig(const std::string& text) {
         if (key == "steer_center_time") { if (Num(val, 0, 10, &d)) c.pad.steerCenterTime = (float)d; else bad("seconds 0 .. 10 (0 = at once)"); continue; }
         if (key == "steer_max_speed") { if (Num(val, 0, 10, &d)) c.pad.steerRate = (float)d; else bad("full turns per second 0 .. 10 (0 = no limit)"); continue; }
         if (key == "steer_deadzone") { if (Num(val, 0, 0.5, &d)) c.pad.steerDeadzone = (float)d; else bad("a number 0 .. 0.5"); continue; }
-        if (key == "steer_curve") { if (Num(val, 1, 3, &d)) c.pad.steerCurve = (float)d; else bad("a number 1 .. 3"); continue; }
+        if (key == "steer_curve") { bad("no longer used (2026-10-23: see steer_fine, steer_fine_zone)"); continue; }
+        if (key == "steer_fine") { if (Num(val, 0.05, 0.95, &d)) c.pad.steerFine = (float)d; else bad("a number 0.05 .. 0.95"); continue; }
+        if (key == "steer_full_at") { if (Num(val, 0.7, 1, &d)) c.pad.steerFullAt = (float)d; else bad("a number 0.7 .. 1"); continue; }
+        if (key == "steer_fine_zone") { if (Num(val, 0.5, 0.95, &d)) c.pad.steerFineZone = (float)d; else bad("a number 0.5 .. 0.95"); continue; }
         if (key == "steer_max")   { if (Num(val, 0.2, 1, &d)) c.pad.steerMax = (float)d; else bad("a number 0.2 .. 1"); continue; }
         if (key == "air_speed")   { if (Num(val, 1, 500, &d)) c.pad.airGain = (float)d; else bad("a number (pixels per degree)"); continue; }
         if (key == "air_mode") {
@@ -272,8 +275,12 @@ std::vector<std::pair<std::string, std::string>> MenuValues(const VrPad::Config&
     kv.push_back({ "steer", p.steerStick == 1 ? "left" : p.steerStick == 2 ? "right" : "off" });
     snprintf(b, sizeof(b), "%.2f", (double)p.steerDeadzone);
     kv.push_back({ "steer_deadzone", b });
-    snprintf(b, sizeof(b), "%.2f", (double)p.steerCurve);
-    kv.push_back({ "steer_curve", b });
+    snprintf(b, sizeof(b), "%.2f", (double)p.steerFine);
+    kv.push_back({ "steer_fine", b });
+    snprintf(b, sizeof(b), "%.2f", (double)p.steerFineZone);
+    kv.push_back({ "steer_fine_zone", b });
+    snprintf(b, sizeof(b), "%.2f", (double)p.steerFullAt);
+    kv.push_back({ "steer_full_at", b });
     snprintf(b, sizeof(b), "%.2f", (double)p.steerMax);
     kv.push_back({ "steer_max", b });
     snprintf(b, sizeof(b), "%.2f", (double)p.steerFollowTime);
@@ -395,11 +402,11 @@ std::string DescribePad(const VrPad::Config& p) {
         VrPad::OutToString(p.modMap[b], v, sizeof(v));
         mod += std::string(" ") + VrPad::BtnNames()[b] + "=" + v;
     }
-    char dr[200] = " | no steering";
+    char dr[260] = " | no steering";
     if (!p.drive) snprintf(dr, sizeof(dr), " | driving off");
     else if (p.steerStick)
-        snprintf(dr, sizeof(dr), " | driving: %s stick steers (dead zone %.2f, curve %.2f, max %.2f, follow %.2f s, back to the middle %.2f s, at most %.2f turns / s, at 90 km/h %.2f%s)",
-                 p.steerStick == 1 ? "left" : "right", (double)p.steerDeadzone, (double)p.steerCurve, (double)p.steerMax,
+        snprintf(dr, sizeof(dr), " | driving: %s stick steers (dead zone %.2f, fine %.2f up to %.2f of the push, full at %.2f, max %.2f, follow %.2f s, back to the middle %.2f s, at most %.2f turns / s, at 90 km/h %.2f%s)",
+                 p.steerStick == 1 ? "left" : "right", (double)p.steerDeadzone, (double)p.steerFine, (double)p.steerFineZone, (double)p.steerFullAt, (double)p.steerMax,
                  (double)p.steerFollowTime, (double)p.steerCenterTime, (double)p.steerRate, (double)p.steerAtSpeed,
                  p.steerSpeedSens ? "" : " off");
     return s + tail + mod + dr;

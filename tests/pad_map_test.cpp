@@ -1,7 +1,7 @@
 // Unit test: VR CONTROLLERS -> keys / mouse (src/pad_map.h). (1) key names -> scan codes and the output parser
 // (combos, mouse, wheel, junk). (2) the Mapper: press / release edges, trigger hysteresis, combos released in reverse, stick
 // directions vs the mouse stick, stick mouse speed and dead zone, the air mouse (yaw right = +x, pitch up = -y, its hold button
-// sends nothing), everything released when inactive, driving (left stick = steering with dead zone / curve / max, left
+// sends nothing), everything released when inactive, driving (left stick = steering with dead zone / two zones / max, left
 // trigger = throttle, the left trigger's mapping and stick directions not used, sent only on change, 0 when inactive). No game, no Windows input. Build: the pad_map_test target.
 // Exit code 0 = every check passed.
 #include <cmath>
@@ -264,17 +264,18 @@ int main() {
     }
     printf("(3) driving\n");
     {
-        Config c = DefaultConfig();                    // left stick x = steering; here: left trigger = gas, curve 2, no modifier keys
+        Config c = DefaultConfig();                    // left stick x = steering; here: left trigger = gas, half push = a quarter, no modifier keys
         c.steerFollowTime = c.steerCenterTime = c.steerRate = 0.0f;   // (the wheel at once: the values below are exact)
-        c.steerCurve = 2.0f;
+        c.steerFine = 0.25f; c.steerFineZone = 0.5f;  // (half the push = a quarter of the wheel, as the checks below use)
+        c.steerFullAt = 1.0f;
         ParseOut("gas", &c.map[kLTrig]);
         c.map[kRTrig] = Out();
         for (Out& mo : c.modMap) mo = Out();
         const Config dc = DefaultConfig();
         CHECK(dc.steerStick == 1 && dc.map[kRTrig].kind == kGas && dc.map[kLTrig].kind == kBrake && dc.map[kLGrip].kind == kNone &&
-              dc.modMap[kRTrig].kind == kMouseL && dc.steerRate == 0.5f && dc.steerCurve == 1.0f && dc.steerFollowTime == 0.4f &&
+              dc.modMap[kRTrig].kind == kMouseL && dc.steerRate == 0.5f && dc.steerFine == 0.2f && dc.steerFineZone == 0.8f && dc.steerFollowTime == 0.4f &&
               dc.steerCenterTime == 0.0f && dc.drive,
-              "defaults: left stick steers, right trigger = gas (+ right grip: left click), left trigger = brake, curve 1, glide");
+              "defaults: left stick steers, right trigger = gas (+ right grip: left click), left trigger = brake, two zones, glide");
         Out po;
         CHECK(ParseOut("gas", &po) && po.kind == kGas && ParseOut("Throttle", &po) && po.kind == kGas && ParseOut("brake", &po) && po.kind == kBrake,
               "gas / throttle / brake parse");
@@ -285,8 +286,8 @@ int main() {
         CHECK(std::fabs(SteerOf(1.0f, c) - 1.0f) < 1e-5f && std::fabs(SteerOf(-1.0f, c) + 1.0f) < 1e-5f, "full stick = full wheel");
         CHECK(std::fabs(SteerOf(0.55f, c) - 0.25f) < 1e-4f, "half way after the dead zone: 0.5^2 (%.4f)", (double)SteerOf(0.55f, c));
         CHECK(SteerOf(1.4f, c) == 1.0f, "a diagonal over 1 is capped");
-        Config m = c; m.steerMax = 0.5f; m.steerCurve = 1.0f;
-        CHECK(std::fabs(SteerOf(-1.0f, m) + 0.5f) < 1e-5f && std::fabs(SteerOf(0.55f, m) - 0.25f) < 1e-4f, "steer_max / curve 1");
+        Config m = c; m.steerMax = 0.5f; m.steerFine = m.steerFineZone;   // (even all the way)
+        CHECK(std::fabs(SteerOf(-1.0f, m) + 0.5f) < 1e-5f && std::fabs(SteerOf(0.55f, m) - 0.25f) < 1e-4f, "steer_max / even");
         CHECK(PedalOf(0.04f) == 0.0f && PedalOf(1.0f) == 1.0f && std::fabs(PedalOf(0.525f) - 0.5f) < 1e-4f, "pedal: rest, full, half");
         Mapper mp; Rec r; Frame f;
         f.hand[0] = f.hand[1] = true;
@@ -382,13 +383,14 @@ int main() {
               "on again: steering, gas, brake; the key released");
     }
     // the steering glide (2026-10-23): the stick = the wheel's target; held (pushed or eased) at steerFollowTime, let go /
-    // the other side = straight at steerCenterTime (default 0: at the limit), never faster than steerRate (* the push held)
+    // the other side = straight at steerCenterTime (default 0: at the limit), never faster than steerRate (* the push held).
+    // (These use an even stick -- steerFine = steerFineZone --, so the wheel's place is the push; the two zones: below.)
     auto run = [](Mapper& mp, Frame& f, double secs, const Config& c, Rec& r) {
         for (int i = 0, n = (int)(secs / 0.011 + 0.5); i < n; ++i) mp.Step(f, true, 0.011, c, r);
     };
     {   // held: smooth, no overshoot, ~95 % in 3 follow times; the limit holds every frame, times the push
         Config c = DefaultConfig();
-        c.steerDeadzone = 0.0f;
+        c.steerDeadzone = 0.0f; c.steerFine = c.steerFineZone; c.steerFullAt = 1.0f;
         Config nr = c; nr.steerRate = 0.0f;
         Mapper mp; Rec r; Frame f;
         f.hand[0] = true; f.sx[0] = 0.6f;
@@ -415,7 +417,7 @@ int main() {
     }
     {   // THE COMPLAINT: 0.9 held, then eased to 0.6 -- the wheel comes in to 0.6 and holds there (it never turns further)
         Config c = DefaultConfig();
-        c.steerDeadzone = 0.0f;
+        c.steerDeadzone = 0.0f; c.steerFine = c.steerFineZone; c.steerFullAt = 1.0f;
         Mapper mp; Rec r; Frame f;
         f.hand[0] = true; f.sx[0] = -0.9f;
         run(mp, f, 5.0, c, r);
@@ -430,7 +432,7 @@ int main() {
     }
     {   // THE WOBBLE (drive log 19:57): at 90 km/h, 0.9 held, the thumb slips to 0.7 for one frame -- hardly a change
         Config c = DefaultConfig();
-        c.steerDeadzone = 0.0f;
+        c.steerDeadzone = 0.0f; c.steerFine = c.steerFineZone; c.steerFullAt = 1.0f;
         Mapper mp; Rec r; Frame f;
         f.hand[0] = true; f.sx[0] = 0.9f;
         mp.SetSpeed(90.0f);
@@ -445,7 +447,7 @@ int main() {
     }
     {   // let go: straight at the limit (centre time 0, the default), exactly straight; a centre time = a glide; at speed slower
         Config c = DefaultConfig();
-        c.steerDeadzone = 0.0f;
+        c.steerDeadzone = 0.0f; c.steerFine = c.steerFineZone; c.steerFullAt = 1.0f;
         Mapper mp; Rec r; Frame f;
         f.hand[0] = true; f.sx[0] = 0.5f;
         run(mp, f, 5.0, c, r);
@@ -472,15 +474,15 @@ int main() {
         run(mf, h, 0.506, c, rf);
         CHECK(std::fabs(rf.drv[0] - (0.3f - 0.5f * std::sqrt(0.3f) * 0.5f)) < 0.006f, "let go 0.5 s at 90 km/h: back by 0.137 (%.3f)", (double)rf.drv[0]);
     }
-    {   // speeding up in a bend: the wheel holds (a part push too, curve 2); eased, it glides into the high-speed range
+    {   // speeding up in a bend: the wheel holds (a part push too); eased, it glides into the high-speed range
         Config c = DefaultConfig();
-        c.steerDeadzone = 0.0f; c.steerRate = 0.0f; c.steerCurve = 2.0f;
+        c.steerDeadzone = 0.0f; c.steerRate = 0.0f; c.steerFine = c.steerFineZone; c.steerFullAt = 1.0f;   // (even all the way)
         Mapper mp; Rec r; Frame f;
         f.hand[0] = true; f.sx[0] = -0.7f;
         mp.SetSpeed(20.0f);
         run(mp, f, 3.0, c, r);
         const float held = r.drv[0];
-        CHECK(std::fabs(held + 0.49f * 0.9125f) < 1e-3f, "20 km/h, 0.7 stick, curve 2: 0.49 * 0.9125 (%.4f)", (double)held);
+        CHECK(std::fabs(held + 0.7f * 0.9125f) < 1e-3f, "20 km/h, 0.7 stick: 0.7 * 0.9125 (%.4f)", (double)held);
         for (int i = 0; i < 160; ++i) { mp.SetSpeed(20.0f + i * 0.5f); f.sx[0] = (i & 1) ? -0.69f : -0.7f; mp.Step(f, true, 0.011, c, r); }
         mp.SetSpeed(90.0f);
         f.sx[0] = -0.7f;
@@ -490,7 +492,7 @@ int main() {
         mp.Step(f, true, 0.011, c, r);
         CHECK(r.drv[0] > held, "eased: comes in");
         run(mp, f, 8.0, c, r);
-        CHECK(std::fabs(r.drv[0] + 0.25f * 0.3f) < 0.003f, "... to the 90 km/h place of half a push: 0.25 * 0.3 within 8 s (%.3f)", (double)r.drv[0]);
+        CHECK(std::fabs(r.drv[0] + 0.5f * 0.3f) < 0.003f, "... to the 90 km/h place of half a push: 0.5 * 0.3 within 8 s (%.3f)", (double)r.drv[0]);
         f.sx[0] = -1.0f;
         run(mp, f, 6.0, c, r);
         CHECK(std::fabs(r.drv[0] + 0.3f) < 1e-3f, "full again: 0.3, the 90 km/h range (%.3f)", (double)r.drv[0]);
@@ -508,7 +510,7 @@ int main() {
     }
     {   // the other side: straight first (at the let-go speed), then out the other way
         Config c = DefaultConfig();
-        c.steerDeadzone = 0.0f;
+        c.steerDeadzone = 0.0f; c.steerFine = c.steerFineZone; c.steerFullAt = 1.0f;
         Mapper mp; Rec r; Frame f;
         f.hand[0] = true; f.sx[0] = 0.5f;
         run(mp, f, 5.0, c, r);
@@ -524,7 +526,7 @@ int main() {
     {   // THE SLIP (drive log 18:19): the thumb slips past the middle for 0.2 s as it lets go -- the wheel only goes straight,
         // exactly as a clean let go, never past the middle
         Config c = DefaultConfig();
-        c.steerDeadzone = 0.0f;
+        c.steerDeadzone = 0.0f; c.steerFine = c.steerFineZone; c.steerFullAt = 1.0f;
         auto tap = [&](bool slip, float* least) {
             Mapper mp; Rec r; Frame f;
             f.hand[0] = true; f.sx[0] = 1.0f / 3.0f;
@@ -576,6 +578,7 @@ int main() {
         run(mx, f, 6.0, h, rx);
         CHECK(std::fabs(rx.drv[0] - 0.5f) < 1e-3f, "... to 0.5 (%.3f)", (double)rx.drv[0]);
         Config now = c; now.steerFollowTime = now.steerCenterTime = now.steerRate = 0.0f; now.steerDeadzone = 0.0f;
+        now.steerFine = now.steerFineZone; now.steerFullAt = 1.0f;
         Mapper mn; Rec rn;
         g.sx[0] = -0.4f;
         mn.Step(g, true, 0.011, now, rn);
@@ -586,7 +589,7 @@ int main() {
     }
     {   // speed-sensitive steering: <= 10 km/h full, 90 km/h and up steerAtSpeed (0.3), between linear; unknown speed = full
         Config c = DefaultConfig();
-        c.steerDeadzone = 0.0f;
+        c.steerDeadzone = 0.0f; c.steerFine = c.steerFineZone; c.steerFullAt = 1.0f;
         CHECK(SpeedFactor(-1.0f, c) == 1.0f && SpeedFactor(5.0f, c) == 1.0f && std::fabs(SpeedFactor(50.0f, c) - 0.65f) < 1e-5f &&
               std::fabs(SpeedFactor(90.0f, c) - 0.3f) < 1e-5f && std::fabs(SpeedFactor(130.0f, c) - 0.3f) < 1e-5f,
               "speed factor: 1 / 0.65 at 50 / 0.3 from 90 km/h");
@@ -608,11 +611,32 @@ int main() {
         mw.SetSpeed(50.0f);
         mw.Step(gw, true, 0.1, w, rw);
         CHECK(std::fabs(rw.drv[0] - 0.65f) < 1e-4f, "at 50 km/h: full stick = 0.65 (%.3f)", (double)rw.drv[0]);
-        Config cv = w; cv.steerCurve = 2.0f;           // the curve: half a push = a quarter of the wheel
-        Mapper mc; Rec rc; Frame g;
-        g.hand[0] = true; g.sx[0] = 0.5f;
-        mc.Step(g, true, 0.011, cv, rc);
-        CHECK(std::fabs(rc.drv[0] - 0.25f) < 1e-4f, "curve 2, half push: 0.25 (%.3f)", (double)rc.drv[0]);
+    }
+    {   // the two zones (defaults: the first 80 % of a push = up to 20 % of the wheel, the rest up to full, bending up)
+        Config c = DefaultConfig();
+        c.steerDeadzone = 0.0f; c.steerFullAt = 1.0f;
+        CHECK(std::fabs(StickShape(0.5f, c) - 0.125f) < 1e-5f && std::fabs(StickShape(0.75f, c) - 0.1875f) < 1e-5f &&
+              std::fabs(StickShape(0.8f, c) - 0.2f) < 1e-5f, "fine zone: half = 0.125, 75 %% = 0.19 (was 0.75), 80 %% = 0.2");
+        CHECK(std::fabs(StickShape(0.9f, c) - 0.4125f) < 1e-5f && StickShape(1.0f, c) == 1.0f && StickShape(-1.0f, c) == -1.0f,
+              "hard zone: 90 %% = 0.41, the edge = full lock, both sides");
+        bool mono = true, smooth = true;
+        float last = 0.0f, lastSlope = -1.0f;
+        for (int i = 1; i <= 1000; ++i) {                // rising all the way, and no jump in the slope at 80 %
+            const float v = StickShape(i / 1000.0f, c), slope = (v - last) * 1000.0f;
+            mono = mono && v > last;
+            if (lastSlope >= 0.0f) smooth = smooth && std::fabs(slope - lastSlope) < 0.05f;
+            last = v; lastSlope = slope;
+        }
+        CHECK(mono && smooth, "rising, no kink between the zones");
+        Config ev = c; ev.steerFine = 0.8f;               // fine = zone: even all the way
+        CHECK(std::fabs(StickShape(0.37f, ev) - 0.37f) < 1e-5f && std::fabs(StickShape(0.93f, ev) - 0.93f) < 1e-5f, "fine = zone: even");
+        Config hi = c; hi.steerFine = 0.95f;              // fine above the zone: even (clamped)
+        CHECK(std::fabs(StickShape(0.5f, hi) - 0.5f) < 1e-5f, "fine above the zone: even");
+        Config dz = DefaultConfig();                      // the defaults: dead zone 0.1, full at 0.95 -- 0.1 + 0.85 * 0.8 = 0.78
+        CHECK(std::fabs(StickShape(0.78f, dz) - 0.2f) < 1e-4f && StickShape(0.1f, dz) == 0.0f, "with the dead zone and the full point");
+        CHECK(StickShape(0.95f, dz) == 1.0f && StickShape(-0.97f, dz) == -1.0f && StickPush(0.95f, dz) == 1.0f,
+              "0.95 (the user's thumb at the rim) = full lock");
+        CHECK(std::fabs(StickShape(0.75f, dz) - 0.1912f) < 1e-3f, "75 %% of the stick: 0.19 of the wheel (%.4f)", (double)StickShape(0.75f, dz));
     }
     printf("%d checks, %d failed\n", g_checks, g_fails);
     return g_fails ? 1 : 0;

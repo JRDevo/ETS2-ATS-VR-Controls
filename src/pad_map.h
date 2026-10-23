@@ -168,8 +168,8 @@ struct Config {
     int   modBtn = kRGrip;
     Out   modMap[kBtnCount];
     // driving -- analog values for the game's own input plugin door (scs_input.h), not keys. Steering: steerStick's x (its
-    // left / right directions are then not buttons, and a mouse on that stick is off). The stick (dead zone, curve, times
-    // steerMax and the speed factor) is the wheel's TARGET place; the wheel glides there (Mapper::Step):
+    // left / right directions are then not buttons, and a mouse on that stick is off). The stick (dead zone, two zones --
+    // StickShape --, times steerMax and the speed factor) is the wheel's TARGET place; the wheel glides there (Mapper::Step):
     //   - stick held (pushed further OR eased): time constant steerFollowTime -- easing the stick = a smaller angle that
     //     holds, and a wobbling thumb near the edge is smoothed (the user's drive log 2026-10-23 19:57: holds at ~0.9 wobble
     //     0.1-0.25 per 0.1 s; an unsmoothed ease made every wobble a twitch);
@@ -185,7 +185,14 @@ struct Config {
                                                        //   stick's left / right are buttons again (the menu's one switch)
     int   steerStick = 1;                              // 0 off, 1 left stick, 2 right stick
     float steerDeadzone = 0.10f;                       // stick, before steering starts
-    float steerCurve = 1.0f;                           // 1 = straight; more = finer near the centre
+    // two zones (2026-10-23: the stick's throw is short -- 75 % of it was two turns of the wheel at low speed): the first
+    // steerFineZone of the push (after the dead zone) turns the wheel up to steerFine (small, careful turns: following the
+    // road), the rest up to the edge turns it on up to full (hard turns). steerFine >= steerFineZone = even all the way.
+    float steerFine = 0.2f;                            // the wheel at the end of the fine zone (share of steerMax)
+    float steerFineZone = 0.8f;                        // the share of the push that is the fine zone
+    // the stick counts as pushed all the way from here on (the user's log: at the rim it read 0.93-0.95 nearly always, 1.0
+    // rarely -- "all the way" gave half lock)
+    float steerFullAt = 0.95f;
     float steerMax = 1.0f;                             // full stick = this much of the wheel (0.2 .. 1)
     float steerFollowTime = 0.4f;                      // s, toward the stick while it is held (0 = at once)
     float steerCenterTime = 0.0f;                      // s, back to straight when let go (0 = at the speed limit)
@@ -248,13 +255,28 @@ struct Sink {
     virtual ~Sink() {}
 };
 
-// driving: the stick's x (-1 left .. +1 right) as the wanted steering after the dead zone and curve; a trigger as a pedal
+// driving: the stick's x (-1 left .. +1 right) as the wanted steering after the dead zone and the two zones; a trigger as a pedal
 // (0 .. 1)
-inline float StickShape(float x, const Config& c) {   // -1 .. 1 after the dead zone and curve
+// the push: 0 in the dead zone .. 1 from steerFullAt on (no sign)
+inline float StickPush(float x, const Config& c) {
     const float a = x < 0 ? -x : x;
-    if (a <= c.steerDeadzone || c.steerDeadzone >= 1.0f) return 0.0f;
-    const float k = ((a > 1.0f ? 1.0f : a) - c.steerDeadzone) / (1.0f - c.steerDeadzone);
-    const float v = std::pow(k, c.steerCurve);
+    const float top = c.steerFullAt > c.steerDeadzone + 0.05f && c.steerFullAt <= 1.0f ? c.steerFullAt : 1.0f;
+    if (a <= c.steerDeadzone || c.steerDeadzone >= top) return 0.0f;
+    return ((a > top ? top : a) - c.steerDeadzone) / (top - c.steerDeadzone);
+}
+inline float StickShape(float x, const Config& c) {   // -1 .. 1 after the dead zone, the full point and the two zones
+    const float k = StickPush(x, c);
+    if (k <= 0.0f) return 0.0f;
+    const float z = c.steerFineZone > 0.05f && c.steerFineZone < 0.99f ? c.steerFineZone : 0.8f;
+    const float fine = c.steerFine < 0.0f ? 0.0f : c.steerFine > z ? z : c.steerFine;
+    float v;
+    if (k <= z) {
+        v = fine * k / z;                              // the fine zone: even, small
+    } else {                                           // the hard zone: on at the fine zone's slope, bending up to full at the
+        const float u = (k - z) / (1.0f - z);          //   edge (fine = zone: b = 0, even all the way)
+        const float s0 = fine / z * (1.0f - z), b = 1.0f - fine - s0;
+        v = fine + s0 * u + b * u * u;
+    }
     return x < 0 ? -v : v;
 }
 inline float SpeedFactor(float kmh, const Config& c) {   // 1 slow .. steerAtSpeed fast; speed unknown (< 0, NaN) = 1
@@ -351,12 +373,14 @@ public:
             // the range the bend began with (range_), so the bend stays; easing the stick (past a little thumb jitter),
             // letting go or steering the other way takes the range of the speed now, and the wheel glides in.
             const float sf = SpeedFactor(speed_, c), rf = std::sqrt(sf);
-            const float shape = StickShape(x, c), ash = shape < 0.0f ? -shape : shape;
-            if (shape == 0.0f || shape * holdSign_ < 0.0f || sf >= range_ || ash < holdPeak_ - 0.03f) {
+            // (the hold rule and the speed limit go by the push, not the wheel shape: the shape is flat in the fine zone and
+            //  steep in the hard zone, the thumb's jitter is the same everywhere)
+            const float shape = StickShape(x, c), push = StickPush(x, c);
+            if (shape == 0.0f || shape * holdSign_ < 0.0f || sf >= range_ || push < holdPeak_ - 0.03f) {
                 range_ = sf;
-                holdPeak_ = ash;
-            } else if (ash > holdPeak_) {
-                holdPeak_ = ash;
+                holdPeak_ = push;
+            } else if (push > holdPeak_) {
+                holdPeak_ = push;
             }
             holdSign_ = shape;
             float tgt = shape * c.steerMax * range_;
@@ -366,7 +390,7 @@ public:
             const float a = t <= 0.0f ? 0.0f : tau > 0.0f ? t / (tau + t) : 1.0f;   // first order, stable for any step
             float step = (tgt - cur) * a;
             if (c.steerRate > 0.0f) {
-                const float m = c.steerRate * rf * t * (letGo ? 1.0f : ash > 0.3f ? ash : 0.3f);
+                const float m = c.steerRate * rf * t * (letGo ? 1.0f : push > 0.3f ? push : 0.3f);
                 step = step > m ? m : step < -m ? -m : step;
             }
             float st = cur + step;
@@ -471,7 +495,7 @@ private:
     float  drive_[3] = {};                             // steer, throttle, brake last sent
     float  stickX_ = 0.0f;                             // the steering stick's x (StickX)
     float  range_ = 0.0f;                              // steering: the speed range of the bend held now (see Step)
-    float  holdPeak_ = 0.0f, holdSign_ = 0.0f;         // ... the most push in it, and its side
+    float  holdPeak_ = 0.0f, holdSign_ = 0.0f;         // ... the most push in it (StickPush), and its side
 };
 
 }  // namespace VrPad

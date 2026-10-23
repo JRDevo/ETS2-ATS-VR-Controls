@@ -355,14 +355,14 @@ if (-not $Only -or $Only -eq 'driveglide') {
 
 # ---- drive
 if (-not $Only -or $Only -eq 'drive') {
-    # left stick 0.55 right 1.0-1.5 (0.5 after the dead zone: 0.5^2 = 0.25), full left 1.6-2.0; left trigger (gas) 0.525 (half)
+    # left stick 0.55 right 1.0-1.5 (0.5 after the dead zone, steer_fine 0.25 at steer_fine_zone 0.5: 0.25), full left 1.6-2.0; left trigger (gas) 0.525 (half)
     # 2.2-2.6; right trigger 2.8-3.0 (its own mapping, a left click); left grip (brake) 0.62 3.0-3.2 (0.6).
     # steer_follow_time / steer_center_time / steer_max_speed = 0: exact values (the glide: pad_map_test, e2e driveglide)
     $s = '1.0-1.5:/user/hand/left/input/thumbstick=0.55,0;1.6-2.0:/user/hand/left/input/thumbstick=-1,0;' +
          '2.2-2.6:/user/hand/left/input/trigger/value=0.525;2.8-3.0:/user/hand/right/input/trigger/value=0.9;' +
          '3.0-3.2:/user/hand/left/input/squeeze/value=0.62'
     $dll = Join-Path $layerDir 'ets2_ats_vr_controls.dll'
-    $r = RunCase 'drive' 'fake_game.exe' @('--scs', "`"$dll`"") 3.5 @{ VRC_MOCK_INPUT = $s } "steer = left`nsteer_follow_time = 0`nsteer_center_time = 0`nsteer_max_speed = 0`nsteer_curve = 2`nmouse_stick = right`nltrigger = gas`nlgrip = brake`n"
+    $r = RunCase 'drive' 'fake_game.exe' @('--scs', "`"$dll`"") 3.5 @{ VRC_MOCK_INPUT = $s } "steer = left`nsteer_follow_time = 0`nsteer_center_time = 0`nsteer_max_speed = 0`nsteer_fine = 0.25`nsteer_fine_zone = 0.5`nsteer_full_at = 1`nmouse_stick = right`nltrigger = gas`nlgrip = brake`n"
     $b = Buttons @($r.events | Where-Object { $_ -notmatch '^drive ' })
     Write-Host "  events: $b"
     Check 'drive' ((@($r.events | Where-Object { $_ -match '^drive ' }) -join ' | ') -eq ('drive 0.250 0.000 0.000 | drive 0.000 0.000 0.000 | ' +

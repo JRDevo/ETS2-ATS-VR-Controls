@@ -91,14 +91,14 @@ int main(int argc, char** argv) {
           SameOut(mr.pad.modMap[VrPad::kX], mo.pad.modMap[VrPad::kX]) && mr.notes.empty(), "the menu's modifier lines read back the same");
     // driving: shipped = defaults; parsing; the menu's lines read back
     CHECK(c.pad.steerStick == d.pad.steerStick && d.pad.steerStick == 1 && c.pad.steerDeadzone == d.pad.steerDeadzone &&
-          c.pad.steerCurve == d.pad.steerCurve && c.pad.steerMax == d.pad.steerMax && c.pad.steerRate == d.pad.steerRate &&
+          c.pad.steerFine == d.pad.steerFine && c.pad.steerFineZone == d.pad.steerFineZone && c.pad.steerMax == d.pad.steerMax && c.pad.steerRate == d.pad.steerRate &&
           c.pad.drive == d.pad.drive && d.pad.drive && c.pad.steerAtSpeed == d.pad.steerAtSpeed &&
           c.pad.steerSpeedSens == d.pad.steerSpeedSens && d.pad.steerSpeedSens && c.pad.steerFollowTime == d.pad.steerFollowTime && c.pad.steerCenterTime == d.pad.steerCenterTime &&
           c.pad.map[VrPad::kRTrig].kind == VrPad::kGas, "shipped driving = the defaults (left stick steers, right trigger = gas)");
-    const Config dr = ParseConfig("steer = right\nsteer_deadzone = 0.2\nsteer_curve = 2.5\nsteer_max = 0.6\nsteer_max_speed = 0.75\n"
+    const Config dr = ParseConfig("steer = right\nsteer_deadzone = 0.2\nsteer_fine = 0.3\nsteer_fine_zone = 0.7\nsteer_max = 0.6\nsteer_max_speed = 0.75\n"
                                   "steer_follow_time = 0.35\nsteer_center_time = 1.5\ndrive = 0\nsteer_at_speed = 0.45\nsteer_speed_sens = 0\n"
                                   "lgrip = brake\nmodifier_keys = rtrigger:brake | a:gas\n");
-    CHECK(dr.pad.steerStick == 2 && dr.pad.steerDeadzone == 0.2f && dr.pad.steerCurve == 2.5f && dr.pad.steerMax == 0.6f &&
+    CHECK(dr.pad.steerStick == 2 && dr.pad.steerDeadzone == 0.2f && dr.pad.steerFine == 0.3f && dr.pad.steerFineZone == 0.7f && dr.pad.steerMax == 0.6f &&
           dr.pad.steerRate == 0.75f && dr.pad.map[VrPad::kLGrip].kind == VrPad::kBrake && dr.pad.modMap[VrPad::kRTrig].kind == VrPad::kBrake &&
           dr.pad.modMap[VrPad::kA].kind == VrPad::kGas && dr.pad.steerFollowTime == 0.35f &&
           dr.pad.steerCenterTime == 1.5f && !dr.pad.drive && dr.pad.steerAtSpeed == 0.45f && !dr.pad.steerSpeedSens && dr.notes.empty(), "driving keys, gas / brake on buttons (%zu notes)", dr.notes.size());
@@ -107,13 +107,13 @@ int main(int argc, char** argv) {
           old.pad.steerRate == d.pad.steerRate && old.notes[0].find("no longer used") != std::string::npos,
           "the old steering keys: a note each, the defaults used (%zu notes)", old.notes.size());
     const Config dc = ParseConfig("steer_max = 5\nsteer_curve = x\nsteer = up\n");
-    CHECK(dc.pad.steerMax == 1.0f && dc.pad.steerCurve == 1.0f && dc.pad.steerStick == 1 && dc.notes.size() == 2,
-          "steer_max clamped, a bad curve and stick noted (%zu notes)", dc.notes.size());
+    CHECK(dc.pad.steerMax == 1.0f && dc.pad.steerFine == d.pad.steerFine && dc.pad.steerStick == 1 && dc.notes.size() == 2,
+          "steer_max clamped, the old steer_curve and a bad stick noted (%zu notes)", dc.notes.size());
     std::string wd;
     for (const auto& kv : MenuValues(dr.pad, PanelPlace(), PanelPlace(), MenuLook())) wd += kv.first + " = " + kv.second + "\n";
     const Config drr = ParseConfig(wd);
     CHECK(!drr.pad.drive && drr.pad.steerAtSpeed == 0.45f && !drr.pad.steerSpeedSens && drr.pad.steerFollowTime == 0.35f && drr.pad.steerCenterTime == 1.5f &&
-          drr.pad.steerStick == 2 && drr.pad.steerCurve == 2.5f && drr.pad.steerMax == 0.6f && drr.pad.steerRate == 0.75f &&
+          drr.pad.steerStick == 2 && drr.pad.steerFine == 0.3f && drr.pad.steerFineZone == 0.7f && drr.pad.steerMax == 0.6f && drr.pad.steerRate == 0.75f &&
           drr.pad.map[VrPad::kLGrip].kind == VrPad::kBrake && drr.pad.modMap[VrPad::kRTrig].kind == VrPad::kBrake && drr.notes.empty(),
           "the menu's driving lines read back the same");
     // OutToString is the inverse of ParseOut (the menu writes what it read)

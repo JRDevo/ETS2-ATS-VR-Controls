@@ -851,10 +851,14 @@ void VrMenu::LayoutMenu() {
         snprintf(b, sizeof(b), "%.2f", (double)pad_.steerDeadzone);
         plusMinus(2, 133, b);
         tip(m0, "How far you must push the stick before the wheel turns. More = a calm middle, less = it reacts sooner.");
-        m0 = el.size(); row(3, "Steering curve");
-        snprintf(b, sizeof(b), pad_.steerCurve < 1.01f ? "%.2f (straight)" : "%.2f", (double)pad_.steerCurve);
+        m0 = el.size(); row(3, "Small turns (most of the stick)");
+        if (pad_.steerFine >= pad_.steerFineZone - 0.001f) snprintf(b, sizeof(b), "even (off)");
+        else snprintf(b, sizeof(b), "up to %d %%", (int)(pad_.steerFine * 100.0f + 0.5f));
         plusMinus(3, 135, b);
-        tip(m0, "1 = even all the way (best for most). More = finer near the middle, but much touchier near the edge.");
+        char hb[200];
+        snprintf(hb, sizeof(hb), "Most of the stick (the first %d %% of a push) makes small, careful turns, up to this much of the wheel."
+                 " Only the last bit, at the edge, turns hard.", (int)(pad_.steerFineZone * 100.0f + 0.5f));
+        tip(m0, hb);
         m0 = el.size(); row(4, "Full stick turns the wheel");
         snprintf(b, sizeof(b), "%d %%", (int)(pad_.steerMax * 100.0f + 0.5f));
         plusMinus(4, 137, b);
@@ -886,7 +890,7 @@ void VrMenu::LayoutMenu() {
             tip(m0, "On: at speed the stick turns the wheel less, for calm highway driving. The % = how much at 90 km/h.");
         }
         add(eInfo, 0, 24, 704, 742, 54, !status_.empty() ? status_ : !pad_.drive ? "Driving off: no steering, gas or brake."
-                                        : "The stick's place = the wheel's place. Let go = straight.");
+                                        : "Most of the stick = small turns. All the way = hard turns.");
     }
     if (!(tab_ == 0 && picking))                        // every tab: back to the defaults (a second press does it)
         add(eSet, kResetArg, 776, 704, 200, 54, resetArm_ == tab_ ? "Sure? Reset" : "Reset tab", resetArm_ == tab_);
@@ -1196,8 +1200,8 @@ void VrMenu::SetValue(int arg) {
         break;
     }
     case 135: case 136: {
-        const float k = pad_.steerCurve + (arg == 136 ? 0.25f : -0.25f);
-        pad_.steerCurve = k < 1.0f ? 1.0f : k > 3.0f ? 3.0f : k;
+        const float z = pad_.steerFineZone, k = pad_.steerFine + (arg == 136 ? 0.05f : -0.05f);   // small turns: 5 % steps
+        pad_.steerFine = k < 0.05f ? 0.05f : k > z ? z : (float)(int)(k * 20.0f + 0.5f) / 20.0f;
         break;
     }
     case 137: case 138: {
@@ -1306,7 +1310,8 @@ void VrMenu::ResetTab() {
     }
     default:
         pad_.drive = d.drive;
-        pad_.steerStick = d.steerStick; pad_.steerDeadzone = d.steerDeadzone; pad_.steerCurve = d.steerCurve;
+        pad_.steerStick = d.steerStick; pad_.steerDeadzone = d.steerDeadzone; pad_.steerFine = d.steerFine;
+        pad_.steerFineZone = d.steerFineZone; pad_.steerFullAt = d.steerFullAt;
         pad_.steerMax = d.steerMax; pad_.steerFollowTime = d.steerFollowTime; pad_.steerCenterTime = d.steerCenterTime;
         pad_.steerRate = d.steerRate;
         pad_.steerAtSpeed = d.steerAtSpeed; pad_.steerSpeedSens = d.steerSpeedSens;
@@ -1510,7 +1515,7 @@ std::string VrMenu::ContentKey(int p) const {
              pan_[1].width, look_.theme, look_.menuOpacity, look_.kbOpacity, look_.smoothing, look_.kbCompact);
     char dr[160];                                       // the Driving tab's values (DescribePad leaves them out while off)
     snprintf(dr, sizeof(dr), "|%d%d|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|", pad_.drive ? 1 : 0, pad_.steerStick,
-             pad_.steerDeadzone, pad_.steerCurve, pad_.steerMax, pad_.steerFollowTime, pad_.steerCenterTime, pad_.steerRate,
+             pad_.steerDeadzone, pad_.steerFine + 10.0f * pad_.steerFineZone, pad_.steerMax, pad_.steerFollowTime, pad_.steerCenterTime, pad_.steerRate,
              pad_.steerSpeedSens ? pad_.steerAtSpeed : -pad_.steerAtSpeed);
     return std::string(b) + std::to_string(resetArm_) + "|" + status_ + dr + DescribePad(pad_) + "|" + HoverHelp();
 }
