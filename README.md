@@ -10,10 +10,12 @@ No steering wheel, no gamepad, no keyboard, no mouse, no extra hardware.
 
 Start the game in VR, put the headset on, and play. You never need to reach for the desk.
 
-> Status: v0.1.0, the first release: controller buttons as keys and mouse, **a VR menu and a full keyboard in the
+> [!NOTE]
+> **Status:** v0.1.0, the first release: controller buttons as keys and mouse, **a VR menu and a full keyboard in the
 > headset**, and **driving with the controllers** (smooth steering, gas and brake). Planned: the keyboard pinned to the
 > cab, and single buttons you place anywhere (for example over a cab switch) that press a key.
 
+> [!IMPORTANT]
 > **OpenXR only.** The mod works when the game runs in its **OpenXR** VR mode (`-openxr`). It does not work in the game's
 > `-openvr` (SteamVR native) or `-oculus` (Oculus native) modes. Every headset can use OpenXR, see
 > [Which VR mode?](#which-vr-mode).
