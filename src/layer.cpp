@@ -69,10 +69,15 @@ bool                      g_measure = false;  // log = 1: the layer's own cost p
 struct Cost {
     std::mutex m;
     double begin = 0, t0 = -1, sum = 0, max = 0, bSum = 0, bMax = 0, eSum = 0, eMax = 0;
+    double split[4] = {}, partMax[4] = {};             // xrBeginFrame: VR system / menu / sending keys / lock wait
     uint64_t frames = 0, menuFrames = 0;
 };
 Cost g_cost;
-void CostBegin(double s) { std::lock_guard<std::mutex> lk(g_cost.m); g_cost.begin = s; }
+void CostBegin(double s, const double split[4]) {
+    std::lock_guard<std::mutex> lk(g_cost.m);
+    g_cost.begin = s;
+    for (int i = 0; i < 4; ++i) g_cost.split[i] = split[i];
+}
 void CostEnd(double s, bool menu) {
     std::lock_guard<std::mutex> lk(g_cost.m);
     const double now = NowS(), f = g_cost.begin + s;
@@ -84,11 +89,14 @@ void CostEnd(double s, bool menu) {
     if (f - s > g_cost.bMax) g_cost.bMax = f - s;
     g_cost.eSum += s;
     if (s > g_cost.eMax) g_cost.eMax = s;
+    for (int i = 0; i < 4; ++i) if (g_cost.split[i] > g_cost.partMax[i]) g_cost.partMax[i] = g_cost.split[i];
     static int slowLogs = 0;                           // a single frame over 3 ms: named (the first 10 per game)
     if (f > 0.003 && slowLogs < 10) {
         ++slowLogs;
-        LOGI("performance: one frame took %.2f ms (controllers + menu %.2f, pictures to the headset %.2f)%s", 1000.0 * f,
-             1000.0 * (f - s), 1000.0 * s, slowLogs == 10 ? " -- no more of these lines" : "");
+        const double* sp = g_cost.split;
+        LOGI("performance: one frame took %.2f ms (controllers + menu %.2f = VR system %.2f, menu %.2f, sending keys %.2f, waiting "
+             "%.2f; pictures to the headset %.2f)%s", 1000.0 * f, 1000.0 * (f - s), 1000.0 * sp[0], 1000.0 * sp[1], 1000.0 * sp[2],
+             1000.0 * sp[3], 1000.0 * s, slowLogs == 10 ? " -- no more of these lines" : "");
     }
     ++g_cost.frames;
     if (menu) ++g_cost.menuFrames;
@@ -96,9 +104,11 @@ void CostEnd(double s, bool menu) {
         const double n = (double)g_cost.frames;
         LOGI("performance: the layer's own work took %.3f ms per frame on average (most %.2f ms) over %llu frames in %.0f s "
              "[controllers + menu %.3f ms avg / %.2f most, pictures to the headset %.3f / %.2f]; VR menu / keyboard shown in "
-             "%llu of them", 1000.0 * g_cost.sum / n, 1000.0 * g_cost.max, (unsigned long long)g_cost.frames, now - g_cost.t0,
-             1000.0 * g_cost.bSum / n, 1000.0 * g_cost.bMax, 1000.0 * g_cost.eSum / n, 1000.0 * g_cost.eMax,
-             (unsigned long long)g_cost.menuFrames);
+             "%llu of them; most in one frame: VR system %.2f, menu %.2f, sending keys %.2f, waiting %.2f ms", 1000.0 * g_cost.sum / n,
+             1000.0 * g_cost.max, (unsigned long long)g_cost.frames, now - g_cost.t0, 1000.0 * g_cost.bSum / n, 1000.0 * g_cost.bMax,
+             1000.0 * g_cost.eSum / n, 1000.0 * g_cost.eMax, (unsigned long long)g_cost.menuFrames, 1000.0 * g_cost.partMax[0],
+             1000.0 * g_cost.partMax[1], 1000.0 * g_cost.partMax[2], 1000.0 * g_cost.partMax[3]);
+        for (double& x : g_cost.partMax) x = 0;
         g_cost.t0 = now;
         g_cost.sum = g_cost.max = g_cost.bSum = g_cost.bMax = g_cost.eSum = g_cost.eMax = 0;
         g_cost.frames = g_cost.menuFrames = 0;
@@ -225,7 +235,11 @@ XrResult XRAPI_CALL Hook_BeginFrame(XrSession session, const XrFrameBeginInfo* b
     if (id->pad) {
         const double t = g_measure ? NowS() : 0.0;
         try { id->pad->BeginFrame(session); } catch (...) { LOGE("frame tick failed (exception) -- skipped"); }
-        if (g_measure) CostBegin(NowS() - t);
+        if (g_measure) {
+            double sp[4];
+            id->pad->LastSplit(sp);
+            CostBegin(NowS() - t, sp);
+        }
     }
     return id->BeginFrame(session, bi);
 }

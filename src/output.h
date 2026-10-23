@@ -5,6 +5,8 @@
 // Test mode (environment VRC_TEST_EVENTS = a file path): every event is written to that file as one line instead
 // ("key 023 down", "mouse 0 up", "wheel +1", "move 12 -3"), and GameInFront is always true.
 #pragma once
+#include <windows.h>
+#include <atomic>
 #include <cstdint>
 #include "pad_map.h"
 
@@ -20,10 +22,15 @@ public:
     void Move(int dx, int dy) override;
     bool TestMode() const { return test_ != nullptr; }
     void SetLogEvents(bool on) { logEvents_ = on; }
+    void SetMeasure(bool on) { measure_ = on; }
+    double TakeSendTime();            // seconds spent in SendInput (or the test file) since the last call (measure on)
 private:
     void Emit(const char* line);
+    void Timed(const INPUT& in);
     void* test_ = nullptr;   // FILE*
     bool  logEvents_ = false;
+    bool  measure_ = false;
+    std::atomic<long long> sendTicks_{0};
 };
 
 bool GameInFront();   // the foreground window belongs to this process (always true in test mode)

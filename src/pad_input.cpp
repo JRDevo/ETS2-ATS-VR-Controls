@@ -45,6 +45,7 @@ PadInput::PadInput(XrInstance instance, const PadDispatch& d, const Config& cfg,
         LOGI("VRC_TEST_SELF_ATTACH_S=%.1f (test): a game without input gets our action set after %.1f s", selfAttachS_, selfAttachS_);
     }
     Sink().SetLogEvents(cfg_.logInputs);
+    Sink().SetMeasure(cfg_.log);
     if (enabled_ && cfg_.menu) {
         menu_ = std::make_unique<VrMenu>(cfg_, configPath);
         std::string combo;
@@ -521,11 +522,20 @@ void PadInput::ProfilesLocked(XrSession s, SessionData& sd, const VrPad::Frame& 
 
 void PadInput::BeginFrame(XrSession s) {
     if (!enabled_) return;
+    const bool meas = cfg_.log;                                      // (log = 0: nothing measured)
+    const double t0 = meas ? NowS() : 0.0;
+    if (meas) { Sink().TakeSendTime(); for (double& x : split_) x = 0; }
     std::lock_guard<std::mutex> lk(m_);
     auto it = sessions_.find(s);
     if (it == sessions_.end()) return;
     SessionData& sd = it->second;
     const double now = NowS();
+    if (meas) split_[3] = now - t0;
+    struct Part {                                                    // adds the time of a scope to split_[i]
+        double* to; double t;
+        Part(bool on, double* d) : to(on ? d : nullptr), t(on ? NowS() : 0.0) {}
+        ~Part() { if (to) *to += NowS() - t; }
+    };
     if (sd.firstFrame < 0) sd.firstFrame = now;
     // a game without any input of its own: ours alone after selfAttachS_ of frames
     if (!sd.ours && !sd.appAttach && !sd.off && !frozen_ && appSets_.empty() && appSuggest_.empty() && now - sd.firstFrame >= selfAttachS_) {
@@ -556,6 +566,7 @@ void PadInput::BeginFrame(XrSession s) {
         const bool fresh = !sd.self && age >= 0 && age <= 0.25;
         if (!fresh && !sd.self && age < 0 && (sd.focusedSince < 0 || now - sd.focusedSince < 2.0)) return;
         bool synced = fresh;
+        Part px(meas, &split_[0]);
         if (!fresh) {
             std::vector<XrActiveActionSet> act;
             if (!sd.self) act = sd.gameActive;
@@ -589,13 +600,21 @@ void PadInput::BeginFrame(XrSession s) {
     const double dt = sd.lastTick < 0 ? 0.0 : now - sd.lastTick;   // since the last Step (frames that waited are not lost)
     sd.lastTick = now;
     if (menu_) {                                                     // first: it takes what it uses out of the frame
+        Part pm(meas, &split_[1]);
         menu_->Update(f, live, sd.headOk, sd.head, now, Sink());
         cfg_.pad = menu_->Pad();
         menuShown_ = menu_->AnyShown();
         handOwn_[0] = menu_->HandOnPanel(0);
         handOwn_[1] = menu_->HandOnPanel(1);
     }
-    sd.mapper.Step(f, live, dt, cfg_.pad, Sink());   // (not live = everything held is released)
+    {
+        Part pm(meas, &split_[1]);
+        sd.mapper.Step(f, live, dt, cfg_.pad, Sink());   // (not live = everything held is released)
+    }
+    if (meas) {                                          // (SendInput ran inside the menu / the mapper: counted apart)
+        split_[2] = Sink().TakeSendTime();
+        split_[1] = split_[1] > split_[2] ? split_[1] - split_[2] : 0.0;
+    }
 }
 
 bool PadInput::EndFrame(XrSession s, const XrFrameEndInfo* in, XrFrameEndInfo* out, std::vector<const XrCompositionLayerBaseHeader*>& layers) {

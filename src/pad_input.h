@@ -92,6 +92,9 @@ public:
     // game thread: after the game's xrWaitFrame (its predicted display time) / before its xrBeginFrame is forwarded (the tick)
     void FrameWaited(XrSession s, XrTime predictedDisplayTime);
     void BeginFrame(XrSession s);
+    // (log = 1) the last BeginFrame's time in seconds: [0] the VR system (sync, controller states, poses, profiles), [1] the
+    // menu, [2] handing keys / mouse to Windows (SendInput), [3] waiting for the layer's lock. Read right after, on that thread.
+    void LastSplit(double out[4]) const { for (int i = 0; i < 4; ++i) out[i] = split_[i]; }
     // the game's xrEndFrame: true = send *out instead (the game's layers + the menu's; `layers` holds the list)
     bool EndFrame(XrSession s, const XrFrameEndInfo* in, XrFrameEndInfo* out, std::vector<const XrCompositionLayerBaseHeader*>& layers);
     void EndFrameRefused(XrSession s, XrResult r);   // the runtime refused the frame with our layers: pictures off (session)
@@ -162,6 +165,7 @@ private:
     double selfAttachS_ = 20.0;
     // phase 2
     std::unique_ptr<VrMenu> menu_;
+    double split_[4] = {};
     OverlayDispatch od_;
     std::set<XrAction> gameTrig_;     // the game's actions bound to a trigger (select on ETS2 / ATS)
 };

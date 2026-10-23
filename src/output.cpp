@@ -19,6 +19,18 @@ InputSink::InputSink() {
     }
 }
 
+void InputSink::Timed(const INPUT& in) {
+    LARGE_INTEGER a{}, b{};
+    if (measure_) QueryPerformanceCounter(&a);
+    SendInput(1, const_cast<INPUT*>(&in), sizeof(INPUT));
+    if (measure_) { QueryPerformanceCounter(&b); sendTicks_ += b.QuadPart - a.QuadPart; }
+}
+
+double InputSink::TakeSendTime() {
+    static const double f = [] { LARGE_INTEGER x; QueryPerformanceFrequency(&x); return (double)x.QuadPart; }();
+    return (double)sendTicks_.exchange(0) / f;
+}
+
 InputSink::~InputSink() {
     if (test_) fclose(static_cast<FILE*>(test_));
 }
@@ -41,7 +53,7 @@ void InputSink::Key(uint16_t code, bool down) {
     in.type = INPUT_KEYBOARD;
     in.ki.wScan = (WORD)(code & 0xFF);
     in.ki.dwFlags = KEYEVENTF_SCANCODE | ((code & VrPad::kExt) ? KEYEVENTF_EXTENDEDKEY : 0) | (down ? 0 : KEYEVENTF_KEYUP);
-    SendInput(1, &in, sizeof(INPUT));
+    Timed(in);
 }
 
 void InputSink::MouseButton(int which, bool down) {
@@ -56,7 +68,7 @@ void InputSink::MouseButton(int which, bool down) {
     INPUT in{};
     in.type = INPUT_MOUSE;
     in.mi.dwFlags = down ? kDown[which] : kUp[which];
-    SendInput(1, &in, sizeof(INPUT));
+    Timed(in);
 }
 
 void InputSink::Wheel(int notches) {
@@ -69,7 +81,7 @@ void InputSink::Wheel(int notches) {
     in.type = INPUT_MOUSE;
     in.mi.dwFlags = MOUSEEVENTF_WHEEL;
     in.mi.mouseData = (DWORD)(notches * WHEEL_DELTA);
-    SendInput(1, &in, sizeof(INPUT));
+    Timed(in);
 }
 
 void InputSink::Move(int dx, int dy) {
@@ -87,7 +99,7 @@ void InputSink::Move(int dx, int dy) {
     in.mi.dwFlags = MOUSEEVENTF_MOVE;
     in.mi.dx = dx;
     in.mi.dy = dy;
-    SendInput(1, &in, sizeof(INPUT));
+    Timed(in);
 }
 
 bool GameInFront() {
