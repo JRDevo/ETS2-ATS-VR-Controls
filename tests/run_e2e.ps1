@@ -22,7 +22,10 @@
     Also checked: the layer never syncs alone while the game syncs (mock "solo" syncs = 0); own sync only after 2 s of FOCUSED.
     Windows PowerShell 5.1 compatible:  powershell -ExecutionPolicy Bypass -File tests\run_e2e.ps1 [-Only ats]
 #>
-param([string]$Only = '')
+param([string]$Only = '', [switch]$Register)
+# -Register (CI only: a throwaway runner that runs ELEVATED): the OpenXR loader ignores XR_RUNTIME_JSON and XR_API_LAYER_PATH
+# in an elevated process, so the mock runtime is made the active runtime and the layer an explicit layer in HKLM instead.
+# Never use it on a PC with a real VR runtime (it replaces the active OpenXR runtime).
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $rel = Join-Path $root 'build\Release'
@@ -37,6 +40,13 @@ $layerDir = Join-Path $work 'layer'
 New-Item -ItemType Directory -Force $layerDir | Out-Null
 Copy-Item (Join-Path $rel 'ets2_ats_vr_controls.dll'), (Join-Path $rel 'XR_APILAYER_JRDEVO_ets2_ats_vr_controls.json') $layerDir -Force
 $env:XR_API_LAYER_PATH = $layerDir
+if ($Register) {
+    $k = 'HKLM:\SOFTWARE\Khronos\OpenXR'
+    New-Item -Force "$k\ApiLayers\Explicit" | Out-Null
+    Set-ItemProperty $k -Name ActiveRuntime -Value $env:XR_RUNTIME_JSON
+    New-ItemProperty "$k\ApiLayers\Explicit" -Name (Join-Path $layerDir 'XR_APILAYER_JRDEVO_ets2_ats_vr_controls.json') -Value 0 -PropertyType DWord -Force | Out-Null
+    Write-Host "registered (elevated CI): active runtime = mock, explicit layer = $layerDir"
+}
 $env:XR_ENABLE_API_LAYERS = 'XR_APILAYER_JRDEVO_ets2_ats_vr_controls'
 $env:XR_LOADER_DEBUG = $null
 # every implicit layer installed on this PC (Virtual Desktop, VectorXR, VR EyeCapture, ...) off through its own

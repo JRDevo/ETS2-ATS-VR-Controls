@@ -28,7 +28,7 @@ jobs:
 
       - name: End-to-end test
         shell: powershell
-        run: powershell -ExecutionPolicy Bypass -File tests\run_e2e.ps1
+        run: powershell -ExecutionPolicy Bypass -File tests\run_e2e.ps1 -Register   # (the runner is elevated: see the script)
 
       - name: Upload the layer
         uses: actions/upload-artifact@v4
