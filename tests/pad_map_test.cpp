@@ -612,6 +612,22 @@ int main() {
         mw.Step(gw, true, 0.1, w, rw);
         CHECK(std::fabs(rw.drv[0] - 0.65f) < 1e-4f, "at 50 km/h: full stick = 0.65 (%.3f)", (double)rw.drv[0]);
     }
+    {   // a slanted push counts by its length within ~50 degrees of sideways, steeper ones by 1.6 x
+        CHECK(std::fabs(SteerX(0.7f, 0.7f) - 0.98995f) < 1e-4f && std::fabs(SteerX(-0.8f, 0.5f) + 0.9434f) < 1e-4f,
+              "up-and-right at the edge = (almost) full right; left and up too");
+        CHECK(std::fabs(SteerX(0.9f, 0.0f) - 0.9f) < 1e-6f && std::fabs(SteerX(0.9f, 0.1f) - 0.9055f) < 1e-3f,
+              "straight sideways: unchanged; a little up / down: hardly");
+        CHECK(std::fabs(SteerX(0.1f, 0.9f) - 0.16f) < 1e-4f && SteerX(0.0f, 1.0f) == 0.0f && SteerX(0.0f, 0.0f) == 0.0f &&
+              std::fabs(SteerX(1.0f, 1.0f) - 1.0f) < 1e-6f && std::fabs(SteerX(-0.3f, 0.0f) + 0.3f) < 1e-6f,
+              "mostly up: 1.6 x; straight up / still: none; over 1: capped; small sideways: unchanged");
+        Config c = DefaultConfig();                    // in the Mapper: up-and-right on the rim -> full right
+        c.steerFollowTime = c.steerCenterTime = c.steerRate = 0.0f;
+        Mapper mp; Rec r; Frame f;
+        f.hand[0] = true; f.sx[0] = 0.68f; f.sy[0] = 0.72f;
+        mp.Step(f, true, 0.011, c, r);
+        CHECK(r.drv[0] == 1.0f && mp.StickX() == 0.68f && mp.StickY() == 0.72f, "the thumb up and to the right at the edge: full lock (%.3f)",
+              (double)r.drv[0]);
+    }
     {   // the two zones (defaults: the first 80 % of a push = up to 20 % of the wheel, the rest up to full, bending up)
         Config c = DefaultConfig();
         c.steerDeadzone = 0.0f; c.steerFullAt = 1.0f;

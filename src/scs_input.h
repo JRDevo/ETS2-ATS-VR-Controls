@@ -10,7 +10,7 @@
 //     one event per call, then "not found" (a value not told in a frame may count as released: steering snapped back).
 //   * Also a telemetry plugin (scs_telemetry_init: truck.speed, truck.input / effective.steering): the speed for
 //     speed-sensitive steering (DriveSpeedKmh -> Mapper::SetSpeed); with log = 1 the log shows what the game made of our
-//     steering ("drive: stick ... sent ... | game input ..., used ... | km/h"), 10 lines a second at most, and a "cab:" line with the
+//     steering ("drive: stick ... (y ...) sent ... | game input ..., used ... | km/h"), 10 lines a second at most, and a "cab:" line with the
 //     cabin / head offsets, the truck's orientation and our VR head pose (data for pinning panels to the cab).
 //   * Only for a game in config.ini 'apps' with enabled = 1 (anything else: unsupported, nothing registered). The device is
 //     registered whatever the settings say, so the VR menu can change steering / gas / brake at once (unused = 0).
@@ -23,7 +23,7 @@ const Config* GameConfig();   // layer.cpp: config.ini of this program (read onc
 
 void DriveSet(float steer, float throttle, float brake);   // any thread
 void DriveGet(float out[3]);                               // the values the game gets next (tests)
-void DriveStickSet(float x);                               // log = 1: the steering stick's x for the drive line
+void DriveStickSet(float x, float y);                      // log = 1: the steering stick's x / y for the drive line
 float DriveSpeedKmh();                                     // the truck's speed from the game's telemetry; -1 = not known
 void VrHeadSet(const double p[3], const double q[4]);      // log = 1: the VR head pose (LOCAL) for the log's cab line
 

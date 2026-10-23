@@ -257,6 +257,16 @@ struct Sink {
 
 // driving: the stick's x (-1 left .. +1 right) as the wanted steering after the dead zone and the two zones; a trigger as a pedal
 // (0 .. 1)
+// the steering of a stick at (x, y): a slanted push counts by its whole length while it is within ~50 degrees of sideways
+// (|x| * 1.6 >= the length), steeper ones by 1.6 x. The user's log 2026-10-23 20:3x: right turns stopped at 0.65-0.9 of x --
+// the thumb pushed up and to the right --, left turns reached the edge.
+inline float SteerX(float x, float y) {
+    const float ax = x < 0 ? -x : x;
+    float len = std::sqrt(x * x + y * y);
+    if (len > 1.0f) len = 1.0f;
+    const float v = ax * 1.6f < len ? ax * 1.6f : len;
+    return x < 0 ? -v : v;
+}
 // the push: 0 in the dead zone .. 1 from steerFullAt on (no sign)
 inline float StickPush(float x, const Config& c) {
     const float a = x < 0 ? -x : x;
@@ -364,8 +374,11 @@ public:
         if (active && c.drive) {
             const int sh = c.steerStick - 1;
             float x = (sh == 0 || sh == 1) && f.hand[sh] ? f.sx[sh] : 0.0f;
+            float y = (sh == 0 || sh == 1) && f.hand[sh] ? f.sy[sh] : 0.0f;
             if (!(x == x)) x = 0.0f;                   // (a NaN stick would stay in the wheel for good)
-            stickX_ = x;
+            if (!(y == y)) y = 0.0f;
+            stickX_ = x; stickY_ = y;
+            x = SteerX(x, y);
             const float t = (float)(dt > 0.0 ? (dt < 0.1 ? dt : 0.1) : 0.0);   // (a hitch = one bounded step)
             const float cur = drive_[0];
             // faster = less wheel (the target range times sf), and a calmer return / rate limit (times sqrt(sf): the user's
@@ -423,7 +436,8 @@ public:
     bool AirOn() const { return airOn_; }
     float Driving(int i) const { return i >= 0 && i < 3 ? drive_[i] : 0.0f; }   // the last steer / gas / brake sent
     void SetSpeed(float kmh) { speed_ = kmh; }          // the truck's speed (km/h, < 0 = not known): speed-sensitive steering
-    float StickX() const { return stickX_; }            // the steering stick's x at the last Step (log = 1: the drive line)
+    float StickX() const { return stickX_; }            // the steering stick's x / y at the last Step (log = 1: the drive line)
+    float StickY() const { return stickY_; }
     int TakeKeyboardToggles() { const int n = kbToggles_; kbToggles_ = 0; return n; }   // "keyboard" presses since the last call
 
 private:
@@ -493,7 +507,7 @@ private:
     double yaw_ = 0.0, pitch_ = 0.0;
     double accX_ = 0.0, accY_ = 0.0;
     float  drive_[3] = {};                             // steer, throttle, brake last sent
-    float  stickX_ = 0.0f;                             // the steering stick's x (StickX)
+    float  stickX_ = 0.0f, stickY_ = 0.0f;             // the steering stick's x / y (StickX / StickY)
     float  range_ = 0.0f;                              // steering: the speed range of the bend held now (see Step)
     float  holdPeak_ = 0.0f, holdSign_ = 0.0f;         // ... the most push in it (StickPush), and its side
 };

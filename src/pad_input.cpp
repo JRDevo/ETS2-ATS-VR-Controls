@@ -614,7 +614,7 @@ void PadInput::BeginFrame(XrSession s) {
         Part pm(meas, &split_[1]);
         sd.mapper.SetSpeed(DriveSpeedKmh());             // (speed-sensitive steering; -1 = no telemetry)
         sd.mapper.Step(f, live, dt, cfg_.pad, Sink());   // (not live = everything held is released)
-        DriveStickSet(sd.mapper.StickX());               // (log = 1: the drive line shows the thumb too)
+        DriveStickSet(sd.mapper.StickX(), sd.mapper.StickY());               // (log = 1: the drive line shows the thumb too)
         const int kb = sd.mapper.TakeKeyboardToggles();  // a button set to "keyboard": show / hide the VR keyboard
         if (menu_ && (kb & 1)) menu_->ToggleKeyboard();
     }
