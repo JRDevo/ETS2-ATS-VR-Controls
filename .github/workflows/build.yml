@@ -1,0 +1,39 @@
+# Release build of ets2_ats_vr_controls.dll + the tests on a Windows runner (Visual Studio 2022). The OpenXR SDK is fetched
+# at configure time. Unit tests are CPU only; the end-to-end test runs the fake game -> real OpenXR loader -> this layer ->
+# the mock runtime (D3D11 on WARP), no headset and no real input.
+name: build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure (Release)
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64
+
+      - name: Build (Release)
+        run: cmake --build build --config Release
+
+      - name: Unit tests
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File tests\run_unit.ps1
+
+      - name: End-to-end test
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File tests\run_e2e.ps1
+
+      - name: Upload the layer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ets2_ats_vr_controls
+          path: |
+            build/Release/ets2_ats_vr_controls.dll
+            build/Release/XR_APILAYER_JRDEVO_ets2_ats_vr_controls.json

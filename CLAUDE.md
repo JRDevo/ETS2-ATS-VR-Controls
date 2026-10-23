@@ -22,7 +22,8 @@ Read `README.md` and the header comments of `src/pad_input.h`, `src/layer.cpp`, 
 - VR tests: install only; the user launches the game from the headset.
 
 ## Git
-- Branch `master`. No remote yet (ask before creating the GitHub repo -- it is public). Commit with
+- Branch `master`. Remote: https://github.com/JRDevo/ETS2-ATS-VR-Controls (PRIVATE; ask before making it public). Issues: bug /
+  feature templates only (no blank issues); needs-logs / needs-info bots as in the DLAA repo; CI = build.yml (build + all tests). Commit with
   `-c user.name=JRDevo -c user.email=42043842+JRDevo@users.noreply.github.com`.
 
 ## Facts

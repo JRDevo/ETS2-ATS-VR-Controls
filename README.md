@@ -73,6 +73,12 @@ VR EyeCapture starts a recording on that.
 Every change works at once and is saved in `config.ini`. The menu uses no keyboard key, so it never clashes with the
 ETS2 / ATS DLAA mod's menu (`Delete`). The menu and keyboard float in the room: after a recenter they move with it.
 
+### Screenshots
+
+| Buttons tab: picking a key | Mouse tab | The keyboard |
+|---|---|---|
+| ![The Buttons tab while a key is picked](docs/images/menu-buttons.png) | ![The Mouse tab](docs/images/menu-mouse.png) | ![The on-screen keyboard](docs/images/keyboard.png) |
+
 ## Install
 
 1. Close the game.
@@ -96,6 +102,14 @@ Values: a key (`h`, `f1`, `space`, `[`), up to 3 keys with `+` (`shift+f`), `mou
 
 The log is `logs\ets2_ats_vr_controls.log` next to the DLL. It says which controller the VR system uses, which buttons are mapped,
 and every problem. Set `log_inputs = 1` in `config.ini` to see every key the layer sends.
+
+<a name="reporting-a-problem-what-to-upload"></a>
+### Reporting a problem (what to upload)
+
+1. In `config.ini` (next to `ets2_ats_vr_controls.dll`) set `log_inputs = 1`.
+2. Start the game in VR and do what goes wrong for 1 to 2 minutes.
+3. Quit the game.
+4. Open a [bug report](../../issues/new/choose) and drag `logs\ets2_ats_vr_controls.log` and `config.ini` into it.
 
 ## Build from source
 

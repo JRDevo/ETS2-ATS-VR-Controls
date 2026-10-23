@@ -117,35 +117,16 @@ these terms.
 
 Required Notice: Copyright (c) 2026 JRDevo
 
-What this license covers in VR EyeCapture:
+What this license covers in ETS2 ATS VR Controls:
 
 - The PolyForm Noncommercial License 1.0.0 above covers the original source of
-  this project: the OpenXR API layer (`eye_capture.dll`: the recorder, encoder,
-  re-projection, dome, overlay, indicator and live-share code in `src/`), the
-  SteamVR per-game proxy (`openvr_api.dll` from `src/openvr/`) and the SteamVR
-  quick-mode mirror recorder (`EyeCaptureMirror.exe`), the tray app
-  (`EyeCaptureTray.exe`, `tray/`), the tests, the scripts (`scripts/`), the
-  build files, `config.ini` and the documentation.
-- The OBS Studio plugin in the `obs/` folder (`obs-eyecapture.dll`) is NOT under
-  this license: it is licensed under the GNU General Public License, version 2
-  or (at your option) any later version (SPDX: GPL-2.0-or-later), because it is
-  built against OBS Studio's libobs, which is GPL. See `obs/COPYING.md`.
-- `src/live_share_proto.h` (the live-share protocol header that both the layer
-  and the OBS plugin compile) is dual-licensed: this PolyForm Noncommercial
-  License 1.0.0 OR, at your option, GPL-2.0-or-later (SPDX:
-  `PolyForm-Noncommercial-1.0.0 OR GPL-2.0-or-later`).
-- Third-party components (the OpenXR SDK headers, the subset of Valve's OpenVR
-  header in `third_party/openvr/`, the libobs headers) are NOT covered by this
-  license; their own terms apply. See THIRD_PARTY.md. VR EyeCapture ships no
-  Valve or OBS binary.
-
-Additional permission for your recordings:
-
-- The videos, screenshots and other recordings you make with this software are
-  yours. The licensor claims no rights in them.
-- You may publish them and earn money from them: ad revenue (for example YouTube
-  monetization), sponsorships, live streams, memberships, donations and paid
-  content. This counts as a permitted purpose under this license.
-- The noncommercial limit applies to the software itself. Without written
-  permission you may not sell the software, include it in a paid product or
-  bundle, or offer it as a paid service.
+  this project: the OpenXR API layer (`ets2_ats_vr_controls.dll`: the controller
+  input, the key / mouse output, the VR menu and on-screen keyboard in `src/`),
+  the tests (`tests/`), the scripts (`scripts/`), the build files, `config.ini`,
+  the screenshots and the documentation.
+- Third-party components (the OpenXR SDK headers the layer is built against, and
+  the OpenXR loader the end-to-end test runs through) are NOT covered by this
+  license; their own terms apply. See THIRD_PARTY.md. The layer itself ships no
+  third-party binary.
+- Euro Truck Simulator 2 and American Truck Simulator are trademarks of SCS
+  Software. This is an unofficial fan mod, not made or endorsed by SCS Software.
