@@ -15,7 +15,8 @@
 //     trigger and up when it is let go. Shift / Ctrl / Alt latch: they go with the next key. While a button is being set, the
 //     keyboard picks its key instead (with the latched modifiers: shift+f).
 //   * Move: point at a panel and hold the GRIP (or the trigger on its top bar) and move the controller: it hangs on the
-//     controller, kept level; that controller's stick up / down pushes it away / pulls it closer meanwhile. While a controller
+//     controller and follows every turn, tilt and twist of the hand; that controller's stick up / down pushes it away / pulls
+//     it closer meanwhile. While a controller
 //     points at a panel its grip is the menu's (no air mouse); while it holds one, its stick too. Size: the - / + on the bar.
 //     Panels tab: size and distance of each. Look tab: colour theme, see-through (opacity) of each panel, pointer smoothing.
 //   * Pointer smoothing (off / low / medium / high): both aim poses go through a PoseSmoother (hand shake out, fast moves

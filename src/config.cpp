@@ -130,21 +130,21 @@ Config ParseConfig(const std::string& text) {
         }
         if (key == "menu_place" || key == "keyboard_place") {
             PanelPlace p;
-            double v[6] = {};
+            double v[7] = {};
             int n = 0;
             size_t a = 0;
             bool ok = true;
-            while (ok && a <= val.size() && n < 7) {
+            while (ok && a <= val.size() && n < 8) {
                 size_t comma = val.find(',', a);
                 if (comma == std::string::npos) comma = val.size();
                 const std::string one = Trim(val.substr(a, comma - a));
-                if (n < 6) ok = Num(one, -1000, 1000, &v[n]);
+                if (n < 7) ok = Num(one, -1000, 1000, &v[n]);
                 ++n;
                 a = comma + 1;
             }
-            if (!ok || n != 6 || v[5] < 0.1 || v[5] > 3.0) { bad("x, y, z, yaw, pitch, width (6 numbers; width 0.1 .. 3 m)"); continue; }
+            if (!ok || (n != 6 && n != 7) || v[5] < 0.1 || v[5] > 3.0) { bad("x, y, z, yaw, pitch, width, roll (6 or 7 numbers; width 0.1 .. 3 m)"); continue; }
             p.set = true;
-            p.x = v[0]; p.y = v[1]; p.z = v[2]; p.yaw = v[3]; p.pitch = v[4]; p.width = v[5];
+            p.x = v[0]; p.y = v[1]; p.z = v[2]; p.yaw = v[3]; p.pitch = v[4]; p.width = v[5]; p.roll = n == 7 ? v[6] : 0.0;
             (key == "menu_place" ? c.menuPlace : c.kbPlace) = p;
             continue;
         }
@@ -191,7 +191,7 @@ Config LoadConfig(const std::wstring& dllDir) {
 
 std::string PlaceString(const PanelPlace& p) {
     char b[160];
-    snprintf(b, sizeof(b), "%.3f, %.3f, %.3f, %.1f, %.1f, %.3f", p.x, p.y, p.z, p.yaw, p.pitch, p.width);
+    snprintf(b, sizeof(b), "%.3f, %.3f, %.3f, %.1f, %.1f, %.3f, %.1f", p.x, p.y, p.z, p.yaw, p.pitch, p.width, p.roll);
     return b;
 }
 

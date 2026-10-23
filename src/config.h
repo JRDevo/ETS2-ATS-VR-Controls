@@ -9,9 +9,10 @@
 
 namespace ck {
 
-// where a VR panel floats (config.ini menu_place / keyboard_place = x, y, z, yaw, pitch, width): metres in the room's LOCAL
-// space, degrees (yaw + = turned left, pitch + = tilted up), width in metres. set = false: in front of the head when opened.
-struct PanelPlace { bool set = false; double x = 0, y = 0, z = 0, yaw = 0, pitch = 0, width = 0; };
+// where a VR panel floats (config.ini menu_place / keyboard_place = x, y, z, yaw, pitch, width[, roll]): metres in the room's
+// LOCAL space, degrees (yaw + = turned left, pitch + = tilted up, roll + = twisted to the left), width in metres. set = false:
+// in front of the head when opened. (An older line without roll = 0.)
+struct PanelPlace { bool set = false; double x = 0, y = 0, z = 0, yaw = 0, pitch = 0, width = 0, roll = 0; };
 
 // the VR menu's look (config.ini theme / menu_opacity / keyboard_opacity) and whether the keyboard stays shown (keyboard_show)
 inline const char* const* ThemeNames() {

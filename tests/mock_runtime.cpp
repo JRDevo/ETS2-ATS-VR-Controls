@@ -321,6 +321,29 @@ void DumpLocked(Session& ss, Swapchain& sc) {
         }
         ctx->Unmap(st, 0);
     }
+    const uint32_t lv = d.MipLevels > 2 ? 2 : 0;          // also mip level 2 (a quarter of the size): the filter can be looked at
+    if (lv && SUCCEEDED(ctx->Map(st, lv, D3D11_MAP_READ, 0, &m))) {
+        const uint32_t w = sc.w >> lv ? sc.w >> lv : 1, h = sc.h >> lv ? sc.h >> lv : 1;
+        char path[MAX_PATH + 64];
+        snprintf(path, sizeof(path), "%s\\quad_%ux%u_mip2.bmp", dir, sc.w, sc.h);
+        FILE* f = nullptr;
+        if (!fopen_s(&f, path, "wb") && f) {
+            BITMAPFILEHEADER fh{};
+            BITMAPINFOHEADER ih{};
+            ih.biSize = sizeof(ih); ih.biWidth = (LONG)w; ih.biHeight = -(LONG)h; ih.biPlanes = 1; ih.biBitCount = 32;
+            fh.bfType = 0x4D42; fh.bfOffBits = sizeof(fh) + sizeof(ih); fh.bfSize = fh.bfOffBits + w * h * 4;
+            fwrite(&fh, sizeof(fh), 1, f);
+            fwrite(&ih, sizeof(ih), 1, f);
+            std::vector<uint8_t> row(w * 4);
+            for (uint32_t y = 0; y < h; ++y) {
+                memcpy(row.data(), static_cast<const uint8_t*>(m.pData) + (size_t)y * m.RowPitch, row.size());
+                for (uint32_t x = 0; x < w; ++x) std::swap(row[x * 4], row[x * 4 + 2]);
+                fwrite(row.data(), 1, row.size(), f);
+            }
+            fclose(f);
+        }
+        ctx->Unmap(st, lv);
+    }
     ctx->Release();
     st->Release();
 }
@@ -363,7 +386,7 @@ XrResult XRAPI_CALL CreateSwapchain(XrSession s, const XrSwapchainCreateInfo* ci
     Swapchain sc;
     sc.ses = s; sc.w = ci->width; sc.h = ci->height; sc.format = ci->format;
     D3D11_TEXTURE2D_DESC d{};
-    d.Width = ci->width; d.Height = ci->height; d.MipLevels = 1; d.ArraySize = 1;
+    d.Width = ci->width; d.Height = ci->height; d.MipLevels = ci->mipCount ? ci->mipCount : 1; d.ArraySize = 1;
     d.Format = DXGI_FORMAT_R8G8B8A8_TYPELESS;
     d.SampleDesc.Count = 1; d.Usage = D3D11_USAGE_DEFAULT; d.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
     for (int i = 0; i < 3; ++i) {
@@ -374,7 +397,7 @@ XrResult XRAPI_CALL CreateSwapchain(XrSession s, const XrSwapchainCreateInfo* ci
     const uint64_t h = g_next++;
     g_swapchains[h] = sc;
     *out = (XrSwapchain)h;
-    Report("swapchain %ux%u", ci->width, ci->height);
+    Report("swapchain %ux%u mips %u", ci->width, ci->height, d.MipLevels);
     return XR_SUCCESS;
 }
 XrResult XRAPI_CALL DestroySwapchain(XrSwapchain sc) {

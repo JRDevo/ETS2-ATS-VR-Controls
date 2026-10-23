@@ -4,6 +4,7 @@
 #include <d3d11.h>
 #define XR_USE_GRAPHICS_API_D3D11
 #include <openxr/openxr_platform.h>
+#include <cmath>
 #include <cstdio>
 #include "log.h"
 
@@ -14,6 +15,52 @@ const char* FormatName(int64_t f) {
          : f == DXGI_FORMAT_R8G8B8A8_UNORM ? "R8G8B8A8_UNORM" : f == DXGI_FORMAT_B8G8R8A8_UNORM ? "B8G8R8A8_UNORM" : "?";
 }
 const char* const kSlotName[Overlay::kSlots] = { "menu", "keyboard", "pointer" };
+
+// sRGB <-> linear for the mip filter (8-bit in, 8-bit out; a 4096-step table back)
+const float* ToLin() {
+    static float t[256];
+    static bool init = false;
+    if (!init) {
+        for (int i = 0; i < 256; ++i) { const double c = i / 255.0; t[i] = (float)(c <= 0.04045 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4)); }
+        init = true;
+    }
+    return t;
+}
+const uint8_t* ToSrgb() {
+    static uint8_t t[4096];
+    static bool init = false;
+    if (!init) {
+        for (int i = 0; i < 4096; ++i) {
+            const double l = i / 4095.0, c = l <= 0.0031308 ? l * 12.92 : 1.055 * std::pow(l, 1 / 2.4) - 0.055;
+            t[i] = (uint8_t)(c * 255.0 + 0.5);
+        }
+        init = true;
+    }
+    return t;
+}
+// one mip level down: 2x2 box (the last row / column of an odd size counts twice), colour in linear light, alpha linear
+void Half(const uint32_t* in, int w, int h, std::vector<uint32_t>& out, int* ow, int* oh) {
+    const int nw = w > 1 ? w / 2 : 1, nh = h > 1 ? h / 2 : 1;
+    out.resize((size_t)nw * nh);
+    const float* lin = ToLin();
+    const uint8_t* srgb = ToSrgb();
+    for (int y = 0; y < nh; ++y)
+        for (int x = 0; x < nw; ++x) {
+            const int x0 = x * 2, y0 = y * 2, x1 = x0 + 1 < w ? x0 + 1 : x0, y1 = y0 + 1 < h ? y0 + 1 : y0;
+            const uint32_t p[4] = { in[(size_t)y0 * w + x0], in[(size_t)y0 * w + x1], in[(size_t)y1 * w + x0], in[(size_t)y1 * w + x1] };
+            float c[3] = {};
+            uint32_t a = 0;
+            for (uint32_t q : p) {
+                c[0] += lin[q & 0xFF]; c[1] += lin[(q >> 8) & 0xFF]; c[2] += lin[(q >> 16) & 0xFF];
+                a += q >> 24;
+            }
+            uint32_t r = (uint32_t)((a + 2) / 4) << 24;
+            for (int k = 0; k < 3; ++k) r |= (uint32_t)srgb[(int)(c[k] * 0.25f * 4095.0f + 0.5f)] << (8 * k);
+            out[(size_t)y * nw + x] = r;
+        }
+    *ow = nw;
+    *oh = nh;
+}
 }  // namespace
 
 bool OverlayDispatch::Complete() const {
@@ -64,10 +111,17 @@ bool Overlay::Create(int slot, int w, int h) {
     ci.height = (uint32_t)h;
     ci.faceCount = 1;
     ci.arraySize = 1;
-    ci.mipCount = 1;
+    uint32_t mips = 1;                        // a mip chain down to ~16 px (see overlay.h)
+    for (int mw = w, mh = h; mips < 8 && mw >= 32 && mh >= 32; mw /= 2, mh /= 2) ++mips;
+    ci.mipCount = mips;
     XrResult r = d_.CreateSwapchain(s_, &ci, &c.sc);
     if (XR_FAILED(r)) {                       // some runtimes refuse TRANSFER_DST: without it (UpdateSubresource needs no flag)
         ci.usageFlags = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
+        r = d_.CreateSwapchain(s_, &ci, &c.sc);
+    }
+    if (XR_FAILED(r) && ci.mipCount > 1) {   // no mipmaps on this runtime: one level, as before
+        LOGW("VR menu: the runtime refuses a %u-level mip chain (%d) -- one level (small panels may shimmer)", ci.mipCount, (int)r);
+        ci.mipCount = 1;
         r = d_.CreateSwapchain(s_, &ci, &c.sc);
     }
     if (XR_FAILED(r)) {
@@ -85,8 +139,9 @@ bool Overlay::Create(int slot, int w, int h) {
     if (XR_FAILED(r) || !n || !im[0].texture) { Kill("xrEnumerateSwapchainImages failed"); return false; }
     c.w = w;
     c.h = h;
+    c.mips = ci.mipCount;
     for (const auto& i : im) c.img.push_back(i.texture);
-    LOGI("VR menu: %s swapchain %dx%d (%u images)", kSlotName[slot], w, h, n);
+    LOGI("VR menu: %s swapchain %dx%d (%u images, %u mip levels)", kSlotName[slot], w, h, n, c.mips);
     return true;
 }
 
@@ -111,6 +166,14 @@ bool Overlay::Upload(int slot, const QuadIn& q) {
         dev_->GetImmediateContext(&ctx);
         if (ctx) {
             ctx->UpdateSubresource(c.img[idx], 0, nullptr, src, (UINT)q.pw * 4, 0);
+            const uint32_t* lv = src;
+            int lw = q.pw, lh = q.ph;
+            for (uint32_t m = 1; m < c.mips; ++m) {   // the smaller copies (mip levels), each from the one before
+                std::vector<uint32_t>& dst = mip_[m & 1];
+                Half(lv, lw, lh, dst, &lw, &lh);
+                ctx->UpdateSubresource(c.img[idx], m, nullptr, dst.data(), (UINT)lw * 4, 0);
+                lv = dst.data();
+            }
             ctx->Release();
         }
     }

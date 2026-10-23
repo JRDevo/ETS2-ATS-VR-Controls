@@ -4,6 +4,9 @@
 //     (XrGraphicsBindingD3D11KHR). Any other graphics API: no menu pictures (logged once), the controls work as before.
 //   * A picture is uploaded only when it changed (CPU pixels -> UpdateSubresource on the device's immediate context, at the
 //     game's xrEndFrame = its render thread); the runtime keeps showing the last released image of a swapchain.
+//   * Mipmaps: a panel seen smaller than its picture (a 1600 px keyboard 0.3 m wide) shimmers without them, so each swapchain
+//     has a mip chain (down to ~16 px) built on the CPU at upload (2x2 box filter in linear light). A runtime that refuses
+//     mipCount > 1 gets one level (as before).
 //   * Any failure (create / acquire / wait / release, or the runtime refusing the frame with our layers): the pictures are off
 //     for this session (logged); PadInput then re-sends the game's frame unchanged.
 #pragma once
@@ -54,6 +57,7 @@ private:
         XrSwapchain sc = XR_NULL_HANDLE;
         int w = 0, h = 0;
         std::vector<ID3D11Texture2D*> img;
+        uint32_t mips = 1;
         uint64_t uploaded = ~0ull;
         bool released = false;         // an image was released once (it may be shown)
     };
@@ -67,7 +71,7 @@ private:
     bool            dead_ = false, abandoned_ = false, formatTried_ = false;
     Sc              sc_[kSlots];
     std::vector<XrCompositionLayerQuad> layers_;
-    std::vector<uint32_t> conv_;
+    std::vector<uint32_t> conv_, mip_[2];
     uint64_t        frames_ = 0;
 };
 

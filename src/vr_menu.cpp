@@ -146,8 +146,15 @@ public:
         SelectObject(dc_, ob);
         DeleteObject(b);
     }
-    void Text(int x, int y, int w, int h, const std::string& s, int px, bool bold, COLORREF c, UINT align) {
+    // fit = true: a smaller font (down to 60 %) when the text is wider than the box minus 12 px, before "..." is used
+    void Text(int x, int y, int w, int h, const std::string& s, int px, bool bold, COLORREF c, UINT align, bool fit = false) {
         if (s.empty()) return;
+        const std::wstring wt = Wide(s);
+        for (int min = px * 6 / 10; fit && px > min; px -= 2) {
+            SelectObject(dc_, Font(px, bold));
+            SIZE sz{};
+            if (!GetTextExtentPoint32W(dc_, wt.c_str(), (int)wt.size(), &sz) || sz.cx <= w - 12) break;
+        }
         SelectObject(dc_, Font(px, bold));
         SetTextColor(dc_, c);
         RECT r{ x, y, x + w, y + h };
@@ -307,12 +314,13 @@ void VrMenu::Place(int p, bool headOk, const Pose& head, bool force) {
         const V3 at = hp + dir * dist;
         pl.set = true;
         pl.x = at.x; pl.y = at.y; pl.z = at.z;
-        pl.yaw = yaw / kDeg; pl.pitch = pitch / kDeg;
+        pl.yaw = yaw / kDeg; pl.pitch = pitch / kDeg; pl.roll = 0;
         pl.width = pn.width;
     }
     pn.width = pl.width;
     pn.pose.p = V3{ pl.x, pl.y, pl.z };
-    pn.pose.q = QYawPitch(pl.yaw * kDeg, pl.pitch * kDeg);
+    const double rr = 0.5 * pl.roll * kDeg;            // the twist about the panel's own axis (+z)
+    pn.pose.q = QNorm(QMul(QYawPitch(pl.yaw * kDeg, pl.pitch * kDeg), Q4{ 0, 0, std::sin(rr), std::cos(rr) }));
 }
 
 void VrMenu::Open(bool headOk, const Pose& head) {
@@ -624,7 +632,7 @@ void VrMenu::DrawElem(MenuCanvas& c, const Elem& e, int st) {
         c.Round(e.x, e.y, e.w, e.h, 12, prs ? T.press : e.on ? T.on : hov ? T.hover : T.elem);
         const bool glyph = e.text == "+" || e.text == "\xE2\x88\x92" || e.text == "\xC3\x97";   // + - x: bigger
         c.Text(e.x, e.y, e.w, e.h, e.text, glyph ? 40 : e.kind == ePickOut ? 24 : 28,
-               true, T.text, DT_CENTER);
+               true, T.text, DT_CENTER, true);
         break;
     }
     }
@@ -703,8 +711,12 @@ void VrMenu::SavePlaces() {
         const Panel& pn = pan_[p];
         double yaw, pitch;
         YawPitchOf(QRot(pn.pose.q, V3{ 0, 0, -1 }), &yaw, &pitch);
+        const Q4 r = QMul(QConj(QYawPitch(yaw, pitch)), pn.pose.q);   // what is left = the twist about the panel's own axis
         place_[p].x = pn.pose.p.x; place_[p].y = pn.pose.p.y; place_[p].z = pn.pose.p.z;
         place_[p].yaw = yaw / kDeg; place_[p].pitch = pitch / kDeg;
+        place_[p].roll = 2.0 * std::atan2(r.z, r.w) / kDeg;
+        if (place_[p].roll > 180.0) place_[p].roll -= 360.0;
+        if (place_[p].roll < -180.0) place_[p].roll += 360.0;
         place_[p].width = pn.width;
     }
     Save();
@@ -900,13 +912,8 @@ void VrMenu::Update(VrPad::Frame& f, bool live, bool headOk, const Pose& head, d
             }
             const Pose* hold = g.pan >= 0 ? &g.off : ps.drag ? &ps.grab : nullptr;
             const int heldPan = g.pan >= 0 ? g.pan : ps.drag ? ps.pan : -1;
-            if (hold && aimOk_[h] && pan_[heldPan].show) {      // the panel hangs on the controller, kept level (no roll)
-                const Pose np = PMul(aim_[h], *hold);
-                double yaw, pitch;
-                YawPitchOf(QRot(np.q, V3{ 0, 0, -1 }), &yaw, &pitch);
-                pan_[heldPan].pose.p = np.p;
-                pan_[heldPan].pose.q = QYawPitch(yaw, pitch);
-            }
+            if (hold && aimOk_[h] && pan_[heldPan].show)       // the panel hangs on the controller: it follows every turn,
+                pan_[heldPan].pose = PMul(aim_[h], *hold);        //   tilt and twist of the hand (kept level, a twist did nothing)
             Ref r;
             double u, v;
             if (!AnyShown() || !Hit(f, h, &r, &u, &v)) r = Ref();

@@ -285,6 +285,35 @@ int main(int argc, char** argv) {
         upd(f);
         CHECK(!m.HandOnPanel(1) || m.Pan(VrMenu::kPanKb).show, "let go");
     }
+    // a twist of the wrist while holding = the held keyboard twists too (it used to stay level); the twist is saved
+    {
+        V3 at;
+        m.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("h"), &at);
+        auto twisted = [&](double deg, float grip) {
+            VrPad::Frame f = Aim(1, at, 0.0f);
+            const Q4 q = QNorm(QMul(Q4{ f.q[1][0], f.q[1][1], f.q[1][2], f.q[1][3] },
+                                    Q4{ 0, 0, std::sin(deg * 3.14159265358979 / 360.0), std::cos(deg * 3.14159265358979 / 360.0) }));
+            f.q[1][0] = q.x; f.q[1][1] = q.y; f.q[1][2] = q.z; f.q[1][3] = q.w;
+            f.grip[1] = grip;
+            upd(f);
+        };
+        twisted(0, 0.0f);
+        twisted(0, 1.0f);
+        for (int i = 0; i < 4; ++i) twisted(30, 1.0f);      // the wrist twisted 30 deg to the left
+        const V3 up = QRot(m.Pan(VrMenu::kPanKb).pose.q, V3{ 0, 1, 0 });
+        twisted(30, 0.0f);                                   // let go: saved
+        for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
+        CHECK(up.x < -0.3, "the held keyboard twists with the wrist (its up %.2f %.2f %.2f)", up.x, up.y, up.z);
+        const Config c2 = ParseConfig(ReadFile(cfgPath));
+        CHECK(std::fabs(c2.kbPlace.roll - 30.0) < 5.0, "the twist is saved (about the tilted panel's own axis) (keyboard_place roll %.1f deg)", c2.kbPlace.roll);
+        VrMenu m4(c2, std::wstring());
+        const V3 up4 = QRot(m4.Pan(VrMenu::kPanKb).pose.q, V3{ 0, 1, 0 });
+        CHECK(Len(up4 - up) < 0.02, "a new game: the keyboard comes back twisted the same way");
+        twisted(0, 0.0f);
+        twisted(0, 1.0f);
+        twisted(0, 1.0f);
+        twisted(0, 0.0f);                                    // (straight again for the tests below)
+    }
     // Panels tab: the menu 5 cm farther; Look tab: theme blue, the menu more see-through
     {
         click(1, VrMenu::kPanMenu, VrMenu::eTab, 2);
@@ -324,6 +353,7 @@ int main(int argc, char** argv) {
         const int pw0 = kb.pw;
         const double wk = kb.width;
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 83), "Compact shown");
+        WriteBmp(dir + L"\\menu_panels.bmp", m.Pan(VrMenu::kPanMenu));
         for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
         V3 at;
         CHECK(kb.pw < pw0 * 0.75 && std::fabs(kb.width / kb.pw - wk / pw0) < 1e-9, "compact: narrower, same key size (%d px, %.3f m)", kb.pw, kb.width);
