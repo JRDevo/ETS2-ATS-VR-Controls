@@ -67,6 +67,8 @@ VR EyeCapture starts a recording on that.
 - **Keyboard** (button at the top of the menu): a full keyboard with F-keys, arrows and number pad. A key goes down when
   you pull the trigger and up when you let go. Shift, Ctrl and Alt stay on for the next key.
   The keyboard **stays** when the menu closes, also at the next game start (put it at the side of your cab). Its x hides it.
+  **Full or Compact** (Panels tab): Compact has only the main keys (Esc / F-keys down to Enter, Shift, Ctrl), with its
+  - / + / x in a column next to Enter: about 30 % narrower.
 - **Move** a panel: point at it, **hold the grip** and move the controller. While you hold it, push that controller's stick
   up / down to move it farther / closer. **Size**: the - and + at the top.
 
@@ -78,6 +80,10 @@ ETS2 / ATS DLAA mod's menu (`Delete`). The menu and keyboard float in the room: 
 | Buttons tab: picking a key | Mouse tab | The keyboard |
 |---|---|---|
 | ![The Buttons tab while a key is picked](docs/images/menu-buttons.png) | ![The Mouse tab](docs/images/menu-mouse.png) | ![The on-screen keyboard](docs/images/keyboard.png) |
+
+The compact keyboard (Panels tab > Compact):
+
+![The compact keyboard](docs/images/keyboard-compact.png)
 
 ## Install
 

@@ -13,6 +13,11 @@ namespace {
 constexpr double kPi = 3.14159265358979;
 constexpr double kDeg = kPi / 180.0;
 constexpr int kMenuW = 1000, kMenuH = 800, kKbW = 1600, kKbH = 450;
+// keyboard: every gap between key groups is kGap of a key; the full keyboard is 22.3 x 6.1 key units in kKbW pixels; the
+// compact one (main block + a column for - / + / x) keeps the same key size, so it is narrower in pixels and in metres
+constexpr double kGap = 0.15;
+constexpr double kKbUnit = (kKbW - 16) / (23.0 - 2 * (0.5 - kGap));
+constexpr int kKbCompactW = (int)(16 + kKbUnit * (16.0 + kGap) + 0.5);
 
 // ---- the keyboard (units of one key; x 0..15 main block, 15.5..18.5 navigation, 19..23 number pad)
 struct KeyDef { const char* label; const char* name; float x, y, w, h; };
@@ -130,6 +135,8 @@ public:
         if (dc_) DeleteDC(dc_);
     }
     bool Ok() const { return dc_ && bmp_ && bits_; }
+    int W() const { return w_; }
+    int H() const { return h_; }
     void Round(int x, int y, int w, int h, int r, COLORREF c) {
         HBRUSH b = CreateSolidBrush(c);
         HGDIOBJ ob = SelectObject(dc_, b), op = SelectObject(dc_, GetStockObject(NULL_PEN));
@@ -251,6 +258,7 @@ VrMenu::VrMenu(const Config& cfg, const std::wstring& path) : pad_(cfg.pad), pat
     pan_[kPanKb].pw = kKbW; pan_[kPanKb].ph = kKbH; pan_[kPanKb].width = 0.8;
     look_ = cfg.look;
     if (look_.theme < 0 || look_.theme >= kThemeCount) look_.theme = 0;
+    if (look_.kbCompact) { pan_[kPanKb].pw = kKbCompactW; pan_[kPanKb].width *= (double)kKbCompactW / kKbW; }   // (same key size)
     for (int p = 0; p < kPanCount; ++p)
         if (place_[p].set) { pan_[p].width = place_[p].width; Place(p, false, Pose(), false); }
     if (look_.kbShow) {                                 // the keyboard stays from the last game (at its place; else in front of
@@ -321,6 +329,19 @@ void VrMenu::ShowKb(bool on) {
     pan_[kPanKb].show = on;
     kbPending_ = false;
     if (look_.kbShow != on) { look_.kbShow = on; Save(); }
+}
+
+void VrMenu::SetKbCompact(bool on) {
+    if (look_.kbCompact == on) return;
+    Panel& pn = pan_[kPanKb];
+    const int npw = on ? kKbCompactW : kKbW;
+    pn.width *= (double)npw / pn.pw;                    // the same key size: the panel narrows / widens with its pixels
+    pn.pw = npw;
+    look_.kbCompact = on;
+    for (int h = 0; h < 2; ++h) if (grab_[h].pan == kPanKb) grab_[h] = Grab();
+    if (place_[kPanKb].set) SavePlaces(); else Save();
+    needRedraw_ = true;
+    LOGI("VR menu: keyboard %s (%d px, %.2f m wide)", on ? "compact" : "full", npw, pn.width);
 }
 
 void VrMenu::Push(int p, double metres) {
@@ -438,8 +459,10 @@ void VrMenu::LayoutMenu() {
         else snprintf(b, sizeof(b), "(hidden)");
         plusMinus(3, 72, b, "Closer", "Farther");
         row(4, "Keyboard");
-        add(eSet, 80, 470, 460, 248, 64, "Show", pan_[kPanKb].show);
-        add(eSet, 81, 728, 460, 248, 64, "Hide", !pan_[kPanKb].show);
+        add(eSet, 80, 470, 460, 119, 64, "Show", pan_[kPanKb].show);
+        add(eSet, 81, 599, 460, 119, 64, "Hide", !pan_[kPanKb].show);
+        add(eSet, 82, 738, 460, 114, 64, "Full", !look_.kbCompact);
+        add(eSet, 83, 862, 460, 114, 64, "Compact", look_.kbCompact);
         add(eHere, 0, 24, 540, 952, 64, "Bring the menu and the keyboard in front of me");
         std::string combo;
         for (int cb : gate_.btns) combo += (combo.empty() ? "" : " + ") + std::string(BtnLabel(cb));
@@ -478,29 +501,37 @@ void VrMenu::LayoutKb() {
         e.kind = kind; e.arg = arg; e.x = x; e.y = y; e.w = w; e.h = h; e.text = t; e.on = on;
         el.push_back(e);
     };
-    // one flat block, no title bar: - / + / x sit in the empty space above the number pad (move it with the grip anywhere).
-    // Picking a key for a button: the whole keyboard gets an accent frame (the menu's bar says which button).
-    // kKeys is a real keyboard's layout (gaps of 1 / 0.5 key between the groups); here every gap between groups is only
-    // kGap of a key: still visible, less wasted room. 22.3 x 6.1 key units, 2 px of gap on each side of a key.
-    constexpr double kGap = 0.15;
-    const double u = (kKbW - 16) / (23.0 - 2 * (0.5 - kGap)), x0 = 8, y0 = 8;
+    // one flat block, no title bar: - / + / x sit in the empty space above the number pad (compact: in a column at the right
+    // edge, next to Enter); move it with the grip anywhere. Picking a key for a button: the whole keyboard gets an accent
+    // frame (the menu's bar says which button). kKeys is a real keyboard's layout (gaps of 1 / 0.5 key between the groups);
+    // here every gap between groups is only kGap of a key: still visible, less wasted room. 2 px of gap around each key.
+    const bool compact = look_.kbCompact;
+    const double u = kKbUnit, x0 = 8, y0 = 8;
     auto mapX = [&](double kx, double ky) {
         if (kx >= 19) return kx - 1.0 + 2 * kGap;                       // number pad
         if (kx >= 15.5) return kx - 0.5 + kGap;                         // navigation / arrows
-        if (ky == 0 && kx >= 11) return kx - 2.0 + 3 * kGap;            // F9 .. F12
-        if (ky == 0 && kx >= 6.5) return kx - 1.5 + 2 * kGap;           // F5 .. F8
-        if (ky == 0 && kx >= 2) return kx - 1.0 + kGap;                 // F1 .. F4
+        if (ky != 0 || kx >= 15) return kx;                             // (the compact column stays at 15 + kGap)
+        if (kx >= 11) return kx - 2.0 + 3 * kGap;                       // F9 .. F12
+        if (kx >= 6.5) return kx - 1.5 + 2 * kGap;                      // F5 .. F8
+        if (kx >= 2) return kx - 1.0 + kGap;                            // F1 .. F4
         return kx;
     };
     auto at = [&](int kind, int arg, double kx, double ky, double kw, double kh, const std::string& t, bool on = false) {
         const double ux = mapX(kx, ky), uy = ky >= 1 ? ky - (0.25 - kGap * 2.0 / 3.0) : ky;   // F-row gap 0.1 of a key
         add(kind, arg, (int)(x0 + ux * u + 2), (int)(y0 + uy * u + 2), (int)(kw * u - 4), (int)(kh * u - 4), t, on);
     };
-    at(eSmaller, 0, 19, 0, 1, 1, "\xE2\x88\x92");
-    at(eBigger, 0, 20, 0, 1, 1, "+");
-    at(eClose, 0, 22, 0, 1, 1, "\xC3\x97");
+    if (compact) {                                       // x on top, then - and + (the column right of the main block)
+        at(eClose, 0, 15 + kGap, 0, 1, 1, "\xC3\x97");
+        at(eSmaller, 0, 15 + kGap, 1.25, 1, 1, "\xE2\x88\x92");
+        at(eBigger, 0, 15 + kGap, 2.25, 1, 1, "+");
+    } else {
+        at(eSmaller, 0, 19, 0, 1, 1, "\xE2\x88\x92");
+        at(eBigger, 0, 20, 0, 1, 1, "+");
+        at(eClose, 0, 22, 0, 1, 1, "\xC3\x97");
+    }
     for (int k = 0; k < kKeyCount; ++k) {
         const KeyDef& d = kKeys[k];
+        if (compact && d.x >= 15) continue;              // compact: no navigation / arrows / number pad
         const int m = ModOf(d.name);
         at(eKey, k, d.x, d.y, d.w, d.h, d.label, m >= 0 && latch_[m]);
     }
@@ -509,7 +540,7 @@ void VrMenu::LayoutKb() {
 void VrMenu::Draw(int p) {
     const Theme& T = kThemes[look_.theme];
     Panel& pn = pan_[p];
-    if (!cv_[p]) cv_[p] = std::make_unique<MenuCanvas>(pn.pw, pn.ph);
+    if (!cv_[p] || cv_[p]->W() != pn.pw || cv_[p]->H() != pn.ph) cv_[p] = std::make_unique<MenuCanvas>(pn.pw, pn.ph);
     MenuCanvas& c = *cv_[p];
     if (!c.Ok()) return;
     c.Round(0, 0, pn.pw, pn.ph, 0, p == kPanKb && pickBtn_ >= 0 ? T.accent : T.bg);   // (picking: an accent frame)
@@ -726,6 +757,7 @@ void VrMenu::SetValue(int arg) {
         SavePlaces();
         return;
     }
+    case 82: case 83: SetKbCompact(arg == 83); return;
     case 80: ShowKb(true); return;
     case 81: ShowKb(false); return;
     default: return;
@@ -922,7 +954,7 @@ std::string VrMenu::ContentKey() const {
     snprintf(b, sizeof(b), "%d%d|%d|%d|%d%d%d|%.3f,%.3f|", pan_[0].show, pan_[1].show, tab_, pickBtn_, latch_[0], latch_[1], latch_[2],
              pan_[0].width, pan_[1].width);
     char l[64];
-    snprintf(l, sizeof(l), "%d|%.2f|%.2f|%d|", look_.theme, look_.menuOpacity, look_.kbOpacity, look_.smoothing);
+    snprintf(l, sizeof(l), "%d|%.2f|%.2f|%d|%d|", look_.theme, look_.menuOpacity, look_.kbOpacity, look_.smoothing, look_.kbCompact);
     return std::string(b) + l + status_ + "|" + DescribePad(pad_);
 }
 

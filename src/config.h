@@ -23,7 +23,8 @@ inline const char* const* SmoothNames() {            // config.ini pointer_smoot
     static const char* const k[4] = { "off", "low", "medium", "high" };
     return k;
 }
-struct MenuLook { int theme = 0; float menuOpacity = 0.95f, kbOpacity = 0.95f; bool kbShow = false; int smoothing = 2; };
+struct MenuLook { int theme = 0; float menuOpacity = 0.95f, kbOpacity = 0.95f; bool kbShow = false; int smoothing = 2;
+                  bool kbCompact = false; };   // keyboard_layout = full / compact (the main keys only)
 
 struct Config {
     bool                      enabled = true;      // enabled = 0: the layer passes everything through

@@ -130,8 +130,11 @@ void Overlay::Frame(const std::vector<QuadIn>& quads, XrSpace space, std::vector
     for (const QuadIn& q : quads) {
         if (q.slot < 0 || q.slot >= kSlots || !q.px || q.pw < 1 || q.ph < 1) continue;
         Sc& c = sc_[q.slot];
+        if (c.sc != XR_NULL_HANDLE && (c.w != q.pw || c.h != q.ph)) {   // a new size (the keyboard full <-> compact)
+            d_.DestroySwapchain(c.sc);
+            c = Sc();
+        }
         if (c.sc == XR_NULL_HANDLE && !Create(q.slot, q.pw, q.ph)) return;
-        if (c.w != q.pw || c.h != q.ph) continue;
         if (c.uploaded != q.version && !Upload(q.slot, q)) return;
         if (!c.released) continue;
         XrCompositionLayerQuad l{XR_TYPE_COMPOSITION_LAYER_QUAD};

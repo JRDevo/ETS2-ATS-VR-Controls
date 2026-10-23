@@ -102,6 +102,12 @@ Config ParseConfig(const std::string& text) {
             if (t < 0) bad("off, low, medium or high"); else c.look.smoothing = t;
             continue;
         }
+        if (key == "keyboard_layout") {
+            if (lv == "full") c.look.kbCompact = false;
+            else if (lv == "compact") c.look.kbCompact = true;
+            else bad("full or compact");
+            continue;
+        }
         if (key == "keyboard_show") { c.look.kbShow = lv == "1" || lv == "on" || lv == "yes"; continue; }
         if (key == "vr_menu") { c.menu = lv != "0" && lv != "off" && lv != "no"; continue; }
         if (key == "menu_hold") { if (Num(val, 0.3, 5, &d)) c.menuHold = (float)d; else bad("a number of seconds (0.3 .. 5)"); continue; }
@@ -214,6 +220,7 @@ std::vector<std::pair<std::string, std::string>> MenuValues(const VrPad::Config&
     snprintf(b, sizeof(b), "%.2f", (double)look.kbOpacity);
     kv.push_back({ "keyboard_opacity", b });
     kv.push_back({ "keyboard_show", look.kbShow ? "1" : "0" });
+    kv.push_back({ "keyboard_layout", look.kbCompact ? "compact" : "full" });
     kv.push_back({ "pointer_smoothing", SmoothNames()[look.smoothing < 0 || look.smoothing > 3 ? 2 : look.smoothing] });
     return kv;
 }

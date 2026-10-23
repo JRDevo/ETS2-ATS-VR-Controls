@@ -9,7 +9,9 @@
 //   * Menu panel: tabs Buttons (every controller button and what it sends: point at one, then pick a key on the keyboard or a
 //     mouse button / none from the bar), Mouse (stick mouse, air mouse hold / toggle, speeds), Panels (sizes, bring here).
 //   * Keyboard panel: a full-size keyboard (main block, F-keys, arrows / navigation, number pad) as one flat block (no title
-//     bar: its - / + / x are above the number pad). A key goes down on the
+//     bar: its - / + / x are above the number pad), or COMPACT (Panels tab / keyboard_layout): the main block only (Esc /
+//     F-keys down to Enter, Shift, Ctrl) with - / + / x in one column at its right edge. Switching keeps the key size (the
+//     panel's width in metres follows its pixel width). A key goes down on the
 //     trigger and up when it is let go. Shift / Ctrl / Alt latch: they go with the next key. While a button is being set, the
 //     keyboard picks its key instead (with the latched modifiers: shift+f).
 //   * Move: point at a panel and hold the GRIP (or the trigger on its top bar) and move the controller: it hangs on the
@@ -120,6 +122,7 @@ private:
     void SetValue(int arg);
     void Push(int p, double metres);              // the panel along the line from the head: + = farther
     void ShowKb(bool on);
+    void SetKbCompact(bool on);
     void Pick(const VrPad::Out& o);
     void Save();
     void SavePlaces();

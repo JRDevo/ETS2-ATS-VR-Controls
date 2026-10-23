@@ -317,6 +317,32 @@ int main(int argc, char** argv) {
         upd(f);
         CHECK(m.Pan(VrMenu::kPanMenu).width < wm * 0.95, "from the bar onto its - button: pressed (%.3f -> %.3f m)", wm, m.Pan(VrMenu::kPanMenu).width);
     }
+    // Panels tab: the keyboard compact (main keys only, - / + / x in a column next to Enter), same key size, then full again
+    {
+        click(1, VrMenu::kPanMenu, VrMenu::eTab, 2);
+        const VrMenu::Panel& kb = m.Pan(VrMenu::kPanKb);
+        const int pw0 = kb.pw;
+        const double wk = kb.width;
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 83), "Compact shown");
+        for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
+        V3 at;
+        CHECK(kb.pw < pw0 * 0.75 && std::fabs(kb.width / kb.pw - wk / pw0) < 1e-9, "compact: narrower, same key size (%d px, %.3f m)", kb.pw, kb.width);
+        CHECK(!m.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("home"), &at) &&
+              !m.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("num5"), &at), "compact: no navigation / number pad");
+        V3 x, mi, pl, en;
+        CHECK(m.ElemCentre(VrMenu::kPanKb, VrMenu::eClose, 0, &x) && m.ElemCentre(VrMenu::kPanKb, VrMenu::eSmaller, 0, &mi) &&
+              m.ElemCentre(VrMenu::kPanKb, VrMenu::eBigger, 0, &pl) && m.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("enter"), &en),
+              "compact: x / - / + and Enter there");
+        const Q4 iq = QConj(kb.pose.q);
+        const V3 lx = QRot(iq, x - kb.pose.p), lm = QRot(iq, mi - kb.pose.p), lp = QRot(iq, pl - kb.pose.p), le = QRot(iq, en - kb.pose.p);
+        CHECK(std::fabs(lx.x - lm.x) < 1e-6 && std::fabs(lm.x - lp.x) < 1e-6 && lx.y > lm.y && lm.y > lp.y && lx.x > le.x,
+              "compact: x, -, + in one column (top down) right of Enter");
+        CHECK(m.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("f5"), &at), "compact: F-keys there");
+        WriteBmp(dir + L"\\keyboard_compact.bmp", kb);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 82), "Full shown");
+        for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
+        CHECK(kb.pw == pw0 && std::fabs(kb.width - wk) < 1e-9, "full again: the old size");
+    }
     // close: the menu's x; the keyboard STAYS (it is its own panel)
     click(1, VrMenu::kPanMenu, VrMenu::eClose, 0);
     CHECK(!m.Pan(VrMenu::kPanMenu).show && m.Pan(VrMenu::kPanKb).show, "menu closed, the keyboard stays");
