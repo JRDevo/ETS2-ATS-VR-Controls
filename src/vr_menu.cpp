@@ -462,6 +462,10 @@ void VrMenu::LayoutMenu() {
         snprintf(b, sizeof(b), "%d %% solid", (int)(look_.kbOpacity * 100.0f + 0.5f));
         add(eInfo, 203, 570, 426, 306, 70, b);
         add(eSet, 93, 886, 426, 90, 70, "+");
+        row(4, "Pointer smoothing");
+        static const char* const kSm[4] = { "Off", "Low", "Medium", "High" };
+        for (int i = 0; i < 4; ++i) add(eSet, 110 + i, 470 + i * 129, 514, 119, 70, kSm[i], look_.smoothing == i);
+        add(eInfo, 302, 24, 596, 952, 56, "Smoothing calms a shaky hand (menu pointer and air mouse).");
         add(eInfo, 0, 24, 716, 952, 64, status_.empty() ? "- = more see-through, + = more solid." : status_);
     }
 }
@@ -596,6 +600,14 @@ bool VrMenu::Hit(const VrPad::Frame&, int h, Ref* r, double* uo, double* vo) {
         r->pan = p; r->kind = eNone; r->arg = 0;
         *uo = u; *vo = v;
         const int x = (int)(u * pn.pw), y = (int)(v * pn.ph);
+        if (hov_[h].pan == p && hov_[h].kind != eNone) {   // the hovered element keeps the pointer up to 8 px outside it
+            const Elem* e = Find(p, hov_[h].kind, hov_[h].arg);
+            if (e && x >= e->x - 8 && y >= e->y - 8 && x < e->x + e->w + 8 && y < e->y + e->h + 8) {
+                r->kind = e->kind;
+                r->arg = e->arg;
+                continue;
+            }
+        }
         for (size_t i = pn.el.size(); i-- > 0;) {       // the last drawn is on top
             const Elem& e = pn.el[i];
             if (x < e.x || y < e.y || x >= e.x + e.w || y >= e.y + e.h) continue;
@@ -688,6 +700,7 @@ void VrMenu::SetValue(int arg) {
         break;
     }
     case 100: case 101: case 102: case 103: case 104: case 105: look_.theme = arg - 100; needRedraw_ = true; break;
+    case 110: case 111: case 112: case 113: look_.smoothing = arg - 110; break;
     case 60: case 61: case 70: case 71: {
         Panel& pn = pan_[arg < 70 ? kPanMenu : kPanKb];
         pn.width *= (arg & 1) ? 1.12 : 1 / 1.12;
@@ -814,6 +827,16 @@ void VrMenu::Update(VrPad::Frame& f, bool live, bool headOk, const Pose& head, d
             if (aimOk_[h]) {
                 aim_[h].q = QNorm(Q4{ f.q[h][0], f.q[h][1], f.q[h][2], f.q[h][3] });
                 aim_[h].p = V3{ f.p[h][0], f.p[h][1], f.p[h][2] };
+                // hand-shake smoothing: rest cut-off (Hz) and its rise per deg/s; written back for the air mouse too
+                static const double kMinCut[4] = { 0, 2.5, 1.2, 0.6 }, kBeta[4] = { 0, 0.04, 0.03, 0.02 };
+                if (look_.smoothing > 0 && look_.smoothing < 4) {
+                    aim_[h] = smooth_[h].Step(aim_[h], dt, kMinCut[look_.smoothing], kBeta[look_.smoothing]);
+                    f.q[h][0] = aim_[h].q.x; f.q[h][1] = aim_[h].q.y; f.q[h][2] = aim_[h].q.z; f.q[h][3] = aim_[h].q.w;
+                } else {
+                    smooth_[h].Reset();
+                }
+            } else {
+                smooth_[h].Reset();
             }
             Press& ps = press_[h];
             Grab& g = grab_[h];
@@ -881,7 +904,7 @@ std::string VrMenu::ContentKey() const {
     snprintf(b, sizeof(b), "%d%d|%d|%d|%d%d%d|%.3f,%.3f|", pan_[0].show, pan_[1].show, tab_, pickBtn_, latch_[0], latch_[1], latch_[2],
              pan_[0].width, pan_[1].width);
     char l[64];
-    snprintf(l, sizeof(l), "%d|%.2f|%.2f|", look_.theme, look_.menuOpacity, look_.kbOpacity);
+    snprintf(l, sizeof(l), "%d|%.2f|%.2f|%d|", look_.theme, look_.menuOpacity, look_.kbOpacity, look_.smoothing);
     return std::string(b) + l + status_ + "|" + DescribePad(pad_);
 }
 

@@ -14,7 +14,10 @@
 //   * Move: point at a panel and hold the GRIP (or the trigger on its top bar) and move the controller: it hangs on the
 //     controller, kept level; that controller's stick up / down pushes it away / pulls it closer meanwhile. While a controller
 //     points at a panel its grip is the menu's (no air mouse); while it holds one, its stick too. Size: the - / + on the bar.
-//     Panels tab: size and distance of each. Look tab: colour theme, see-through (opacity) of each panel.
+//     Panels tab: size and distance of each. Look tab: colour theme, see-through (opacity) of each panel, pointer smoothing.
+//   * Pointer smoothing (off / low / medium / high): both aim poses go through a PoseSmoother (hand shake out, fast moves
+//     follow) -- the menu's pointer AND the air mouse (the smoothed aim is written back into the frame). A hovered element
+//     also keeps the pointer until it is 8 px outside it (no jumping between two keys at their edge).
 //   * The keyboard is its own panel: the combo opens / closes only the menu; the keyboard stays where it is (shown or not,
 //     also at the next game start: keyboard_show) until its x -- e.g. fixed at the side of the cab, always there.
 //   * Every change is written to config.ini at once (menu_place / keyboard_place in the room's LOCAL space: a recenter moves
@@ -133,6 +136,7 @@ private:
     Grab          grab_[2];               // a panel held by the grip
     bool          gripDown_[2] = {};
     double        lastNow_ = -1;
+    PoseSmoother  smooth_[2];
     bool          latch_[3] = {};         // Shift, Ctrl, Alt latched (left / right alike)
     Ref           hov_[2];
     Press         press_[2];

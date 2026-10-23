@@ -115,6 +115,44 @@ int main(int argc, char** argv) {
         step(false, false, false, false);
     }
 
+    printf("(1b) pointer smoothing\n");
+    {
+        // a hand held still with a 0.6 deg shake: the medium filter takes most of it out; a fast 30 deg turn is followed
+        auto shake = [](int level, double* jitterOut, double* lagAfter) {
+            PoseSmoother sm;
+            static const double kMinCut[4] = { 0, 2.5, 1.2, 0.6 }, kBeta[4] = { 0, 0.04, 0.03, 0.02 };
+            double prevYaw = 0, sum = 0;
+            int n = 0;
+            for (int i = 0; i < 200; ++i) {
+                const double yaw = ((i * 7919) % 13 - 6) / 6.0 * 0.6 * 3.14159265358979 / 180.0;   // +-0.6 deg, every frame
+                Pose in;
+                in.q = QYawPitch(yaw, 0);
+                const Pose o = level ? sm.Step(in, 0.011, kMinCut[level], kBeta[level]) : in;
+                double y, p;
+                YawPitchOf(QRot(o.q, V3{ 0, 0, -1 }), &y, &p);
+                if (i > 100) { sum += std::fabs(y - prevYaw); ++n; }
+                prevYaw = y;
+            }
+            *jitterOut = sum / n * 180.0 / 3.14159265358979;
+            // then a 30 deg turn held: how far behind after 0.15 s
+            Pose in;
+            in.q = QYawPitch(30.0 * 3.14159265358979 / 180.0, 0);
+            Pose o = in;
+            for (int i = 0; i < 14; ++i) o = level ? sm.Step(in, 0.011, kMinCut[level], kBeta[level]) : in;
+            double y, p;
+            YawPitchOf(QRot(o.q, V3{ 0, 0, -1 }), &y, &p);
+            *lagAfter = 30.0 - y * 180.0 / 3.14159265358979;
+        };
+        double j0, l0, j2, l2, j3, l3;
+        shake(0, &j0, &l0);
+        shake(2, &j2, &l2);
+        shake(3, &j3, &l3);
+        printf("   shake per frame: off %.3f deg, medium %.3f, high %.3f; behind after a fast 30 deg turn + 0.15 s: medium %.2f deg, high %.2f\n",
+               j0, j2, j3, l2, l3);
+        CHECK(j2 < j0 * 0.35 && j3 < j2, "medium takes most of the shake out, high more");
+        CHECK(l2 < 1.5 && l3 < 3.0, "a fast turn is followed (medium %.2f deg, high %.2f deg behind)", l2, l3);
+    }
+
     printf("(2) menu\n");
     const std::wstring cfgPath = dir + L"\\config.ini";
     {
@@ -122,7 +160,7 @@ int main(int argc, char** argv) {
         _wfopen_s(&f, cfgPath.c_str(), L"wb");
         if (f) { fputs("# test\r\na = enter   # was\r\nmouse_speed = 900\r\n", f); fclose(f); }
     }
-    Config cfg = ParseConfig("a = enter\n");
+    Config cfg = ParseConfig("a = enter\npointer_smoothing = off\n");   // (the clicks below jump the aim in one frame)
     VrMenu m(cfg, cfgPath);
     Rec sink;
     double now = 10.0;

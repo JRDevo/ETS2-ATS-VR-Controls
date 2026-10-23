@@ -96,6 +96,12 @@ Config ParseConfig(const std::string& text) {
             (key == "menu_opacity" ? c.look.menuOpacity : c.look.kbOpacity) = (float)d;
             continue;
         }
+        if (key == "pointer_smoothing") {
+            int t = -1;
+            for (int i = 0; i < 4; ++i) if (lv == SmoothNames()[i]) t = i;
+            if (t < 0) bad("off, low, medium or high"); else c.look.smoothing = t;
+            continue;
+        }
         if (key == "keyboard_show") { c.look.kbShow = lv == "1" || lv == "on" || lv == "yes"; continue; }
         if (key == "vr_menu") { c.menu = lv != "0" && lv != "off" && lv != "no"; continue; }
         if (key == "menu_hold") { if (Num(val, 0.3, 5, &d)) c.menuHold = (float)d; else bad("a number of seconds (0.3 .. 5)"); continue; }
@@ -208,6 +214,7 @@ std::vector<std::pair<std::string, std::string>> MenuValues(const VrPad::Config&
     snprintf(b, sizeof(b), "%.2f", (double)look.kbOpacity);
     kv.push_back({ "keyboard_opacity", b });
     kv.push_back({ "keyboard_show", look.kbShow ? "1" : "0" });
+    kv.push_back({ "pointer_smoothing", SmoothNames()[look.smoothing < 0 || look.smoothing > 3 ? 2 : look.smoothing] });
     return kv;
 }
 

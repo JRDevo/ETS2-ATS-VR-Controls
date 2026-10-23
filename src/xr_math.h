@@ -43,6 +43,27 @@ inline void YawPitchOf(V3 fwd, double* yaw, double* pitch) {
 inline Pose PMul(const Pose& a, const Pose& b) { return { QNorm(QMul(a.q, b.q)), a.p + QRot(a.q, b.p) }; }
 inline Pose PInv(const Pose& a) { const Q4 c = QConj(a.q); return { c, QRot(c, a.p * -1.0) }; }
 
+// Hand-shake filter for a pose (a "one euro" filter): the cut-off frequency rises with the speed, so a hand held still is
+// smoothed hard (the shake goes) and a fast move follows with little lag. minCut = the cut-off at rest (Hz; lower = smoother),
+// beta = how much it rises per degree / second of turn. Reset: the next pose is taken as it is.
+struct PoseSmoother {
+    bool init = false;
+    Pose s;
+    void Reset() { init = false; }
+    Pose Step(const Pose& in, double dt, double minCut, double beta) {
+        if (!init || dt <= 0.0) { s = in; init = true; return s; }
+        Q4 q = in.q;
+        if (q.x * s.q.x + q.y * s.q.y + q.z * s.q.z + q.w * s.q.w < 0) q = Q4{ -q.x, -q.y, -q.z, -q.w };   // the short way
+        const double dot = std::fabs(q.x * s.q.x + q.y * s.q.y + q.z * s.q.z + q.w * s.q.w);
+        const double ang = 2.0 * std::acos(dot > 1.0 ? 1.0 : dot) * 57.29577951308232;   // degrees turned since the last output
+        const double cut = minCut + beta * ang / dt;
+        const double tau = 1.0 / (6.283185307179586 * cut), a = 1.0 / (1.0 + tau / dt);
+        s.q = QNorm(Q4{ s.q.x + (q.x - s.q.x) * a, s.q.y + (q.y - s.q.y) * a, s.q.z + (q.z - s.q.z) * a, s.q.w + (q.w - s.q.w) * a });
+        s.p = s.p + (in.p - s.p) * a;
+        return s;
+    }
+};
+
 // A ray (origin o, unit direction d) against a quad at `quad` (seen from its +z side, centre at the pose, w x h metres).
 // True = hit from the front within the quad (or within `margin` metres around it): t = distance, u / v = 0..1 from the
 // top-left corner (may be a little outside with a margin).

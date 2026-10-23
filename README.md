@@ -62,7 +62,8 @@ VR EyeCapture starts a recording on that.
 - **Mouse** tab: which stick moves the mouse, its speed and dead zone, the air mouse button, hold or toggle, its speed.
 - **Panels** tab: menu size, keyboard size, show / hide the keyboard, bring both in front of you.
 - **Panels** tab also: the distance of each panel (Closer / Farther).
-- **Look** tab: colours (Dark, Blue, Grey, Light, Black, Green) and how see-through the menu and the keyboard are.
+- **Look** tab: colours (Dark, Blue, Grey, Light, Black, Green), how see-through the menu and the keyboard are, and
+  **pointer smoothing** (Off / Low / Medium / High): calms a shaky hand, for the menu pointer and the air mouse.
 - **Keyboard** (button at the top of the menu): a full keyboard with F-keys, arrows and number pad. A key goes down when
   you pull the trigger and up when you let go. Shift, Ctrl and Alt stay on for the next key.
   The keyboard **stays** when the menu closes, also at the next game start (put it at the side of your cab). Its x hides it.
