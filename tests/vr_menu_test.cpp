@@ -1,6 +1,6 @@
 // Unit test: the VR menu + keyboard (src/vr_menu.cpp) with made-up controller frames -- no OpenXR, no game.
-//   (1) the combo gate: a short stick click still goes through (as a tap), a long one after 0.25 s, both held 1 s = the combo
-//       and neither click reaches the Mapper.
+//   (1) the combo gate (both grips + left stick click): each alone goes through at once, both stick clicks (VR EyeCapture's
+//       combo) are not ours, grips first then the stick = all taken out from that frame, the combo after 1 s, once.
 //   (2) the menu: opens in front of the head; pointing + trigger on a tab / a setting / a button row; picking a key on the
 //       keyboard (Shift latched + F = shift+f); typing a key (down on the trigger, up on its release); the trigger is taken out
 //       of the frame while it points at a panel; moving a panel by its top bar; - / + size; close.
@@ -75,32 +75,44 @@ int main(int argc, char** argv) {
 
     printf("(1) combo gate\n");
     {
-        ComboGate g;
+        ComboGate g;                                     // default: lgrip + rgrip + lstick
         VrPad::Frame f;
         double t = 0;
-        auto step = [&](bool l, bool r) { f = VrPad::Frame(); f.click[0] = l; f.click[1] = r; const bool done = g.Step(f, t); t += 0.011; return done; };
-        // a short tap of the left click: held back, then sent as a tap at its release
-        step(true, false);
-        CHECK(!f.click[0], "a click is held back first");
-        step(true, false);
-        step(false, false);
-        CHECK(f.click[0], "a short click goes through at its release (tap)");
-        for (int i = 0; i < 10; ++i) step(false, false);
-        CHECK(!f.click[0], "the tap ends");
-        // a long press passes after 0.25 s
-        bool seen = false;
-        for (int i = 0; i < 40; ++i) { step(true, false); seen = seen || f.click[0]; }
-        CHECK(seen, "a long click passes after 0.25 s");
-        step(false, false);
-        // both: masked, the combo after 1 s
-        bool done = false, leak = false;
-        for (int i = 0; i < 100 && !done; ++i) { done = step(true, true); leak = leak || f.click[0] || f.click[1]; }
-        CHECK(done && !leak, "both held 1 s = the combo, no click leaks (%d %d)", done, leak);
-        CHECK(t > 1.2 && t < 1.8, "the combo after ~1 s of both (t=%.2f)", t);
+        auto step = [&](bool lg, bool rg, bool ls, bool rs) {
+            f = VrPad::Frame();
+            f.grip[0] = lg ? 1.0f : 0.0f; f.grip[1] = rg ? 1.0f : 0.0f; f.click[0] = ls; f.click[1] = rs;
+            const bool done = g.Step(f, t);
+            t += 0.011;
+            return done;
+        };
+        // each button alone goes through at once (hazards, air mouse grip): nothing held back
+        step(false, false, true, false);
+        CHECK(f.click[0], "the left stick click alone goes through at once");
+        step(false, true, false, false);
+        CHECK(f.grip[1] == 1.0f, "the right grip alone goes through at once");
+        step(false, false, false, false);
+        // both stick clicks (VR EyeCapture's combo) are not ours
+        bool done = false;
+        for (int i = 0; i < 120; ++i) done = step(false, false, true, true) || done;
+        CHECK(!done && f.click[0] && f.click[1], "both stick clicks: not the menu, both go through");
+        step(false, false, false, false);
+        // grips first (they go through), then the stick: from that frame on all three are taken out; the combo after 1 s
+        step(true, true, false, false);
+        CHECK(f.grip[0] == 1.0f && f.grip[1] == 1.0f, "grips go through before the stick");
+        bool leak = false;
+        const double t0 = t;
+        for (int i = 0; i < 150 && !done; ++i) { done = step(true, true, true, false); leak = leak || f.click[0] || f.grip[0] > 0 || f.grip[1] > 0; }
+        CHECK(done && !leak, "grips + left stick held 1 s = the combo, nothing leaks (%d %d)", done, leak);
+        CHECK(t - t0 > 0.95 && t - t0 < 1.1, "the combo after ~1 s (%.2f)", t - t0);
         done = false;
-        for (int i = 0; i < 20; ++i) done = done || step(true, true);
+        for (int i = 0; i < 20; ++i) done = step(true, true, true, false) || done;
         CHECK(!done, "fires once per hold");
-        step(false, false);
+        step(true, false, false, false);
+        CHECK(f.grip[0] == 0.0f, "still taken out while any of them is held");
+        step(false, false, false, false);
+        step(false, false, true, false);
+        CHECK(f.click[0], "all let go: the stick click is its own again");
+        step(false, false, false, false);
     }
 
     printf("(2) menu\n");
@@ -119,7 +131,8 @@ int main(int argc, char** argv) {
     VrPad::Frame idle;
     idle.hand[0] = idle.hand[1] = true;
     // open with the combo
-    for (int i = 0; i < 120 && !m.AnyShown(); ++i) { VrPad::Frame f = idle; f.click[0] = f.click[1] = true; upd(f); }
+    for (int i = 0; i < 120 && !m.AnyShown(); ++i) { VrPad::Frame f = idle; f.grip[0] = f.grip[1] = 1.0f; f.click[0] = true; upd(f); }
+    for (int i = 0; i < 3; ++i) { VrPad::Frame f = idle; upd(f); }   // (let go)
     CHECK(m.AnyShown() && m.Pan(VrMenu::kPanMenu).show && !m.Pan(VrMenu::kPanKb).show, "the combo opens the menu (keyboard hidden)");
     for (int i = 0; i < 3; ++i) { VrPad::Frame f = idle; upd(f); }
     const VrMenu::Panel& mp = m.Pan(VrMenu::kPanMenu);

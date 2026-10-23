@@ -1,8 +1,9 @@
 // vr_menu -- phase 2: the mod's own VR menu and the on-screen keyboard. Two flat panels that float in the room (OpenXR quad
 // layers drawn by overlay.h on top of the game's picture; the game's graphics are never touched), so they never meet the DLAA
 // mod's in-picture menu (Delete): nothing here uses a keyboard key.
-//   * Open / close: hold BOTH menu_combo buttons (default the two stick clicks) for menu_hold seconds (1 s). A short press of
-//     one of them alone still does its own job (horn / hazards): it is held back up to 0.25 s, then sent (ComboGate).
+//   * Open / close: hold ALL menu_combo buttons (default both grips + the left stick click; NOT both stick clicks: that is VR
+//     EyeCapture's record combo) for menu_hold seconds (1 s). Nothing is held back: each button does its own job until the last
+//     one of the combo goes down; from then on all of them are taken out of the frame until all are let go (ComboGate).
 //   * Point with either controller (its aim ray); a dot shows where. Its trigger presses what it points at. While a controller
 //     points at a panel, its trigger reaches neither the game nor the trigger's mapping (PadInput hides it).
 //   * Menu panel: tabs Buttons (every controller button and what it sends: point at one, then pick a key on the keyboard or a
@@ -25,19 +26,17 @@
 
 namespace ck {
 
-// both buttons of a combo held for `hold` seconds; one alone passes through (a tap at its release, a hold after 0.25 s)
+// all buttons of a combo held for `hold` seconds. Before the last one goes down each passes through; from then on all are
+// taken out of the frame until every one is let go (so the Mapper sees them released).
 struct ComboGate {
-    int    a = VrPad::kLStick, b = VrPad::kRStick;
+    std::vector<int> btns = { VrPad::kLGrip, VrPad::kRGrip, VrPad::kLStick };
     double hold = 1.0;
-    // masks the combo buttons in f as needed; true = the combo was just completed
+    // masks the combo buttons in f while the combo is held; true = it was just held for `hold` seconds
     bool Step(VrPad::Frame& f, double now);
 private:
-    int    st_ = 0;                  // 0 idle, 1 one down (waiting for the other), 2 one passes through, 3 both (the combo)
-    int    first_ = -1;
+    bool   on_ = false;              // all went down: the combo owns the buttons
     double t0_ = 0;
     bool   fired_ = false;
-    int    tapBtn_ = -1;
-    double tapUntil_ = 0;
 };
 bool BtnDown(const VrPad::Frame& f, int b);   // kLTrig .. kMenu (not the stick directions)
 void BtnSet(VrPad::Frame& f, int b, bool on);

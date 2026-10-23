@@ -16,9 +16,9 @@
       vive       Vive wands: the game's right menu = our B, left to the game with a warning
       unfocus    the session leaves FOCUSED while the trigger is held: released at once, pressed again after
       restore    the runtime refuses our bindings merged into the game's Touch suggestion: the game's own is put back
-      menu       a D3D11 game: both stick clicks held 1 s open the VR menu (quad layers on D3D11 swapchains), the right hand
+      menu       a D3D11 game: both grips + the left stick click held 1 s open the VR menu (quad layers on D3D11 swapchains), the right hand
                  points at the Mouse tab and at "air mouse: toggled on" (written to config.ini), the game never sees those
-                 trigger pulls, a short stick click alone is still the horn, both stick clicks again close it
+                 trigger pulls, a short stick click alone is still the horn (at once), the combo again closes it
     Also checked: the layer never syncs alone while the game syncs (mock "solo" syncs = 0); own sync only after 2 s of FOCUSED.
     Windows PowerShell 5.1 compatible:  powershell -ExecutionPolicy Bypass -File tests\run_e2e.ps1 [-Only ats]
 #>
@@ -209,13 +209,15 @@ if (-not $Only -or $Only -eq 'restore') {
 # ---- menu: the VR menu on a D3D11 session. The menu opens 0.75 m ahead, 8 deg down: the Mouse tab is at aim yaw 0 / pitch 5,
 # "Toggled on" (air mouse) at yaw 16.1 / pitch -14.2 (vr_menu.cpp layout; mock: + yaw = right)
 if (-not $Only -or $Only -eq 'menu') {
-    $menuScript = '1.0-2.4:/user/hand/left/input/thumbstick/click=1;1.0-2.4:/user/hand/right/input/thumbstick/click=1;' +
+    $menuScript = '1.0-2.6:/user/hand/left/input/squeeze/value=1;1.0-2.6:/user/hand/right/input/squeeze/value=1;' +
+                  '1.2-2.6:/user/hand/left/input/thumbstick/click=1;' +
                   '2.6-3.6:/user/hand/right/input/aim/pose=0,5,0,5;' +
                   '3.0-3.3:/user/hand/right/input/trigger/value=0.9;3.0-3.3:/user/hand/right/input/select/click=1;' +
                   '3.7-4.6:/user/hand/right/input/aim/pose=16.1,-14.2,16.1,-14.2;' +
                   '4.0-4.3:/user/hand/right/input/trigger/value=0.9;4.0-4.3:/user/hand/right/input/select/click=1;' +
                   '5.0-5.1:/user/hand/right/input/thumbstick/click=1;' +
-                  '5.5-6.8:/user/hand/left/input/thumbstick/click=1;5.5-6.8:/user/hand/right/input/thumbstick/click=1'
+                  '5.5-7.0:/user/hand/left/input/squeeze/value=1;5.5-7.0:/user/hand/right/input/squeeze/value=1;' +
+                  '5.6-7.0:/user/hand/left/input/thumbstick/click=1'
     $d = Join-Path $work 'menu'
     $r = RunCase 'menu' 'fake_game.exe' @('--d3d11') 7.5 @{ VRC_MOCK_INPUT = $menuScript; VRC_MOCK_DUMP = $d }
     $b = Buttons $r.events

@@ -13,7 +13,7 @@ Press a controller button, and the game gets a key press. Move a stick or point 
 - One stick moves the mouse pointer (the left stick by default).
 - **Air mouse**: hold the right grip and turn the controller. The pointer follows, like a laser pointer. (Or set it to
   toggle: one press on, the next press off.)
-- **VR menu + keyboard**: hold both stick clicks for 1 second. A menu opens in front of you. See [The VR menu](#the-vr-menu).
+- **VR menu + keyboard**: hold both grips + the left stick click for 1 second. A menu opens in front of you. See [The VR menu](#the-vr-menu).
 - The game's own VR controls (the trigger and the left menu button) still work.
 - It only works in the games named in `config.ini`. In every other VR program it does nothing.
 - It only sends input while the game window is in front. It never types into another program.
@@ -34,7 +34,7 @@ works next to the ETS2 / ATS DLAA mod, VR EyeCapture, Virtual Desktop, OpenXR To
 | Y | `]` | right indicator |
 | Right stick click | H | horn |
 | Left stick click | F | hazard lights |
-| Both stick clicks, 1 second | opens / closes the VR menu | |
+| Both grips + left stick click, 1 second | opens / closes the VR menu | |
 | Right stick up / down / left / right | arrow keys | |
 | Left stick | moves the mouse pointer | |
 
@@ -48,8 +48,9 @@ function to a controller button instead (for example `y = l` for the lights).
 
 ## The VR menu
 
-Hold **both stick clicks** for 1 second. The menu opens in front of you. Do it again to close it.
-A short press of one stick click alone still works as before (horn / hazards).
+Hold **both grips**, then press and hold the **left stick click**, for 1 second. The menu opens in front of you. Do it again
+to close it. (Grips first: the left stick click alone is still the hazard lights.) It is not both stick clicks, because
+VR EyeCapture starts a recording on that.
 
 - **Point** with either controller. A white dot shows where. **Pull the trigger** to press.
   While you point at the menu, the game does not get that trigger.

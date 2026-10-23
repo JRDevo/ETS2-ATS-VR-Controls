@@ -19,7 +19,7 @@ struct Config {
     VrPad::Config             pad = VrPad::DefaultConfig();
     bool                      logInputs = false;   // log_inputs = 1: every key / mouse event in the log
     bool                      menu = true;         // vr_menu = 0: no VR menu / keyboard (and no combo)
-    int                       menuBtnA = VrPad::kLStick, menuBtnB = VrPad::kRStick;   // menu_combo: both held = open / close
+    std::vector<int>          menuCombo = { VrPad::kLGrip, VrPad::kRGrip, VrPad::kLStick };   // menu_combo: all held = open / close
     float                     menuHold = 1.0f;     // menu_hold: seconds
     PanelPlace                menuPlace, kbPlace;  // menu_place / keyboard_place
     std::wstring              loadedFrom;          // empty = no file (defaults)

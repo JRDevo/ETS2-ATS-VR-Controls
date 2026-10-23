@@ -88,12 +88,20 @@ Config ParseConfig(const std::string& text) {
         if (key == "vr_menu") { c.menu = lv != "0" && lv != "off" && lv != "no"; continue; }
         if (key == "menu_hold") { if (Num(val, 0.3, 5, &d)) c.menuHold = (float)d; else bad("a number of seconds (0.3 .. 5)"); continue; }
         if (key == "menu_combo") {
-            const size_t plus = lv.find('+');
-            const int b1 = plus == std::string::npos ? -1 : VrPad::BtnOfName(Trim(lv.substr(0, plus)).c_str());
-            const int b2 = plus == std::string::npos ? -1 : VrPad::BtnOfName(Trim(lv.substr(plus + 1)).c_str());
-            if (b1 < 0 || b2 < 0 || b1 == b2 || b1 >= VrPad::kLUp || b2 >= VrPad::kLUp) { bad("two different buttons with + (lstick+rstick); no stick directions"); continue; }
-            c.menuBtnA = b1;
-            c.menuBtnB = b2;
+            std::vector<int> combo;
+            bool ok = true;
+            size_t a = 0;
+            while (ok && a <= lv.size()) {
+                size_t plus = lv.find('+', a);
+                if (plus == std::string::npos) plus = lv.size();
+                const int b = VrPad::BtnOfName(Trim(lv.substr(a, plus - a)).c_str());
+                for (int x : combo) ok = ok && x != b;
+                ok = ok && b >= 0 && b < VrPad::kLUp;
+                combo.push_back(b);
+                a = plus + 1;
+            }
+            if (!ok || combo.size() < 2 || combo.size() > 4) { bad("2 to 4 different buttons with + (lgrip+rgrip+lstick); no stick directions"); continue; }
+            c.menuCombo = combo;
             continue;
         }
         if (key == "menu_place" || key == "keyboard_place") {
@@ -221,7 +229,7 @@ bool SaveConfigValues(const std::wstring& path, const std::vector<std::pair<std:
         if (done) continue;
         if (!header) {
             if (!lines.empty() && !Trim(lines.back()).empty()) lines.push_back("");
-            lines.push_back("# ---- saved by the VR menu (in the headset: hold both stick clicks 1 s) ------------------------------------------");
+            lines.push_back("# ---- saved by the VR menu (in the headset: hold both grips + the left stick click 1 s) ----------------------------");
             header = true;
         }
         lines.push_back(e.first + " = " + e.second);

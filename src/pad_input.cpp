@@ -40,8 +40,9 @@ PadInput::PadInput(XrInstance instance, const PadDispatch& d, const Config& cfg,
     Sink().SetLogEvents(cfg_.logInputs);
     if (enabled_ && cfg_.menu) {
         menu_ = std::make_unique<VrMenu>(cfg_, configPath);
-        LOGI("VR menu: hold %s + %s for %.1f s to open it%s", VrPad::BtnNames()[cfg_.menuBtnA], VrPad::BtnNames()[cfg_.menuBtnB],
-             (double)cfg_.menuHold, od_.Complete() ? "" : " (no swapchain functions from the runtime: it cannot be shown)");
+        std::string combo;
+        for (int b : cfg_.menuCombo) combo += (combo.empty() ? "" : " + ") + std::string(VrPad::BtnNames()[b]);
+        LOGI("VR menu: hold %s for %.1f s to open it%s", combo.c_str(), (double)cfg_.menuHold, od_.Complete() ? "" : " (no swapchain functions from the runtime: it cannot be shown)");
     }
 }
 

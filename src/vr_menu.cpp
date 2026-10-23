@@ -215,33 +215,15 @@ void BtnSet(VrPad::Frame& f, int b, bool on) {
 }
 
 bool ComboGate::Step(VrPad::Frame& f, double now) {
-    const bool da = BtnDown(f, a), db = BtnDown(f, b);
-    switch (st_) {
-    case 0:
-        if (da && db) { st_ = 3; t0_ = now; fired_ = false; }
-        else if (da || db) { st_ = 1; first_ = da ? a : b; t0_ = now; }
-        break;
-    case 1:
-        if (da && db) { st_ = 3; t0_ = now; fired_ = false; }
-        else if (!BtnDown(f, first_)) { st_ = 0; tapBtn_ = first_; tapUntil_ = now + 0.08; }   // a short press: sent now
-        else if (now - t0_ > 0.25) st_ = 2;                                                    // a long one: passes
-        break;
-    case 2:
-        if (!BtnDown(f, first_)) st_ = 0;
-        break;
-    default:
-        if (!da && !db) st_ = 0;
-        break;
-    }
-    bool done = false;
-    if (st_ == 3 && !fired_ && da && db && now - t0_ >= hold) { fired_ = true; done = true; }
-    if (st_ == 1) BtnSet(f, first_, false);
-    if (st_ == 3) { BtnSet(f, a, false); BtnSet(f, b, false); }
-    if (tapBtn_ >= 0) {
-        if (now < tapUntil_) BtnSet(f, tapBtn_, true);
-        else tapBtn_ = -1;
-    }
-    return done;
+    if (btns.empty()) return false;
+    bool all = true, any = false;
+    for (int b : btns) { const bool d = BtnDown(f, b); all = all && d; any = any || d; }
+    if (!on_ && all) { on_ = true; t0_ = now; fired_ = false; }
+    if (on_ && !any) on_ = false;
+    if (!on_) return false;
+    for (int b : btns) BtnSet(f, b, false);
+    if (!fired_ && all && now - t0_ >= hold) { fired_ = true; return true; }
+    return false;
 }
 
 // ------------------------------------------------------------------------------------------------ the menu
@@ -249,8 +231,7 @@ bool ComboGate::Step(VrPad::Frame& f, double now) {
 VrMenu::~VrMenu() = default;
 
 VrMenu::VrMenu(const Config& cfg, const std::wstring& path) : pad_(cfg.pad), path_(path) {
-    gate_.a = cfg.menuBtnA;
-    gate_.b = cfg.menuBtnB;
+    gate_.btns = cfg.menuCombo;
     gate_.hold = cfg.menuHold;
     place_[kPanMenu] = cfg.menuPlace;
     place_[kPanKb] = cfg.kbPlace;
@@ -357,7 +338,8 @@ void VrMenu::LayoutMenu() {
                 bool dim = false;
                 if (btn == pad_.airBtn) { val = "air mouse"; dim = true; }
                 else if (btn >= VrPad::kLUp && pad_.mouseStick == (btn >= VrPad::kRUp ? 2 : 1)) { val = "moves the mouse"; dim = true; }
-                const bool combo = btn == gate_.a || btn == gate_.b;
+                bool combo = false;
+                for (int cb : gate_.btns) combo = combo || cb == btn;
                 add(eRow, btn, col ? 508 : 24, 156 + i * 54, 468, 50, BtnLabel(btn), pickBtn_ == btn, dim,
                     combo ? val + "  (+menu)" : val);
             }
@@ -413,8 +395,10 @@ void VrMenu::LayoutMenu() {
         add(eSet, 80, 470, 338, 248, 70, "Show", pan_[kPanKb].show);
         add(eSet, 81, 728, 338, 248, 70, "Hide", !pan_[kPanKb].show);
         add(eHere, 0, 24, 434, 952, 70, "Bring the menu and the keyboard in front of me");
-        snprintf(b, sizeof(b), "Open / close: hold %s + %s for %.1f s", BtnLabel(gate_.a), BtnLabel(gate_.b), gate_.hold);
-        add(eInfo, 300, 24, 530, 952, 56, b);
+        std::string combo;
+        for (int cb : gate_.btns) combo += (combo.empty() ? "" : " + ") + std::string(BtnLabel(cb));
+        snprintf(b, sizeof(b), " for %.1f s", gate_.hold);
+        add(eInfo, 300, 24, 530, 952, 56, "Open / close: hold " + combo + b);
         add(eInfo, 301, 24, 590, 952, 56, "Move a panel: point at its top bar, hold the trigger, move.");
         add(eInfo, 0, 24, 716, 952, 64, status_.empty() ? "Saved in config.ini at once." : status_);
     }
