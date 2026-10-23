@@ -264,7 +264,7 @@ int main() {
         const Config dc = DefaultConfig();
         CHECK(dc.steerStick == 1 && dc.map[kRTrig].kind == kGas && dc.map[kLTrig].kind == kBrake && dc.map[kLGrip].kind == kNone &&
               dc.modMap[kRTrig].kind == kMouseL && dc.steerSpeed == 0.5f && dc.steerCurve == 1.0f && dc.steerMode == 1 &&
-              dc.steerTurnTime == 5.0f && dc.steerReturnTime == 3.0f,
+              dc.steerTurnTime == 5.0f && dc.steerReturnTime == 3.0f && dc.drive,
               "defaults: left stick steers, right trigger = gas (+ right grip: left click), left trigger = brake, curve 1, speed 0.5");
         Out po;
         CHECK(ParseOut("gas", &po) && po.kind == kGas && ParseOut("Throttle", &po) && po.kind == kGas && ParseOut("brake", &po) && po.kind == kBrake,
@@ -342,6 +342,20 @@ int main() {
         k.hand[0] = k.hand[1] = true; k.sx[1] = -1.0f;
         mr.Step(k, true, 0.011, rs, rr);
         CHECK(rr.drv[0] == -1.0f && rr.mx == 0 && rr.Take().empty(), "steer = right: the right stick steers");
+    }
+    {   // drive = 0 (the menu's switch): nothing driven, the gas trigger is quiet, the steering stick's left / right are keys
+        Config c = DefaultConfig();
+        c.drive = false;
+        ParseOut("a", &c.map[kLLeft]);
+        Mapper mp; Rec r; Frame f;
+        f.hand[0] = f.hand[1] = true;
+        f.sx[0] = -1.0f; f.trig[1] = 1.0f; f.trig[0] = 1.0f;
+        for (int i = 0; i < 3; ++i) mp.Step(f, true, 0.1, c, r);
+        CHECK(r.drives == 0 && r.Take() == "k01ev", "driving off: no steering / gas / brake, left stick left = its key (A)");
+        c.drive = true;
+        mp.Step(f, true, 0.1, c, r);
+        CHECK(r.drives == 1 && r.drv[1] == 1.0f && r.drv[2] == 1.0f && r.drv[0] < 0.0f && r.Take() == "k01e^",
+              "on again: steering, gas, brake; the key released");
     }
     {   // turn speed style (the default): the push turns the wheel, let go = back to the middle
         Config c = DefaultConfig();

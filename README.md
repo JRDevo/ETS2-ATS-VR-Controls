@@ -132,8 +132,8 @@ By default:
 
 Too twitchy? Make the curve bigger, or the full turn slower.
 
-**Switch driving off:** Driving tab > Stick that steers: **Off**, and give the gas / brake triggers another job (Buttons
-tab).
+**Switch driving off:** Driving tab > Driving: **Off** (or `drive = 0`). Then nothing steers, the gas / brake buttons do
+nothing, and the steering stick's left / right send their keys again. **On** brings it all back.
 
 It is smooth, like a gamepad: not on / off keys. How: ETS2 and ATS have their own door for input add-ons (the SCS input
 SDK). This mod is also such an add-on, so the game gets the stick and the triggers directly. **No driver**, no fake gamepad,
@@ -183,7 +183,7 @@ a laser pointer. A **white dot** appears where you point, and the key under it l
 - **Mouse** tab: which stick moves the mouse, its speed and dead zone, the air mouse button, hold or toggle, its speed.
 - **Panels** tab: menu size, keyboard size, show / hide the keyboard, bring both in front of you.
 - **Panels** tab also: the distance of each panel (Closer / Farther).
-- **Driving** tab: the steering style (turn speed / wheel), the stick that steers (left / right / off), the dead zone,
+- **Driving** tab: driving on / off, the steering style (turn speed / wheel), the stick that steers (left / right / off), the dead zone,
   curve, how far the wheel turns, and the times of the style. Gas and brake: any button, Buttons tab. See [Driving](#driving-with-one-controller).
 - **Look** tab: colours (Dark, Blue, Grey, Light, Black, Green), how see-through the menu and the keyboard are, and
   **pointer smoothing** (Off / Low / Medium / High): calms a shaky hand, for the menu pointer and the air mouse.

@@ -86,6 +86,7 @@ Config ParseConfig(const std::string& text) {
             else bad("use left, right or off");
             continue;
         }
+        if (key == "drive") { c.pad.drive = lv != "0" && lv != "off" && lv != "no"; continue; }
         if (key == "steer_mode") {
             if (lv == "wheel") c.pad.steerMode = 0;
             else if (lv == "rate" || lv == "turn" || lv == "speed") c.pad.steerMode = 1;
@@ -265,6 +266,7 @@ std::vector<std::pair<std::string, std::string>> MenuValues(const VrPad::Config&
     kv.push_back({ "modifier_keys", mk.empty() ? "none" : mk });
     snprintf(b, sizeof(b), "%.0f", (double)p.airGain);
     kv.push_back({ "air_speed", b });
+    kv.push_back({ "drive", p.drive ? "1" : "0" });
     kv.push_back({ "steer", p.steerStick == 1 ? "left" : p.steerStick == 2 ? "right" : "off" });
     snprintf(b, sizeof(b), "%.2f", (double)p.steerDeadzone);
     kv.push_back({ "steer_deadzone", b });
@@ -359,7 +361,7 @@ std::string DescribePad(const VrPad::Config& p) {
         const VrPad::Out& o = p.map[b];
         if (o.kind == VrPad::kNone) continue;
         if ((p.mouseStick == 1 && b >= VrPad::kLUp && b <= VrPad::kLRight) || (p.mouseStick == 2 && b >= VrPad::kRUp)) continue;
-        if (p.steerStick == (b >= VrPad::kRUp ? 2 : 1) && b >= VrPad::kLUp && (b - VrPad::kLUp) % 4 >= 2) continue;
+        if (VrPad::SteerStickOf(p) == (b >= VrPad::kRUp ? 2 : 1) && b >= VrPad::kLUp && (b - VrPad::kLUp) % 4 >= 2) continue;
         char v[48];
         switch (o.kind) {
         case VrPad::kMouseL: snprintf(v, sizeof(v), "mouse_left"); break;
@@ -389,7 +391,8 @@ std::string DescribePad(const VrPad::Config& p) {
         mod += std::string(" ") + VrPad::BtnNames()[b] + "=" + v;
     }
     char dr[200] = " | no steering";
-    if (p.steerStick)
+    if (!p.drive) snprintf(dr, sizeof(dr), " | driving off");
+    else if (p.steerStick)
         snprintf(dr, sizeof(dr), " | driving: %s stick steers, %s (dead zone %.2f, curve %.2f, max %.2f, %s %.2f, back to the middle %.1f s)",
                  p.steerStick == 1 ? "left" : "right", p.steerMode == 1 ? "rate" : "wheel", (double)p.steerDeadzone,
                  (double)p.steerCurve, (double)p.steerMax, p.steerMode == 1 ? "full turn s" : "speed / s",

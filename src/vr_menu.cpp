@@ -631,9 +631,9 @@ void VrMenu::Close() {
     LOGI("VR menu closed");
 }
 
-// steering (pad_map.h Config::steerStick) takes that stick's left / right directions
+// steering (pad_map.h SteerStickOf) takes that stick's left / right directions
 static bool DrivingUses(const VrPad::Config& p, int btn) {
-    return btn >= VrPad::kLUp && (btn - VrPad::kLUp) % 4 >= 2 && p.steerStick == (btn >= VrPad::kRUp ? 2 : 1);
+    return btn >= VrPad::kLUp && (btn - VrPad::kLUp) % 4 >= 2 && VrPad::SteerStickOf(p) == (btn >= VrPad::kRUp ? 2 : 1);
 }
 
 void VrMenu::Layout(int p) { if (p == kPanMenu) LayoutMenu(); else LayoutKb(); }
@@ -775,46 +775,48 @@ void VrMenu::LayoutMenu() {
         add(eInfo, 302, 24, 596, 952, 56, "Smoothing calms a shaky hand (menu pointer and air mouse).");
         add(eInfo, 0, 24, 716, 742, 64, status_.empty() ? "- = more see-through, + = more solid." : status_);
     } else {                                            // Driving (scs_input.h): steering here, gas / brake on any button
-        auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 156 + r * 76, 440, 64, label); };
+        auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 156 + r * 68, 440, 60, label); };
         auto opts = [&](int r, int base, std::initializer_list<const char*> names, int cur) {
             const int n = (int)names.size(), w = (506 - (n - 1) * 10) / n;
             int i = 0;
-            for (const char* nm : names) { add(eSet, base + i, 470 + i * (w + 10), 156 + r * 76, w, 64, nm, i == cur); ++i; }
+            for (const char* nm : names) { add(eSet, base + i, 470 + i * (w + 10), 156 + r * 68, w, 60, nm, i == cur); ++i; }
         };
         auto plusMinus = [&](int r, int base, const std::string& value) {
-            add(eSet, base, 470, 156 + r * 76, 90, 64, "\xE2\x88\x92");
-            add(eInfo, 200 + r, 570, 156 + r * 76, 306, 64, value);
-            add(eSet, base + 1, 886, 156 + r * 76, 90, 64, "+");
+            add(eSet, base, 470, 156 + r * 68, 90, 60, "\xE2\x88\x92");
+            add(eInfo, 200 + r, 570, 156 + r * 68, 306, 60, value);
+            add(eSet, base + 1, 886, 156 + r * 68, 90, 60, "+");
         };
         const bool rate = pad_.steerMode == 1;
-        row(0, "Steering style");
-        opts(0, 141, { "Turn speed", "Wheel" }, rate ? 0 : 1);
-        row(1, "Stick that steers");
-        opts(1, 130, { "Left", "Right", "Off" }, pad_.steerStick == 1 ? 0 : pad_.steerStick == 2 ? 1 : 2);
-        row(2, "Steering dead zone");
+        row(0, "Driving");
+        opts(0, 147, { "On", "Off" }, pad_.drive ? 0 : 1);
+        row(1, "Steering style");
+        opts(1, 141, { "Turn speed", "Wheel" }, rate ? 0 : 1);
+        row(2, "Stick that steers");
+        opts(2, 130, { "Left", "Right", "Off" }, pad_.steerStick == 1 ? 0 : pad_.steerStick == 2 ? 1 : 2);
+        row(3, "Steering dead zone");
         snprintf(b, sizeof(b), "%.2f", (double)pad_.steerDeadzone);
-        plusMinus(2, 133, b);
-        row(3, "Steering curve");
+        plusMinus(3, 133, b);
+        row(4, "Steering curve");
         snprintf(b, sizeof(b), pad_.steerCurve < 1.01f ? "%.2f (straight)" : "%.2f", (double)pad_.steerCurve);
-        plusMinus(3, 135, b);
-        row(4, rate ? "Wheel turns at most" : "Full stick turns the wheel");
+        plusMinus(4, 135, b);
+        row(5, rate ? "Wheel turns at most" : "Full stick turns the wheel");
         snprintf(b, sizeof(b), "%d %%", (int)(pad_.steerMax * 100.0f + 0.5f));
-        plusMinus(4, 137, b);
+        plusMinus(5, 137, b);
         if (rate) {
-            row(5, "Full stick: full turn in");
+            row(6, "Full stick: full turn in");
             snprintf(b, sizeof(b), "%.3g s", (double)pad_.steerTurnTime);
-            plusMinus(5, 143, b);
-            row(6, "Let go: straight again in");
+            plusMinus(6, 143, b);
+            row(7, "Let go: straight again in");
             snprintf(b, sizeof(b), "%.3g s", (double)pad_.steerReturnTime);
-            plusMinus(6, 145, b);
+            plusMinus(7, 145, b);
         } else {
-            row(5, "Steering speed");
+            row(6, "Steering speed");
             if (pad_.steerSpeed <= 0.0f) snprintf(b, sizeof(b), "at once");
             else snprintf(b, sizeof(b), "%.2g s to full", 1.0 / (double)pad_.steerSpeed);
-            plusMinus(5, 139, b);
+            plusMinus(6, 139, b);
         }
-        add(eInfo, 0, 24, 716, 742, 64, !status_.empty() ? status_ : rate ? "Push a little = turn slowly, all the way = fast."
-                                                                             : "The stick's place = the wheel's place.");
+        add(eInfo, 0, 24, 716, 742, 64, !status_.empty() ? status_ : !pad_.drive ? "Driving off: no steering, gas or brake."
+                                        : rate ? "Push a little = turn slowly, all the way = fast." : "The stick's place = the wheel's place.");
     }
     if (!(tab_ == 0 && picking))                        // every tab: back to the defaults (a second press does it)
         add(eSet, kResetArg, 776, 716, 200, 64, resetArm_ == tab_ ? "Sure? Reset" : "Reset tab", resetArm_ == tab_);
@@ -1122,6 +1124,7 @@ void VrMenu::SetValue(int arg) {
         break;
     }
     case 141: case 142: pad_.steerMode = arg == 141 ? 1 : 0; break;
+    case 147: case 148: pad_.drive = arg == 147; break;
     case 143: case 144: case 145: case 146: {          // rate: full-turn time / back-to-the-middle time, in steps (seconds)
         static const float kTimes[] = { 0.5f, 1.0f, 1.5f, 2.0f, 3.0f, 4.0f, 5.0f, 7.0f, 10.0f, 15.0f, 20.0f };
         constexpr int kLast = (int)(sizeof(kTimes) / sizeof(kTimes[0])) - 1;
@@ -1212,6 +1215,7 @@ void VrMenu::ResetTab() {
         break;
     }
     default:
+        pad_.drive = d.drive;
         pad_.steerStick = d.steerStick; pad_.steerDeadzone = d.steerDeadzone; pad_.steerCurve = d.steerCurve;
         pad_.steerMax = d.steerMax; pad_.steerSpeed = d.steerSpeed;
         pad_.steerMode = d.steerMode; pad_.steerTurnTime = d.steerTurnTime; pad_.steerReturnTime = d.steerReturnTime;

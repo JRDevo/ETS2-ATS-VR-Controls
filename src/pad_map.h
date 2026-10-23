@@ -171,6 +171,8 @@ struct Config {
     //              let go: the wheel goes back to the middle (full lock -> straight in steerReturnTime s).
     // Both: dead zone + curve on the stick, the wheel never past steerMax. Gas / brake: any button mapped to "gas" / "brake"
     // (map or modMap), see kGas.
+    bool  drive = true;                                // off: no steering, gas / brake buttons send nothing, the steering
+                                                       //   stick's left / right are buttons again (the menu's one switch)
     int   steerStick = 1;                              // 0 off, 1 left stick, 2 right stick
     float steerDeadzone = 0.10f;                       // stick, before steering starts
     float steerCurve = 1.0f;                           // 1 = straight; more = finer near the centre
@@ -241,6 +243,7 @@ inline float StickShape(float x, const Config& c) {   // -1 .. 1 after the dead 
     const float v = std::pow(k, c.steerCurve);
     return x < 0 ? -v : v;
 }
+inline int SteerStickOf(const Config& c) { return c.drive ? c.steerStick : 0; }   // the stick that steers now (0 none)
 inline float SteerOf(float x, const Config& c) { return StickShape(x, c) * c.steerMax; }   // wheel style: the wheel position
 inline float PedalOf(float t) {
     constexpr float kRest = 0.05f;                     // a resting finger: no throttle
@@ -300,7 +303,7 @@ public:
             airOn_ = false;
         }
         // stick mouse
-        const int ms = c.steerStick == c.mouseStick ? 0 : c.mouseStick;   // (steering owns that stick)
+        const int ms = SteerStickOf(c) == c.mouseStick ? 0 : c.mouseStick;   // (steering owns that stick)
         if (active && (ms == 1 || ms == 2) && f.hand[ms - 1] && dt > 0.0 && dt < 0.25) {
             const int h = ms - 1;
             const double x = f.sx[h], y = f.sy[h];
@@ -315,7 +318,7 @@ public:
         }
         // driving: sent only when a value changed (inactive = all 0, at once)
         float dv[3] = {};
-        if (active) {
+        if (active && c.drive) {
             const int sh = c.steerStick - 1;
             const float x = (sh == 0 || sh == 1) && f.hand[sh] ? f.sx[sh] : 0.0f;
             const float t = (float)(dt > 0.0 && dt < 0.25 ? dt : 0.011);
@@ -374,7 +377,7 @@ private:
                 const int u = h ? kRUp : kLUp;
                 ana(u + 0, f.sy[h]);
                 ana(u + 1, -f.sy[h]);
-                if (c.steerStick != h + 1) {           // (left / right: not while that stick steers)
+                if (SteerStickOf(c) != h + 1) {        // (left / right: not while that stick steers)
                     ana(u + 2, -f.sx[h]);
                     ana(u + 3, f.sx[h]);
                 }
@@ -396,7 +399,7 @@ private:
         default: break;
         }
         const int d = (b - kLUp) % 4;                  // up, down, left, right
-        if (c.mouseStick == h + 1 || (d >= 2 && c.steerStick == h + 1)) return 0.0f;
+        if (c.mouseStick == h + 1 || (d >= 2 && SteerStickOf(c) == h + 1)) return 0.0f;
         const float v = d == 0 ? f.sy[h] : d == 1 ? -f.sy[h] : d == 2 ? -f.sx[h] : f.sx[h];
         if (v <= c.deadzone || c.deadzone >= 1.0f) return 0.0f;
         const float k = ((v > 1.0f ? 1.0f : v) - c.deadzone) / (1.0f - c.deadzone);

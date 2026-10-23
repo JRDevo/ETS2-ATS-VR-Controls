@@ -340,6 +340,8 @@ int main(int argc, char** argv) {
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 131) && m.Pad().steerStick == 2, "steer: right");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 132) && m.Pad().steerStick == 0, "steer: off");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 130) && m.Pad().steerStick == 1, "steer: left again");
+        CHECK(m.Pad().drive && click(1, VrMenu::kPanMenu, VrMenu::eSet, 148) && !m.Pad().drive, "Driving: Off");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 147) && m.Pad().drive, "Driving: On");
         CHECK(m.Pad().steerMode == 1 && m.Pad().steerTurnTime == 5.0f && m.Pad().steerReturnTime == 3.0f,
               "default style: turn speed, full turn 5 s, back in 3 s");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 144) && m.Pad().steerTurnTime == 7.0f, "full turn 5 -> 7 s (slower)");
@@ -386,10 +388,12 @@ int main(int argc, char** argv) {
               "A = Shift + F again (as the config.ini checks below expect)");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 4) && click(1, VrMenu::kPanMenu, VrMenu::eSet, 144) &&
               click(1, VrMenu::kPanMenu, VrMenu::eSet, 131) && click(1, VrMenu::kPanMenu, VrMenu::eSet, 142) &&
-              m.Pad().steerTurnTime == 7.0f && m.Pad().steerStick == 2 && m.Pad().steerMode == 0, "Driving changed");
+              click(1, VrMenu::kPanMenu, VrMenu::eSet, 148) &&
+              m.Pad().steerTurnTime == 7.0f && m.Pad().steerStick == 2 && m.Pad().steerMode == 0 && !m.Pad().drive, "Driving changed");
         const float mouseSpeed = m.Pad().mouseSpeed;
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) && click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) &&
-              m.Pad().steerTurnTime == 5.0f && m.Pad().steerMode == 1 && m.Pad().steerStick == 1 && m.Pad().mouseSpeed == mouseSpeed,
+              m.Pad().steerTurnTime == 5.0f && m.Pad().steerMode == 1 && m.Pad().steerStick == 1 && m.Pad().drive &&
+              m.Pad().mouseSpeed == mouseSpeed,
               "Driving tab reset (the Mouse tab untouched)");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 3), "Look tab again");
     }

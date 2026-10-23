@@ -9,7 +9,7 @@
 //   * Menu panel: tabs Buttons (every controller button and what it sends: point at one, then pick a key on the keyboard or a
 //     mouse button / none from the bar; "Normal" or "With modifier": what a button sends while the modifier button -- chosen
 //     there, default the right grip -- is held, e.g. right grip + B = right click), Mouse (stick mouse, air mouse
-//     hold / toggle, speeds), Panels (sizes, bring here), Driving (steering style turn speed / wheel, the stick that
+//     hold / toggle, speeds), Panels (sizes, bring here), Driving (on / off, steering style turn speed / wheel, the stick that
 //     steers, its dead zone, curve, the most wheel, the style's times; gas / brake are button choices in Buttons). Every
 //     tab: Reset tab (two presses).
 //   * Keyboard panel: a full-size keyboard (main block, F-keys, arrows / navigation, number pad) as one flat block (no title
