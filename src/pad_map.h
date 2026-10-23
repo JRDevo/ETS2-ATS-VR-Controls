@@ -164,14 +164,21 @@ struct Config {
     int   modBtn = kRGrip;
     Out   modMap[kBtnCount];
     // driving -- analog values for the game's own input plugin door (scs_input.h), not keys. Steering: steerStick's x (its
-    // left / right directions are then not buttons, and a mouse on that stick is off); the wheel follows the stick at most
-    // steerSpeed full turns (centre -> full lock) per second, so a flick does not throw the wheel. Gas / brake: any button
-    // mapped to "gas" / "brake" (map or modMap), see kGas.
+    // left / right directions are then not buttons, and a mouse on that stick is off), in one of two styles (steerMode):
+    //   wheel (0): the stick's position is the wheel's position; the wheel follows it at most steerSpeed full turns (centre ->
+    //              full lock) per second, so a flick does not throw the wheel.
+    //   rate  (1): the stick's push is how fast the wheel turns -- a little = slowly, full = full lock in steerTurnTime s;
+    //              let go: the wheel goes back to the middle (full lock -> straight in steerReturnTime s).
+    // Both: dead zone + curve on the stick, the wheel never past steerMax. Gas / brake: any button mapped to "gas" / "brake"
+    // (map or modMap), see kGas.
     int   steerStick = 1;                              // 0 off, 1 left stick, 2 right stick
     float steerDeadzone = 0.10f;                       // stick, before steering starts
     float steerCurve = 1.0f;                           // 1 = straight; more = finer near the centre
     float steerMax = 1.0f;                             // full stick = this much of the wheel (0.2 .. 1)
-    float steerSpeed = 0.5f;                           // centre -> full lock per second at most (0 = at once)
+    float steerSpeed = 0.5f;                           // wheel: centre -> full lock per second at most (0 = at once)
+    int   steerMode = 1;                               // 0 wheel, 1 rate
+    float steerTurnTime = 5.0f;                        // rate: full stick turns centre -> full lock in this many seconds
+    float steerReturnTime = 3.0f;                      // rate: let go, full lock -> straight in this many seconds
 };
 inline Config DefaultConfig() {
     Config c;
@@ -227,13 +234,14 @@ struct Sink {
 
 // driving: the stick's x (-1 left .. +1 right) as the wanted steering after the dead zone and curve; a trigger as a pedal
 // (0 .. 1)
-inline float SteerOf(float x, const Config& c) {
+inline float StickShape(float x, const Config& c) {   // -1 .. 1 after the dead zone and curve
     const float a = x < 0 ? -x : x;
     if (a <= c.steerDeadzone || c.steerDeadzone >= 1.0f) return 0.0f;
     const float k = ((a > 1.0f ? 1.0f : a) - c.steerDeadzone) / (1.0f - c.steerDeadzone);
-    const float v = std::pow(k, c.steerCurve) * c.steerMax;
+    const float v = std::pow(k, c.steerCurve);
     return x < 0 ? -v : v;
 }
+inline float SteerOf(float x, const Config& c) { return StickShape(x, c) * c.steerMax; }   // wheel style: the wheel position
 inline float PedalOf(float t) {
     constexpr float kRest = 0.05f;                     // a resting finger: no throttle
     if (t <= kRest) return 0.0f;
@@ -309,13 +317,27 @@ public:
         float dv[3] = {};
         if (active) {
             const int sh = c.steerStick - 1;
-            float st = sh == 0 || sh == 1 ? (f.hand[sh] ? SteerOf(f.sx[sh], c) : 0.0f) : 0.0f;
-            if (c.steerSpeed > 0.0f) {                 // the wheel turns toward the stick, not at once
-                const float step = c.steerSpeed * (float)(dt > 0.0 && dt < 0.25 ? dt : 0.011);
-                const float cur = drive_[0];
-                st = st > cur + step ? cur + step : st < cur - step ? cur - step : st;
+            const float x = (sh == 0 || sh == 1) && f.hand[sh] ? f.sx[sh] : 0.0f;
+            const float t = (float)(dt > 0.0 && dt < 0.25 ? dt : 0.011);
+            const float cur = drive_[0];
+            float st;
+            if (c.steerMode == 1) {                    // rate: the push turns the wheel; let go = back to the middle
+                const float r = StickShape(x, c);
+                if (r != 0.0f) {
+                    st = cur + r * t / (c.steerTurnTime > 0.1f ? c.steerTurnTime : 0.1f);
+                } else {
+                    const float step = t / (c.steerReturnTime > 0.1f ? c.steerReturnTime : 0.1f);
+                    st = cur > step ? cur - step : cur < -step ? cur + step : 0.0f;
+                }
+                st = st > c.steerMax ? c.steerMax : st < -c.steerMax ? -c.steerMax : st;
+            } else {                                   // wheel: the stick's position, reached at most steerSpeed / s
+                st = SteerOf(x, c);
+                if (c.steerSpeed > 0.0f) {
+                    const float step = c.steerSpeed * t;
+                    st = st > cur + step ? cur + step : st < cur - step ? cur - step : st;
+                }
             }
-            dv[0] = st;
+            dv[0] = sh == 0 || sh == 1 ? st : 0.0f;
             for (int b = 0; b < kBtnCount; ++b) {      // gas / brake: the most pressed button mapped to each
                 if (b == c.airBtn) continue;
                 const Out& o = modOn && b != c.modBtn && c.modMap[b].kind != kNone ? c.modMap[b] : c.map[b];

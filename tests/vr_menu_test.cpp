@@ -340,6 +340,18 @@ int main(int argc, char** argv) {
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 131) && m.Pad().steerStick == 2, "steer: right");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 132) && m.Pad().steerStick == 0, "steer: off");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 130) && m.Pad().steerStick == 1, "steer: left again");
+        CHECK(m.Pad().steerMode == 1 && m.Pad().steerTurnTime == 5.0f && m.Pad().steerReturnTime == 3.0f,
+              "default style: turn speed, full turn 5 s, back in 3 s");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 144) && m.Pad().steerTurnTime == 7.0f, "full turn 5 -> 7 s (slower)");
+        click(1, VrMenu::kPanMenu, VrMenu::eSet, 143);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 143) && m.Pad().steerTurnTime == 4.0f, "full turn -> 4 s");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 146) && m.Pad().steerReturnTime == 4.0f, "back 3 -> 4 s");
+        click(1, VrMenu::kPanMenu, VrMenu::eSet, 144);
+        click(1, VrMenu::kPanMenu, VrMenu::eSet, 145);
+        CHECK(m.Pad().steerTurnTime == 5.0f && m.Pad().steerReturnTime == 3.0f, "times back");
+        CHECK(!click(1, VrMenu::kPanMenu, VrMenu::eSet, 139), "turn speed style: no wheel speed row");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 142) && m.Pad().steerMode == 0, "style: wheel");
+        CHECK(!click(1, VrMenu::kPanMenu, VrMenu::eSet, 143), "wheel style: no full-turn row");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 136) && std::fabs(m.Pad().steerCurve - 1.25f) < 0.01f, "curve 1 -> 1.25");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 137) && std::fabs(m.Pad().steerMax - 0.9f) < 0.01f, "full stick 100 -> 90 %%");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 139) && m.Pad().steerSpeed == 0.35f, "speed 0.5 -> 0.35 (slower)");
@@ -352,6 +364,7 @@ int main(int argc, char** argv) {
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 138);
         CHECK(m.Pad().steerSpeed == 0.5f && std::fabs(m.Pad().steerCurve - 1.0f) < 0.01f && std::fabs(m.Pad().steerMax - 1.0f) < 0.01f,
               "driving settings back (speed %.2f)", (double)m.Pad().steerSpeed);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 141) && m.Pad().steerMode == 1, "style: turn speed again");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 0) && click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kLGrip) &&
               click(1, VrMenu::kPanMenu, VrMenu::ePickOut, VrPad::kBrake) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kBrake,
               "Buttons tab: left grip = Brake (picked from the bar)");
@@ -371,11 +384,12 @@ int main(int argc, char** argv) {
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kA) && click(1, VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("shift")) &&
               click(1, VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("f")) && m.Pad().map[VrPad::kA].n == 2,
               "A = Shift + F again (as the config.ini checks below expect)");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 4) && click(1, VrMenu::kPanMenu, VrMenu::eSet, 140) &&
-              click(1, VrMenu::kPanMenu, VrMenu::eSet, 131) && m.Pad().steerSpeed == 0.75f && m.Pad().steerStick == 2, "Driving changed");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 4) && click(1, VrMenu::kPanMenu, VrMenu::eSet, 144) &&
+              click(1, VrMenu::kPanMenu, VrMenu::eSet, 131) && click(1, VrMenu::kPanMenu, VrMenu::eSet, 142) &&
+              m.Pad().steerTurnTime == 7.0f && m.Pad().steerStick == 2 && m.Pad().steerMode == 0, "Driving changed");
         const float mouseSpeed = m.Pad().mouseSpeed;
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) && click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) &&
-              m.Pad().steerSpeed == 0.5f && m.Pad().steerStick == 1 && m.Pad().mouseSpeed == mouseSpeed,
+              m.Pad().steerTurnTime == 5.0f && m.Pad().steerMode == 1 && m.Pad().steerStick == 1 && m.Pad().mouseSpeed == mouseSpeed,
               "Driving tab reset (the Mouse tab untouched)");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 3), "Look tab again");
     }

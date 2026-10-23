@@ -71,7 +71,7 @@ steering, right trigger = gas, left trigger = brake.
 | Right grip + right trigger | left mouse click | click while the air mouse aims |
 | Right trigger | **gas pedal** (press harder = more gas, let go = roll) | |
 | B | Esc | menu / back |
-| Left stick left / right | **steering** (let go = straight) | see [Driving](#driving-with-one-controller) |
+| Left stick left / right | **steering** (push more = turn faster; let go = straight again) | see [Driving](#driving-with-one-controller) |
 | Left trigger | **brake** (press harder = more brake) | |
 | X | `[` | left indicator |
 | Y | `]` | right indicator |
@@ -98,7 +98,7 @@ By default:
 
 | Controller | Does |
 |---|---|
-| Left stick left / right | steering wheel. Let go: the wheel goes straight again. |
+| Left stick left / right | steering. Push a little = turn slowly, all the way = fast. Let go: the wheel goes straight again. |
 | Right trigger | gas pedal. Press a little = a little gas. Let go = the truck rolls (no gas). |
 | Left trigger | brake. Press a little = a little brake. |
 | Right grip + right trigger | left mouse click (not gas): hold the grip to aim with the air mouse, pull the trigger to click |
@@ -113,16 +113,27 @@ By default:
 - The steering stick: left, right or off (Driving tab, or `steer = left / right / off`). That stick's left / right then
   steer; its up / down are still free buttons (for example gas and brake).
 
+**Two steering styles** (Driving tab > Steering style, or `steer_mode`):
+
+- **Turn speed** (`rate`, the default): how far you push the stick = how fast the wheel turns. Push a little: the wheel
+  turns slowly and gently. Push all the way: it turns fast. Let go: the wheel goes back to the middle by itself.
+- **Wheel** (`wheel`): where the stick is = where the wheel is. Stick half left = wheel half left.
+
 **Steering feel** (Driving tab, or `config.ini`):
 
 | Setting | What it does | Default |
 |---|---|---|
 | Steering dead zone (`steer_deadzone`) | how far the stick must move before the wheel turns | 0.10 |
-| Steering curve (`steer_curve`) | 1 = straight. More = small stick moves turn the wheel only a little; full lock only at the end | 1.00 |
-| Full stick turns the wheel (`steer_max`) | how much of the wheel full stick turns | 100 % |
-| Steering speed (`steer_speed`) | how fast the wheel follows the stick, in full turns per second. 0.5 = 2 seconds from the middle to full lock. Less = calmer, more = quicker. 0 = at once (twitchy) | 0.50 |
+| Steering curve (`steer_curve`) | 1 = straight. More = small pushes much gentler (both styles) | 1.00 |
+| Wheel turns at most (`steer_max`) | how far the wheel can turn | 100 % |
+| Full stick: full turn in (`steer_turn_time`, turn speed) | seconds from the middle to full lock with the stick all the way. More = calmer | 5 s |
+| Let go: straight again in (`steer_return_time`, turn speed) | seconds from full lock back to straight after you let go | 3 s |
+| Steering speed (`steer_speed`, wheel) | how fast the wheel follows the stick, in full turns per second. 0.5 = 2 seconds to full lock. 0 = at once (twitchy) | 0.50 |
 
-Too twitchy? Make the curve bigger, or the steering speed slower.
+Too twitchy? Make the curve bigger, or the full turn slower.
+
+**Switch driving off:** Driving tab > Stick that steers: **Off**, and give the gas / brake triggers another job (Buttons
+tab).
 
 It is smooth, like a gamepad: not on / off keys. How: ETS2 and ATS have their own door for input add-ons (the SCS input
 SDK). This mod is also such an add-on, so the game gets the stick and the triggers directly. **No driver**, no fake gamepad,
@@ -172,8 +183,8 @@ a laser pointer. A **white dot** appears where you point, and the key under it l
 - **Mouse** tab: which stick moves the mouse, its speed and dead zone, the air mouse button, hold or toggle, its speed.
 - **Panels** tab: menu size, keyboard size, show / hide the keyboard, bring both in front of you.
 - **Panels** tab also: the distance of each panel (Closer / Farther).
-- **Driving** tab: the stick that steers (left / right / off), the steering dead zone, curve, how far full stick turns
-  the wheel and the steering speed. Gas and brake: any button, Buttons tab. See [Driving](#driving-with-one-controller).
+- **Driving** tab: the steering style (turn speed / wheel), the stick that steers (left / right / off), the dead zone,
+  curve, how far the wheel turns, and the times of the style. Gas and brake: any button, Buttons tab. See [Driving](#driving-with-one-controller).
 - **Look** tab: colours (Dark, Blue, Grey, Light, Black, Green), how see-through the menu and the keyboard are, and
   **pointer smoothing** (Off / Low / Medium / High): calms a shaky hand, for the menu pointer and the air mouse.
 - **Reset tab** (bottom right of every tab): puts that tab's settings back to the defaults. Press it twice (the first

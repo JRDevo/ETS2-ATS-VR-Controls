@@ -255,14 +255,16 @@ int main() {
     printf("(3) driving\n");
     {
         Config c = DefaultConfig();                    // left stick x = steering; here: left trigger = gas, curve 2, no modifier keys
-        c.steerSpeed = 0.0f;                           // (at once: the values below are exact)
+        c.steerSpeed = 0.0f;                           // (wheel style, at once: the values below are exact)
+        c.steerMode = 0;
         c.steerCurve = 2.0f;
         ParseOut("gas", &c.map[kLTrig]);
         c.map[kRTrig] = Out();
         for (Out& mo : c.modMap) mo = Out();
         const Config dc = DefaultConfig();
         CHECK(dc.steerStick == 1 && dc.map[kRTrig].kind == kGas && dc.map[kLTrig].kind == kBrake && dc.map[kLGrip].kind == kNone &&
-              dc.modMap[kRTrig].kind == kMouseL && dc.steerSpeed == 0.5f && dc.steerCurve == 1.0f,
+              dc.modMap[kRTrig].kind == kMouseL && dc.steerSpeed == 0.5f && dc.steerCurve == 1.0f && dc.steerMode == 1 &&
+              dc.steerTurnTime == 5.0f && dc.steerReturnTime == 3.0f,
               "defaults: left stick steers, right trigger = gas (+ right grip: left click), left trigger = brake, curve 1, speed 0.5");
         Out po;
         CHECK(ParseOut("gas", &po) && po.kind == kGas && ParseOut("Throttle", &po) && po.kind == kGas && ParseOut("brake", &po) && po.kind == kBrake,
@@ -341,8 +343,38 @@ int main() {
         mr.Step(k, true, 0.011, rs, rr);
         CHECK(rr.drv[0] == -1.0f && rr.mx == 0 && rr.Take().empty(), "steer = right: the right stick steers");
     }
-    {   // steering speed: the wheel follows the stick at most steerSpeed full turns per second
+    {   // turn speed style (the default): the push turns the wheel, let go = back to the middle
         Config c = DefaultConfig();
+        c.steerDeadzone = 0.0f;                        // (curve 1, full turn 5 s, back in 3 s: the defaults)
+        Mapper mp; Rec r; Frame f;
+        f.hand[0] = true; f.sx[0] = 1.0f;
+        for (int i = 0; i < 10; ++i) mp.Step(f, true, 0.1, c, r);
+        CHECK(std::fabs(r.drv[0] - 0.2f) < 1e-4f, "full stick 1 s: 1/5 of the wheel (%.3f)", (double)r.drv[0]);
+        f.sx[0] = 0.5f;
+        for (int i = 0; i < 10; ++i) mp.Step(f, true, 0.1, c, r);
+        CHECK(std::fabs(r.drv[0] - 0.3f) < 1e-4f, "half stick 1 s: half as fast (%.3f)", (double)r.drv[0]);
+        f.sx[0] = 0.0f;
+        for (int i = 0; i < 3; ++i) mp.Step(f, true, 0.1, c, r);
+        CHECK(std::fabs(r.drv[0] - 0.2f) < 1e-4f, "let go 0.3 s: 0.1 back toward the middle (%.3f)", (double)r.drv[0]);
+        for (int i = 0; i < 10; ++i) mp.Step(f, true, 0.1, c, r);
+        CHECK(r.drv[0] == 0.0f, "... and straight, not past the middle");
+        f.sx[0] = -1.0f;
+        for (int i = 0; i < 80; ++i) mp.Step(f, true, 0.1, c, r);
+        CHECK(r.drv[0] == -1.0f, "held 8 s: full left, no further");
+        Config m = c; m.steerMax = 0.5f;
+        mp.Step(f, true, 0.1, m, r);
+        CHECK(r.drv[0] == -0.5f, "never past steer_max");
+        Config cv = c; cv.steerCurve = 2.0f;           // the curve on the push: a small push turns much more slowly
+        Mapper mc; Rec rc; Frame g;
+        g.hand[0] = true; g.sx[0] = 0.5f;
+        for (int i = 0; i < 10; ++i) mc.Step(g, true, 0.1, cv, rc);
+        CHECK(std::fabs(rc.drv[0] - 0.05f) < 1e-4f, "curve 2, half push 1 s: 0.25 / 5 (%.3f)", (double)rc.drv[0]);
+        mc.Step(g, false, 0.1, cv, rc);
+        CHECK(rc.drv[0] == 0.0f, "inactive: 0 at once");
+    }
+    {   // wheel style speed: the wheel follows the stick at most steerSpeed full turns per second
+        Config c = DefaultConfig();
+        c.steerMode = 0;
         c.steerSpeed = 2.0f; c.steerCurve = 1.0f; c.steerDeadzone = 0.0f;
         Mapper mp; Rec r; Frame f;
         f.hand[0] = true; f.sx[0] = 1.0f;
