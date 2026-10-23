@@ -6,8 +6,10 @@
 //     aforward = throttle, abackward = brake) and work with no binding in the game's options (controls.sii has
 //     "+ semantical.aforward?0" etc. in its mixes). Steering: -1 full left .. +1 full right; pedals 0 .. 1.
 //   * The controllers' side (pad_map.h Mapper, the game's VR thread) only stores the values (DriveSet: three atomic floats,
-//     on change). The game's main thread asks once per frame (event callback, first_in_frame) and gets only what changed since
-//     it was last told (all three after an activation), one event per call, then "not found".
+//     on change). The game's main thread asks once per frame (event callback, first_in_frame) and gets ALL THREE every frame,
+//     one event per call, then "not found" (a value not told in a frame may count as released: steering snapped back).
+//   * log = 1 only: also a telemetry plugin (scs_telemetry_init: truck.input / effective.steering, truck.speed) so the log
+//     shows what the game made of our steering ("drive: sent ... | game input ..., used ..."), 10 lines a second at most.
 //   * Only for a game in config.ini 'apps' with enabled = 1 (anything else: unsupported, nothing registered). The device is
 //     registered whatever the settings say, so the VR menu can change steering / gas / brake at once (unused = 0).
 #pragma once

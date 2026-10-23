@@ -336,6 +336,7 @@ if (-not $Only -or $Only -eq 'drive') {
     Check 'drive' ($r.game -match 'scs same module: yes') 'the OpenXR loader got the same module (shared values)'
     $j = $scs -join ' | '
     Check 'drive' ($j -match '^scs steering 0\.000 \| scs aforward 0\.000 \| scs abackward 0\.000') 'all three told at the first frame'
+    Check 'drive' ($r.game -match 'scs events per frame: 3 \.\. 3') 'all three told in EVERY frame (a value not told may count as released)'
     Check 'drive' ($j -match 'scs steering 0\.250 \| scs steering 0\.000 \| scs steering -1\.000 \| scs steering 0\.000') 'steering: 0.25, straight, full left, straight'
     Check 'drive' ($j -match 'scs aforward 0\.500 \| scs aforward 0\.000') 'gas (left trigger) half, then 0 (roll)'
     Check 'drive' ($j -match 'scs abackward 0\.600 \| scs abackward 0\.000') 'brake (left grip) 0.6, then 0'

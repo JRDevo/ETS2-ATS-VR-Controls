@@ -37,6 +37,15 @@ struct ScsInitV100 {                                        // scs_input_init_pa
     const char* game_name; const char* game_id; uint32_t game_version; uint32_t padding; ScsLog log;
     ScsRegister register_device;
 };
+struct ScsValue { uint32_t type; uint32_t padding; union { float value_float; double sizing[7]; }; };   // scs_value_t
+typedef void (__stdcall* ScsChannelCb)(const char* name, uint32_t index, const ScsValue* value, void* context);
+typedef scs_result_t (__stdcall* ScsRegisterChannel)(const char* name, uint32_t index, uint32_t type, uint32_t flags,
+                                                     ScsChannelCb callback, void* context);
+struct ScsTelemetryInitV100 {                               // scs_telemetry_init_params_v100_t (64 bytes)
+    const char* game_name; const char* game_id; uint32_t game_version; uint32_t padding; ScsLog log;
+    void* register_for_event; void* unregister_from_event; ScsRegisterChannel register_for_channel; void* unregister_from_channel;
+};
+static_assert(sizeof(ScsTelemetryInitV100) == 64, "SCS telemetry layout (x64)");
 static_assert(sizeof(ScsEvent) == 28 && sizeof(ScsDeviceInput) == 24 && sizeof(ScsDevice) == 56 && sizeof(ScsInitV100) == 40,
               "SCS SDK layouts (x64)");
 
@@ -47,25 +56,54 @@ const ScsDeviceInput kInputs[3] = {
     { "abackward", "Brake", kValueFloat, 0 },
 };
 // main thread only (the game's)
-float g_now[3] = {}, g_told[3] = { NAN, NAN, NAN };
+float g_now[3] = {};
 int   g_next = 3;
 int   g_activeLogs = 0;
+// telemetry (log = 1: what the game made of our steering; the game's main thread too)
+std::atomic<float> g_tm[3];                                 // truck.input.steering, truck.effective.steering, truck.speed
+bool   g_tmOn = false, g_logDrive = false;
+double g_lastDriveLog = 0;
+float  g_lastLogged[3] = { NAN, NAN, NAN };
+int    g_driveLogs = 0;
 
+double NowSec() {
+    static LARGE_INTEGER f = [] { LARGE_INTEGER x; QueryPerformanceFrequency(&x); return x; }();
+    LARGE_INTEGER c;
+    QueryPerformanceCounter(&c);
+    return (double)c.QuadPart / (double)f.QuadPart;
+}
+
+// log = 1: ten lines a second at most while anything moves, the first 3000 (about 5 minutes of steering): what we sent, what
+// the game took as input and what its simulation used (truck.input / effective.steering are counterclockwise: + = left)
+void LogDrive() {
+    if (!g_logDrive || g_driveLogs >= 3000) return;
+    const double now = NowSec();
+    if (now - g_lastDriveLog < 0.1) return;
+    const float in = g_tm[0].load(std::memory_order_relaxed), eff = g_tm[1].load(std::memory_order_relaxed);
+    if (g_now[0] == g_lastLogged[0] && in == g_lastLogged[1] && eff == g_lastLogged[2]) return;
+    g_lastDriveLog = now;
+    g_lastLogged[0] = g_now[0]; g_lastLogged[1] = in; g_lastLogged[2] = eff;
+    ++g_driveLogs;
+    if (g_tmOn)
+        LOGI("drive: sent steer %+.3f gas %.2f brake %.2f | game input steer %+.3f, used %+.3f | %.0f km/h%s", g_now[0], g_now[1],
+             g_now[2], -in, -eff, g_tm[2].load(std::memory_order_relaxed) * 3.6f, g_driveLogs == 3000 ? " (no more of these lines)" : "");
+    else
+        LOGI("drive: sent steer %+.3f gas %.2f brake %.2f%s", g_now[0], g_now[1], g_now[2], g_driveLogs == 3000 ? " (no more of these lines)" : "");
+}
+
+// All three values every frame: a semantical input the game is not told in a frame may count as released (steering that
+// snapped back the moment the thumb held still).
 scs_result_t __stdcall OnEvent(ScsEvent* ev, uint32_t flags, void*) {
-    if (flags & kFirstAfterActivation) for (float& t : g_told) t = NAN;   // (NaN differs from everything: all told again)
     if (flags & kFirstInFrame) {
         for (int i = 0; i < 3; ++i) g_now[i] = g_val[i].load(std::memory_order_relaxed);
         g_next = 0;
+        LogDrive();
     }
-    for (; g_next < 3; ++g_next) {
-        if (g_now[g_next] == g_told[g_next]) continue;
-        ev->input_index = (uint32_t)g_next;
-        ev->value_float = g_now[g_next];
-        g_told[g_next] = g_now[g_next];
-        ++g_next;
-        return kOk;
-    }
-    return kNotFound;
+    if (g_next >= 3) return kNotFound;
+    ev->input_index = (uint32_t)g_next;
+    ev->value_float = g_now[g_next];
+    ++g_next;
+    return kOk;
 }
 void __stdcall OnActive(uint8_t active, void*) {
     if (g_activeLogs < 10) LOGI("driving: the game %s our input device%s", active ? "uses" : "stopped using",
@@ -73,6 +111,10 @@ void __stdcall OnActive(uint8_t active, void*) {
 }
 
 }  // namespace
+
+void __stdcall OnChannel(const char*, uint32_t, const ScsValue* v, void* context) {
+    if (v && v->type == kValueFloat) g_tm[(int)(intptr_t)context].store(v->value_float, std::memory_order_relaxed);
+}
 
 void DriveSet(float steer, float throttle, float brake) {
     g_val[0].store(steer, std::memory_order_relaxed);
@@ -108,7 +150,26 @@ extern "C" __declspec(dllexport) ck::scs_result_t __stdcall scs_input_init(const
     }
     LOGI("driving: input device registered in %s (input API 1.0, game input version %u.%u)", p->game_name ? p->game_name : "?",
          p->game_version >> 16, p->game_version & 0xFFFF);
+    g_logDrive = c->log;
     return kOk;
 }
+
+// The telemetry API: only with log = 1, to write what the game made of our steering (LogDrive). Nothing else uses it yet.
+extern "C" __declspec(dllexport) ck::scs_result_t __stdcall scs_telemetry_init(const uint32_t version, const void* params) {
+    using namespace ck;
+    if ((version >> 16) != 1 || !params) return kUnsupported;
+    const Config* c = GameConfig();
+    if (!c || !c->log) return kUnsupported;
+    const ScsTelemetryInitV100* p = static_cast<const ScsTelemetryInitV100*>(params);
+    if (!p->register_for_channel) return kGenericError;
+    static const char* const kCh[3] = { "truck.input.steering", "truck.effective.steering", "truck.speed" };
+    int ok = 0;
+    for (int i = 0; i < 3; ++i) ok += p->register_for_channel(kCh[i], 0xFFFFFFFFu, kValueFloat, 0, OnChannel, (void*)(intptr_t)i) == kOk;
+    g_tmOn = ok == 3;
+    LOGI("driving: telemetry for the log (%d of 3 channels)", ok);
+    return kOk;
+}
+
+extern "C" __declspec(dllexport) void __stdcall scs_telemetry_shutdown(void) { ck::g_tmOn = false; }
 
 extern "C" __declspec(dllexport) void __stdcall scs_input_shutdown(void) {}

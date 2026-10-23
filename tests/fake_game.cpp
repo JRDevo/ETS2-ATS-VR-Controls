@@ -16,8 +16,8 @@
 //                   suggested on Touch, attached with the game's set
 //     --scs <dll>   what ETS2 / ATS's plugin loader does first: loads <dll> (the layer's file) and calls its scs_input_init with
 //                   a register_device of ours; each frame asks the device for its events (first_in_frame, first_after_activation
-//                   at the first) and prints "scs <input> <value> at <t>" for each; "scs same module" = the OpenXR loader got
-//                   the same module
+//                   at the first) and prints "scs <input> <value> at <t>" when a value changed ("scs events per frame:
+//                   min .. max" at the end); "scs same module" = the OpenXR loader got the same module
 // Exit code 0 = every OpenXR call the game made succeeded.
 #include <windows.h>
 #include <d3d11.h>
@@ -84,6 +84,8 @@ int main(int argc, char** argv) {
         printf("scs init %s -> %d\n", scsDll, (int)r);
     }
     bool scsFirst = true;
+    float scsLast[8] = { -9, -9, -9, -9, -9, -9, -9, -9 };   // the last value printed per input
+    int scsMin = 99, scsMax = -1;                            // events per frame
     int frame = 0, inactive = 0;
     bool synced = false;
     XrInstanceCreateInfo ic{XR_TYPE_INSTANCE_CREATE_INFO};
@@ -232,13 +234,19 @@ int main(int argc, char** argv) {
         if (g_scsDev.event_cb) {                         // the game's main thread: the device's events of this frame
             uint32_t flags = 1u | (scsFirst ? 2u : 0u);
             scsFirst = false;
-            for (int n = 0; n < 16; ++n) {
+            int n = 0;
+            for (; n < 16; ++n) {
                 ScsEvent e = {};
                 if (g_scsDev.event_cb(&e, flags, g_scsDev.context) != 0) break;
                 flags = 0;
-                printf("scs %s %.3f at %.2f\n", e.input_index < 8 && g_scsNames[e.input_index] ? g_scsNames[e.input_index] : "?",
-                       (double)e.value_float, Now() - t0);
+                if (e.input_index < 8 && e.value_float != scsLast[e.input_index]) {   // (printed only when it changed)
+                    scsLast[e.input_index] = e.value_float;
+                    printf("scs %s %.3f at %.2f\n", g_scsNames[e.input_index] ? g_scsNames[e.input_index] : "?",
+                           (double)e.value_float, Now() - t0);
+                }
             }
+            scsMin = n < scsMin ? n : scsMin;
+            scsMax = n > scsMax ? n : scsMax;
         }
         XrFrameEndInfo fe{XR_TYPE_FRAME_END_INFO};
         fe.displayTime = fs.predictedDisplayTime;
@@ -251,6 +259,7 @@ int main(int argc, char** argv) {
     }
     CK(xrDestroyInstance(inst));
     if (dev) dev->Release();
+    if (g_scsDev.event_cb) printf("scs events per frame: %d .. %d\n", scsMin, scsMax);
     printf("game input inactive reads: %d\n", inactive);
     printf("fake_game done, %d failed call(s)\n", g_bad);
     return g_bad ? 1 : 0;
