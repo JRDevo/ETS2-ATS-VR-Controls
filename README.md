@@ -113,25 +113,29 @@ By default:
 - The steering stick: left, right or off (Driving tab, or `steer = left / right / off`). That stick's left / right then
   steer; its up / down are still free buttons (for example gas and brake).
 
-**How the wheel moves:** the stick's place is where the wheel goes (stick half left = wheel half left). The wheel does not
-jump there: it glides. A big push moves it fast, a small correction gently. Ease the stick a bit (the next bend needs less):
-the wheel comes back to the new place and stays there. Let go: the wheel glides back to straight -- calmer at speed, like a
-real truck.
+**How the wheel moves:** the stick's place is where the wheel goes (stick half left = wheel half left). While you hold
+the stick, the wheel glides there: a small push turns it slowly, a full push fast, and a wobbling thumb is smoothed. Ease the
+stick a bit (the next bend needs less): the wheel comes back to the new place and stays there. Let go: the wheel goes back to
+straight. If your thumb slips past the middle as you let go, the wheel only goes straight, never past it.
 
 **Steering feel** (Driving tab, or `config.ini`):
 
 | Setting | What it does | Default |
 |---|---|---|
 | Steering dead zone (`steer_deadzone`) | how far the stick must move before the wheel turns | 0.10 |
-| Steering curve (`steer_curve`) | 1 = straight. More = small pushes much gentler | 1.00 |
+| Steering curve (`steer_curve`) | 1 = even all the way (the best for most). More = finer near the middle, but much touchier near the edge of the stick | 1.00 |
 | Full stick turns the wheel (`steer_max`) | how far the wheel turns with the stick all the way | 100 % |
-| Wheel follows the stick (`steer_follow_time`) | how quickly the wheel goes to the stick's place, in seconds (when standing; calmer at speed by itself). More = calmer. 0 = at once | 0.25 s |
-| Let go: back to the middle (`steer_center_time`) | how quickly the wheel comes back when you ease, let go or push the other way, in seconds (when standing; calmer at speed by itself). If your thumb slips past the middle as you let go, the wheel does not jump: it still comes back calmly. 0 = at once | 0.8 s |
-| Wheel speed at most (`steer_max_speed`) | the wheel never turns faster than this: seconds from the middle to full lock (in config.ini: full turns per second, 0.6 = 1.7 s). Slower at speed too | 1.7 s |
+| Wheel follows the stick (`steer_follow_time`) | smoothing while you hold the stick: how quickly the wheel goes to the stick's place, in seconds (when standing; calmer at speed by itself). More = smoother and calmer | 0.4 s |
+| Let go: back to the middle (`steer_center_time`) | how the wheel comes back when you let go. At once = at the wheel speed below (the default). More = a slow glide, in seconds | at once |
+| Wheel speed at most (`steer_max_speed`) | the fastest the wheel turns, with the stick pushed all the way (a small push turns it slower): seconds from straight to full lock (in config.ini: full turns per second, 0.5 = 2 s). Slower at speed too | 2 s |
 | At 90 km/h (`steer_speed_sens`, `steer_at_speed`) | **speed-sensitive steering**, On / Off: up to 10 km/h the stick steers fully; at 90 km/h and faster full stick turns the wheel only this much (30 %), so small moves are fine. A bend you hold while you speed up stays | On, 30 % |
 
-Too twitchy at speed? Lower "At 90 km/h". Too twitchy everywhere? Make the curve bigger, or "Wheel follows the stick"
-slower. The wheel comes back too fast or too slowly? Change "Let go: back to the middle".
+Too twitchy at speed? Lower "At 90 km/h". Too twitchy everywhere? Make "Wheel follows the stick" slower (more seconds) or
+"Wheel speed at most" slower. Touchy when you hold the stick far out? Set the curve back to 1. The wheel comes back too fast?
+Give "Let go: back to the middle" some seconds.
+
+**Not sure what a setting does?** In the VR menu, point at it (or at its name): the line at the bottom of the menu says what
+it does.
 
 **Switch driving off:** Driving tab > Driving: **Off** (or `drive = 0`). Then nothing steers, the gas / brake buttons do
 nothing, and the steering stick's left / right send their keys again. **On** brings it all back.

@@ -71,7 +71,8 @@ class Painter;      // vr_menu.cpp: the background thread that draws / shrinks /
 class VrMenu {
 public:
     enum { kPanMenu, kPanKb, kPanCount };
-    struct Elem { int kind = 0, arg = 0, x = 0, y = 0, w = 0, h = 0; std::string text, sub; bool on = false, dim = false; };
+    // help: what it does, in plain words -- shown in the menu's bottom line while a pointer is on it (row labels too)
+    struct Elem { int kind = 0, arg = 0, x = 0, y = 0, w = 0, h = 0; std::string text, sub, help; bool on = false, dim = false; };
     struct Panel {
         bool     show = false;
         Pose     pose;                // LOCAL space; the quad faces +z
@@ -121,6 +122,7 @@ public:
     // element kinds (public for the tests)
     enum Kind { eNone, eBar, eClose, eSmaller, eBigger, eKbBtn, eTab, eRow, ePickOut, ePickCancel, eSet, eKey, eHere, eInfo };
     static constexpr int kFootArg = 400;          // eInfo arg of the bottom line (project, copyright, licence)
+    static constexpr int kHelpArg = 401;          // eInfo arg of the hint line while it shows a pointed-at element's help
     static constexpr int kResetArg = 150;         // eSet arg of every tab's Reset button (tests)
     void Open(bool headOk, const Pose& head);     // as the combo does (tests)
     static int KeyIndex(const char* name);        // tests: the eKey arg of a keyboard key ("f1", "shift"); -1 = none
@@ -142,6 +144,7 @@ private:
     void RedrawAll() { Redraw(kPanMenu); Redraw(kPanKb); }
     bool Hit(const VrPad::Frame& f, int h, Ref* r, double* u, double* v);
     std::string ContentKey(int p) const;            // everything panel p's look depends on but hover / press
+    const std::string& HoverHelp() const;           // the help of the menu element a pointer is on ("" = none)
     const Elem* Find(int p, int kind, int arg) const;
     void Activate(int h, const Ref& r, const VrPad::Frame& f, VrPad::Sink& sink);
     void Release(int h, VrPad::Sink& sink);

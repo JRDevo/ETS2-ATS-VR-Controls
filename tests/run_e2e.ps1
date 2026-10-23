@@ -21,8 +21,8 @@
                  the plugin device (one module for both sides), the left trigger / stick send no keys or mouse
       kbkey      a button set to "keyboard" (Y): the first press shows the VR keyboard, the second hides it (no key sent)
       drivespeed speed-sensitive steering: the fake game's telemetry says 90 km/h, full stick sends 0.3 of the wheel
-      driveglide the default steering glide: full stick 1.5 s, let go -- the wheel rises smoothly (at most 0.6 turns / s),
-                 then glides back to exactly straight
+      driveglide the default steering glide: full stick 1.5 s, let go -- the wheel rises smoothly (at most 0.5 turns / s),
+                 then goes back to exactly straight
       menu       a D3D11 game with VR EyeCapture's set (both stick clicks, shared): both grips + the left stick click held 1 s open the VR menu (quad layers on D3D11 swapchains), the right hand
                  points at the Mouse tab and at "air mouse: toggled on" (written to config.ini), the game never sees those
                  trigger pulls, a short stick click alone is still the horn (at once), the combo again closes it
@@ -349,7 +349,8 @@ if (-not $Only -or $Only -eq 'driveglide') {
     Check 'driveglide' ($st.Count -gt 50 -and $st[0] -gt 0 -and $st[0] -lt 0.07) 'starts small (no jump to full)'
     Check 'driveglide' ($up -and $down -and $peak -gt 0.5 -and $peak -le 0.95) "rises to the peak, then only comes back (peak $peak)"
     Check 'driveglide' ($jump -le 0.061) "no jumps: at most 0.6 turns / s * 0.1 s per frame (biggest $jump)"
-    Check 'driveglide' ($st[-2] -lt 0.003 -and $st[-1] -eq 0) "glides to exactly straight by itself (before the end: $($st[-2]))"
+    # (let go: straight at the limit, 0.5 turns / s -- even steps, the last one up to 0.05 at the fake game's frame times)
+    Check 'driveglide' ($st[-2] -le 0.061 -and $st[-1] -eq 0) "back to exactly straight by itself (the last step from $($st[-2]))"
 }
 
 # ---- drive

@@ -272,8 +272,8 @@ int main() {
         for (Out& mo : c.modMap) mo = Out();
         const Config dc = DefaultConfig();
         CHECK(dc.steerStick == 1 && dc.map[kRTrig].kind == kGas && dc.map[kLTrig].kind == kBrake && dc.map[kLGrip].kind == kNone &&
-              dc.modMap[kRTrig].kind == kMouseL && dc.steerRate == 0.6f && dc.steerCurve == 1.0f && dc.steerFollowTime == 0.25f &&
-              dc.steerCenterTime == 0.8f && dc.drive,
+              dc.modMap[kRTrig].kind == kMouseL && dc.steerRate == 0.5f && dc.steerCurve == 1.0f && dc.steerFollowTime == 0.4f &&
+              dc.steerCenterTime == 0.0f && dc.drive,
               "defaults: left stick steers, right trigger = gas (+ right grip: left click), left trigger = brake, curve 1, glide");
         Out po;
         CHECK(ParseOut("gas", &po) && po.kind == kGas && ParseOut("Throttle", &po) && po.kind == kGas && ParseOut("brake", &po) && po.kind == kBrake,
@@ -381,12 +381,12 @@ int main() {
         CHECK(r.drives == 1 && r.drv[1] == 1.0f && r.drv[2] == 1.0f && r.drv[0] < 0.0f && r.Take() == "k01e^",
               "on again: steering, gas, brake; the key released");
     }
-    // the steering glide (2026-10-23): the stick = the wheel's target; out at steerFollowTime, in (eased / let go) at
-    // steerCenterTime / sqrt(speed factor), never faster than steerRate full turns / s
+    // the steering glide (2026-10-23): the stick = the wheel's target; held (pushed or eased) at steerFollowTime, let go /
+    // the other side = straight at steerCenterTime (default 0: at the limit), never faster than steerRate (* the push held)
     auto run = [](Mapper& mp, Frame& f, double secs, const Config& c, Rec& r) {
         for (int i = 0, n = (int)(secs / 0.011 + 0.5); i < n; ++i) mp.Step(f, true, 0.011, c, r);
     };
-    {   // out: smooth, no overshoot, ~95 % in 3 follow times; the rate limit holds every frame
+    {   // held: smooth, no overshoot, ~95 % in 3 follow times; the limit holds every frame, times the push
         Config c = DefaultConfig();
         c.steerDeadzone = 0.0f;
         Config nr = c; nr.steerRate = 0.0f;
@@ -394,21 +394,31 @@ int main() {
         f.hand[0] = true; f.sx[0] = 0.6f;
         float last = 0.0f;
         bool mono = true;
-        for (int i = 0; i < 68; ++i) { mp.Step(f, true, 0.011, nr, r); mono = mono && r.drv[0] >= last && r.drv[0] <= 0.6f; last = r.drv[0]; }
-        CHECK(mono && r.drv[0] > 0.6f * 0.94f, "to 0.6 (no limit): rising, never past, 94 %% in 0.75 s (%.3f)", (double)r.drv[0]);
+        for (int i = 0; i < 109; ++i) { mp.Step(f, true, 0.011, nr, r); mono = mono && r.drv[0] >= last && r.drv[0] <= 0.6f; last = r.drv[0]; }
+        CHECK(mono && r.drv[0] > 0.6f * 0.94f, "to 0.6 (no limit): rising, never past, 94 %% in 1.2 s (%.3f)", (double)r.drv[0]);
         Mapper ml; Rec rl;
         f.sx[0] = 1.0f;
         last = 0.0f;
         bool capped = true;
-        for (int i = 0; i < 300; ++i) { ml.Step(f, true, 0.011, c, rl); capped = capped && rl.drv[0] - last <= 0.6f * 0.011f + 1e-5f; last = rl.drv[0]; }
-        CHECK(capped && rl.drv[0] > 0.99f, "a flick to full: at most 0.6 turns / s, full after ~2 s (%.3f)", (double)rl.drv[0]);
+        for (int i = 0; i < 300; ++i) { ml.Step(f, true, 0.011, c, rl); capped = capped && rl.drv[0] - last <= 0.5f * 0.011f + 1e-5f; last = rl.drv[0]; }
+        CHECK(capped && rl.drv[0] > 0.99f, "full push: at most 0.5 turns / s, full after ~3 s (%.3f)", (double)rl.drv[0]);
+        Mapper ms; Rec rs;                              // a small push turns slowly: 0.3 push = 0.3 of the limit
+        f.sx[0] = 0.3f;
+        last = 0.0f;
+        capped = true;
+        for (int i = 0; i < 300; ++i) { ms.Step(f, true, 0.011, c, rs); capped = capped && rs.drv[0] - last <= 0.3f * 0.5f * 0.011f + 1e-5f; last = rs.drv[0]; }
+        CHECK(capped && std::fabs(rs.drv[0] - 0.3f) < 0.005f, "0.3 push: at most 0.15 turns / s, settles at 0.3 (%.3f)", (double)rs.drv[0]);
+        Mapper mt; Rec rt;                              // ... but never slower than 0.3 of the limit
+        f.sx[0] = 0.1f;
+        mt.Step(f, true, 0.011, c, rt);
+        CHECK(rt.drv[0] > 0.0f && rt.drv[0] <= 0.3f * 0.5f * 0.011f + 1e-6f, "0.1 push: the first step (%.5f)", (double)rt.drv[0]);
     }
     {   // THE COMPLAINT: 0.9 held, then eased to 0.6 -- the wheel comes in to 0.6 and holds there (it never turns further)
         Config c = DefaultConfig();
         c.steerDeadzone = 0.0f;
         Mapper mp; Rec r; Frame f;
         f.hand[0] = true; f.sx[0] = -0.9f;
-        run(mp, f, 4.0, c, r);
+        run(mp, f, 5.0, c, r);
         CHECK(std::fabs(r.drv[0] + 0.9f) < 0.005f, "0.9 left held (%.3f)", (double)r.drv[0]);
         f.sx[0] = -0.6f;
         float last = r.drv[0];
@@ -418,25 +428,49 @@ int main() {
         run(mp, f, 3.0, c, r);
         CHECK(std::fabs(r.drv[0] + 0.6f) < 1e-3f, "... and holds 0.6 (%.4f)", (double)r.drv[0]);
     }
-    {   // let go: a glide back, exactly straight in the end; calmer at speed
+    {   // THE WOBBLE (drive log 19:57): at 90 km/h, 0.9 held, the thumb slips to 0.7 for one frame -- hardly a change
         Config c = DefaultConfig();
-        c.steerDeadzone = 0.0f; c.steerRate = 0.0f;
+        c.steerDeadzone = 0.0f;
+        Mapper mp; Rec r; Frame f;
+        f.hand[0] = true; f.sx[0] = 0.9f;
+        mp.SetSpeed(90.0f);
+        run(mp, f, 6.0, c, r);
+        const float before = r.drv[0];
+        f.sx[0] = 0.7f;
+        mp.Step(f, true, 0.011, c, r);
+        f.sx[0] = 0.9f;
+        mp.Step(f, true, 0.011, c, r);
+        CHECK(std::fabs(before - 0.27f) < 0.002f && std::fabs(r.drv[0] - before) < 0.01f, "90 km/h, 0.9 held (%.3f), one wobble: %.4f",
+              (double)before, (double)(r.drv[0] - before));
+    }
+    {   // let go: straight at the limit (centre time 0, the default), exactly straight; a centre time = a glide; at speed slower
+        Config c = DefaultConfig();
+        c.steerDeadzone = 0.0f;
         Mapper mp; Rec r; Frame f;
         f.hand[0] = true; f.sx[0] = 0.5f;
-        run(mp, f, 3.0, c, r);
+        run(mp, f, 5.0, c, r);
         f.sx[0] = 0.0f;
-        run(mp, f, 0.8, c, r);
-        CHECK(r.drv[0] > 0.5f * 0.35f && r.drv[0] < 0.5f * 0.39f, "let go 0.8 s: ~37 %% left (%.3f of 0.5)", (double)r.drv[0]);
-        run(mp, f, 6.0, c, r);
-        CHECK(r.drv[0] == 0.0f, "... exactly straight in the end");
-        Mapper mf; Rec rf; Frame g;                     // at 90 km/h: 0.8 s / sqrt(0.3) = 1.46 s
-        g.hand[0] = true; g.sx[0] = 1.0f;
+        run(mp, f, 0.506, c, r);
+        CHECK(std::fabs(r.drv[0] - 0.25f) < 0.006f, "let go 0.5 s: 0.5 -> 0.25 at 0.5 turns / s (%.3f)", (double)r.drv[0]);
+        run(mp, f, 0.6, c, r);
+        CHECK(r.drv[0] == 0.0f, "... exactly straight after ~1 s");
+        Config g = c; g.steerCenterTime = 0.8f; g.steerRate = 0.0f;
+        Mapper mg; Rec rg; Frame fg;
+        fg.hand[0] = true; fg.sx[0] = 0.5f;
+        run(mg, fg, 5.0, g, rg);
+        fg.sx[0] = 0.0f;
+        run(mg, fg, 0.8, g, rg);
+        CHECK(rg.drv[0] > 0.5f * 0.35f && rg.drv[0] < 0.5f * 0.39f, "centre time 0.8 s: ~37 %% left after 0.8 s (%.3f of 0.5)", (double)rg.drv[0]);
+        run(mg, fg, 6.0, g, rg);
+        CHECK(rg.drv[0] == 0.0f, "... exactly straight in the end");
+        Mapper mf; Rec rf; Frame h;                      // at 90 km/h: 0.5 * sqrt(0.3) = 0.27 turns / s
+        h.hand[0] = true; h.sx[0] = 1.0f;
         mf.SetSpeed(90.0f);
-        run(mf, g, 3.0, c, rf);
-        CHECK(std::fabs(rf.drv[0] - 0.3f) < 1e-3f, "90 km/h: full stick = 0.3 (%.3f)", (double)rf.drv[0]);
-        g.sx[0] = 0.0f;
-        run(mf, g, 0.8, c, rf);
-        CHECK(rf.drv[0] > 0.3f * 0.55f && rf.drv[0] < 0.3f * 0.6f, "let go 0.8 s at 90 km/h: ~58 %% left (%.3f of 0.3)", (double)rf.drv[0]);
+        run(mf, h, 6.0, c, rf);
+        CHECK(std::fabs(rf.drv[0] - 0.3f) < 2e-3f, "90 km/h: full stick = 0.3 (%.3f)", (double)rf.drv[0]);
+        h.sx[0] = 0.0f;
+        run(mf, h, 0.506, c, rf);
+        CHECK(std::fabs(rf.drv[0] - (0.3f - 0.5f * std::sqrt(0.3f) * 0.5f)) < 0.006f, "let go 0.5 s at 90 km/h: back by 0.137 (%.3f)", (double)rf.drv[0]);
     }
     {   // speeding up in a bend: the wheel holds (a part push too, curve 2); eased, it glides into the high-speed range
         Config c = DefaultConfig();
@@ -458,7 +492,7 @@ int main() {
         run(mp, f, 8.0, c, r);
         CHECK(std::fabs(r.drv[0] + 0.25f * 0.3f) < 0.003f, "... to the 90 km/h place of half a push: 0.25 * 0.3 within 8 s (%.3f)", (double)r.drv[0]);
         f.sx[0] = -1.0f;
-        run(mp, f, 3.0, c, r);
+        run(mp, f, 6.0, c, r);
         CHECK(std::fabs(r.drv[0] + 0.3f) < 1e-3f, "full again: 0.3, the 90 km/h range (%.3f)", (double)r.drv[0]);
         f.sx[0] = 0.0f;
         run(mp, f, 8.0, c, r);
@@ -472,37 +506,45 @@ int main() {
         run(mp, f, 8.0, c, r);
         CHECK(r.drv[0] == 0.0f, "a NaN stick counts as let go (the wheel is not stuck at NaN)");
     }
-    {   // the other side counts as "in" (the return time) until the wheel is past the middle, then "out"
-        Config c = DefaultConfig();
-        c.steerDeadzone = 0.0f; c.steerRate = 0.0f;
-        Mapper mp; Rec r; Frame f;
-        f.hand[0] = true; f.sx[0] = 0.5f;
-        run(mp, f, 3.0, c, r);
-        f.sx[0] = -1.0f;
-        run(mp, f, 0.22, c, r);
-        const float early = r.drv[0];
-        run(mp, f, 0.2, c, r);
-        CHECK(early > 0.0f && r.drv[0] < 0.0f, "+0.5 -> full left: past the middle after ~0.32 s, not at once (%.3f, %.3f)",
-              (double)early, (double)r.drv[0]);
-        run(mp, f, 1.0, c, r);
-        CHECK(r.drv[0] < -0.95f, "... then out at the follow time: full left soon (%.3f)", (double)r.drv[0]);
-    }
-    {   // THE SLIP (drive log 18:19): at 90 km/h a tap to 0.1, the thumb slips past the middle for 0.2 s as it lets go --
-        // the wheel comes back only a little faster than a clean let go, no quick drop
+    {   // the other side: straight first (at the let-go speed), then out the other way
         Config c = DefaultConfig();
         c.steerDeadzone = 0.0f;
-        auto tap = [&](bool slip) {
+        Mapper mp; Rec r; Frame f;
+        f.hand[0] = true; f.sx[0] = 0.5f;
+        run(mp, f, 5.0, c, r);
+        f.sx[0] = -0.95f;
+        run(mp, f, 0.9, c, r);
+        const float early = r.drv[0];
+        run(mp, f, 0.2, c, r);
+        CHECK(early > 0.0f && r.drv[0] < 0.0f, "+0.5 -> 0.95 left: straight after ~1 s at the limit, then across (%.3f, %.3f)",
+              (double)early, (double)r.drv[0]);
+        run(mp, f, 4.0, c, r);
+        CHECK(r.drv[0] < -0.94f, "... then out to 0.95 left (%.3f)", (double)r.drv[0]);
+    }
+    {   // THE SLIP (drive log 18:19): the thumb slips past the middle for 0.2 s as it lets go -- the wheel only goes straight,
+        // exactly as a clean let go, never past the middle
+        Config c = DefaultConfig();
+        c.steerDeadzone = 0.0f;
+        auto tap = [&](bool slip, float* least) {
             Mapper mp; Rec r; Frame f;
             f.hand[0] = true; f.sx[0] = 1.0f / 3.0f;
             mp.SetSpeed(90.0f);
-            for (int i = 0; i < 400; ++i) mp.Step(f, true, 0.011, c, r);
+            for (int i = 0; i < 600; ++i) mp.Step(f, true, 0.011, c, r);
             f.sx[0] = slip ? -0.4f : 0.0f;
-            for (int i = 0; i < 18; ++i) mp.Step(f, true, 0.011, c, r);
+            *least = 1.0f;
+            for (int i = 0; i < 90; ++i) {
+                if (i == 18) f.sx[0] = 0.0f;
+                mp.Step(f, true, 0.011, c, r);
+                if (i == 17) *least = r.drv[0] < *least ? r.drv[0] : *least;
+                if (i > 17 && r.drv[0] < *least) *least = r.drv[0];
+            }
             return r.drv[0];
         };
-        const float clean = tap(false), slipped = tap(true);
-        CHECK(clean > 0.085f && slipped > 0.06f && slipped < clean, "0.2 s after a let go: clean %.3f, slipped %.3f (was ~0.03)",
-              (double)clean, (double)slipped);
+        float lc = 0.0f, ls = 0.0f;
+        tap(false, &lc);
+        tap(true, &ls);
+        CHECK(ls == lc && ls >= 0.0f, "a slip past the middle on let go: the same as a clean let go, never past straight (%.4f, %.4f)",
+              (double)lc, (double)ls);
     }
     {   // odd frame times, the dead zone edge, steer_max, at once, inactive
         Config c = DefaultConfig();
@@ -553,12 +595,12 @@ int main() {
         CHECK(SpeedFactor(std::nanf(""), c) == 1.0f, "a NaN speed counts as not known");
         Config sw = c; sw.steerSpeedSens = false;
         CHECK(SpeedFactor(120.0f, sw) == 1.0f, "steer_speed_sens = 0 (the switch): off");
-        Mapper mp; Rec r; Frame f;                      // the rate limit at 90 km/h: 0.6 * sqrt(0.3) turns / s
+        Mapper mp; Rec r; Frame f;                      // the rate limit at 90 km/h: 0.5 * sqrt(0.3) turns / s
         f.hand[0] = true; f.sx[0] = 1.0f;
         mp.SetSpeed(90.0f);
         float last = 0.0f;
         bool capped = true;
-        for (int i = 0; i < 300; ++i) { mp.Step(f, true, 0.011, c, r); capped = capped && r.drv[0] - last <= 0.6f * std::sqrt(0.3f) * 0.011f + 1e-5f && r.drv[0] <= 0.3f + 1e-6f; last = r.drv[0]; }
+        for (int i = 0; i < 600; ++i) { mp.Step(f, true, 0.011, c, r); capped = capped && r.drv[0] - last <= 0.5f * std::sqrt(0.3f) * 0.011f + 1e-5f && r.drv[0] <= 0.3f + 1e-6f; last = r.drv[0]; }
         CHECK(capped && std::fabs(r.drv[0] - 0.3f) < 1e-3f, "90 km/h: slower limit, never past 0.3 (%.3f)", (double)r.drv[0]);
         Config w = c; w.steerFollowTime = w.steerCenterTime = w.steerRate = 0.0f;   // at once: the place times the factor
         Mapper mw; Rec rw; Frame gw;

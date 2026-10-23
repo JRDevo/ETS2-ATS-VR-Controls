@@ -170,16 +170,15 @@ struct Config {
     // driving -- analog values for the game's own input plugin door (scs_input.h), not keys. Steering: steerStick's x (its
     // left / right directions are then not buttons, and a mouse on that stick is off). The stick (dead zone, curve, times
     // steerMax and the speed factor) is the wheel's TARGET place; the wheel glides there (Mapper::Step):
-    //   - out (further from the middle on the wheel's side, or from straight): time constant steerFollowTime -- a big move
-    //     goes fast, a small correction slowly, and thumb jitter is smoothed;
-    //   - in (the stick eased, let go, or pushed to the other side): time constant steerCenterTime -- easing the stick = a
-    //     smaller angle that holds; let go = a calm return to straight. The other side counts as "in" until the wheel is
-    //     past the middle: a thumb that slips past the middle as it lets go must not throw the wheel back (the user's
-    //     drive log 2026-10-23 18:19: every tap ended in a quick drop, then a slow creep); a hard push the other way still
-    //     comes back faster (the target is further away);
-    //   - both times longer at speed (/ sqrt(speed factor)): calmer on the highway;
-    //   - never faster than steerRate full turns (centre -> full lock) per second (* sqrt(speed factor)): a flick does not
-    //     throw the wheel.
+    //   - stick held (pushed further OR eased): time constant steerFollowTime -- easing the stick = a smaller angle that
+    //     holds, and a wobbling thumb near the edge is smoothed (the user's drive log 2026-10-23 19:57: holds at ~0.9 wobble
+    //     0.1-0.25 per 0.1 s; an unsmoothed ease made every wobble a twitch);
+    //   - let go: back to straight at steerCenterTime (default 0 = at the wheel speed limit: the user's choice, "more
+    //     realistic"). The stick on the OTHER side counts as let go until the wheel is straight, then it turns out: a thumb
+    //     slipping past the middle as it lets go never throws the wheel past straight;
+    //   - never faster than steerRate full turns (centre -> full lock) per second, times the push while held (at least
+    //     0.3): a small push turns slowly, a full push fast (the user's thumb is mostly 0 or ~0.9: taps);
+    //   - times longer and the limit lower at speed (/ and * sqrt(speed factor)): calmer on the highway.
     // (2026-10-23, Fable's design: the old "turn speed" style kept turning while the stick was eased, and only the dead zone
     //  brought it back.) Gas / brake: any button mapped to "gas" / "brake" (map or modMap), see kGas.
     bool  drive = true;                                // off: no steering, gas / brake buttons send nothing, the steering
@@ -188,9 +187,9 @@ struct Config {
     float steerDeadzone = 0.10f;                       // stick, before steering starts
     float steerCurve = 1.0f;                           // 1 = straight; more = finer near the centre
     float steerMax = 1.0f;                             // full stick = this much of the wheel (0.2 .. 1)
-    float steerFollowTime = 0.25f;                     // s, out toward the stick (0 = at once)
-    float steerCenterTime = 0.8f;                      // s, in toward the middle when standing (0 = at once)
-    float steerRate = 0.6f;                            // full turns per second at most (0 = no limit)
+    float steerFollowTime = 0.4f;                      // s, toward the stick while it is held (0 = at once)
+    float steerCenterTime = 0.0f;                      // s, back to straight when let go (0 = at the speed limit)
+    float steerRate = 0.5f;                            // full turns per second at most (0 = no limit)
     // speed-sensitive steering (the truck's speed from the game, SetSpeed): up to 10 km/h the stick steers fully; at 90 km/h
     // and faster the wheel turns at most steerAtSpeed of that; the return and the rate limit go sqrt(steerAtSpeed) as fast.
     // 1 = off.
@@ -346,7 +345,7 @@ public:
             if (!(x == x)) x = 0.0f;                   // (a NaN stick would stay in the wheel for good)
             stickX_ = x;
             const float t = (float)(dt > 0.0 ? (dt < 0.1 ? dt : 0.1) : 0.0);   // (a hitch = one bounded step)
-            const float cur = drive_[0], acur = cur < 0.0f ? -cur : cur;
+            const float cur = drive_[0];
             // faster = less wheel (the target range times sf), and a calmer return / rate limit (times sqrt(sf): the user's
             // drive logs moved the wheel at most ~0.13 / s at 85-92 km/h). Speeding up in a bend with the stick held keeps
             // the range the bend began with (range_), so the bend stays; easing the stick (past a little thumb jitter),
@@ -360,14 +359,14 @@ public:
                 holdPeak_ = ash;
             }
             holdSign_ = shape;
-            const float tgt = shape * c.steerMax * range_;
-            const float atgt = tgt < 0.0f ? -tgt : tgt;
-            const bool out = tgt != 0.0f && (cur == 0.0f || (tgt * cur > 0.0f && atgt > acur));   // (see Config: in / out)
-            const float tau = (out ? c.steerFollowTime : c.steerCenterTime) / rf;
+            float tgt = shape * c.steerMax * range_;
+            if (tgt * cur < 0.0f) tgt = 0.0f;          // the other side: straight first (see Config)
+            const bool letGo = tgt == 0.0f;
+            const float tau = (letGo ? c.steerCenterTime : c.steerFollowTime) / rf;
             const float a = t <= 0.0f ? 0.0f : tau > 0.0f ? t / (tau + t) : 1.0f;   // first order, stable for any step
             float step = (tgt - cur) * a;
             if (c.steerRate > 0.0f) {
-                const float m = c.steerRate * rf * t;
+                const float m = c.steerRate * rf * t * (letGo ? 1.0f : ash > 0.3f ? ash : 0.3f);
                 step = step > m ? m : step < -m ? -m : step;
             }
             float st = cur + step;

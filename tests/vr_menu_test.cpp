@@ -342,17 +342,17 @@ int main(int argc, char** argv) {
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 130) && m.Pad().steerStick == 1, "steer: left again");
         CHECK(m.Pad().drive && click(1, VrMenu::kPanMenu, VrMenu::eSet, 148) && !m.Pad().drive, "Driving: Off");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 147) && m.Pad().drive, "Driving: On");
-        CHECK(m.Pad().steerFollowTime == 0.25f && m.Pad().steerCenterTime == 0.8f && m.Pad().steerRate == 0.6f,
-              "defaults: follow 0.25 s, back to the middle 0.8 s, at most 0.6 turns / s");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 144) && m.Pad().steerFollowTime == 0.35f, "follow 0.25 -> 0.35 s (calmer)");
+        CHECK(m.Pad().steerFollowTime == 0.4f && m.Pad().steerCenterTime == 0.0f && m.Pad().steerRate == 0.5f,
+              "defaults: follow 0.4 s, back to the middle at once, at most 0.5 turns / s");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 144) && m.Pad().steerFollowTime == 0.5f, "follow 0.4 -> 0.5 s (calmer)");
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 143);
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 143) && m.Pad().steerFollowTime == 0.15f, "follow -> 0.15 s");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 143) && m.Pad().steerFollowTime == 0.35f, "follow -> 0.35 s");
         for (int i = 0; i < 4; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 143);
         CHECK(m.Pad().steerFollowTime == 0.0f, "the quickest: at once");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 146) && m.Pad().steerCenterTime == 1.2f, "back 0.8 -> 1.2 s");
-        for (int i = 0; i < 3; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 144);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 146) && m.Pad().steerCenterTime == 0.3f, "back at once -> 0.3 s");
+        for (int i = 0; i < 5; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 144);
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 145);
-        CHECK(m.Pad().steerFollowTime == 0.25f && m.Pad().steerCenterTime == 0.8f, "times back");
+        CHECK(m.Pad().steerFollowTime == 0.4f && m.Pad().steerCenterTime == 0.0f, "times back");
         CHECK(m.Pad().steerAtSpeed == 0.3f && click(1, VrMenu::kPanMenu, VrMenu::eSet, 152) &&
               std::fabs(m.Pad().steerAtSpeed - 0.25f) < 1e-4f, "at 90 km/h: 30 -> 25 %%");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 153) && std::fabs(m.Pad().steerAtSpeed - 0.3f) < 1e-4f, "... and back to 30 %%");
@@ -361,15 +361,14 @@ int main(int argc, char** argv) {
         CHECK(!click(1, VrMenu::kPanMenu, VrMenu::eSet, 141) && !click(1, VrMenu::kPanMenu, VrMenu::eSet, 142), "no style row any more");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 136) && std::fabs(m.Pad().steerCurve - 1.25f) < 0.01f, "curve 1 -> 1.25");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 137) && std::fabs(m.Pad().steerMax - 0.9f) < 0.01f, "full stick 100 -> 90 %%");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 139) && m.Pad().steerRate == 0.5f, "wheel speed 0.6 -> 0.5 (slower)");
-        click(1, VrMenu::kPanMenu, VrMenu::eSet, 139);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 139) && m.Pad().steerRate == 0.35f, "wheel speed 0.5 -> 0.35 (slower)");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 139) && m.Pad().steerRate == 0.25f, "the slowest: 0.25");
         for (int i = 0; i < 10; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 140);
         CHECK(m.Pad().steerRate == 0.0f, "fastest step: no limit (%.2f)", (double)m.Pad().steerRate);
-        for (int i = 0; i < 7; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 139);
+        for (int i = 0; i < 8; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 139);
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 135);
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 138);
-        CHECK(m.Pad().steerRate == 0.6f && std::fabs(m.Pad().steerCurve - 1.0f) < 0.01f && std::fabs(m.Pad().steerMax - 1.0f) < 0.01f,
+        CHECK(m.Pad().steerRate == 0.5f && std::fabs(m.Pad().steerCurve - 1.0f) < 0.01f && std::fabs(m.Pad().steerMax - 1.0f) < 0.01f,
               "driving settings back (wheel speed %.2f)", (double)m.Pad().steerRate);
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 0) && click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kLGrip) &&
               click(1, VrMenu::kPanMenu, VrMenu::ePickOut, VrPad::kBrake) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kBrake,
@@ -404,11 +403,11 @@ int main(int argc, char** argv) {
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 4) && click(1, VrMenu::kPanMenu, VrMenu::eSet, 144) &&
               click(1, VrMenu::kPanMenu, VrMenu::eSet, 131) && click(1, VrMenu::kPanMenu, VrMenu::eSet, 146) &&
               click(1, VrMenu::kPanMenu, VrMenu::eSet, 148) &&
-              m.Pad().steerFollowTime == 0.35f && m.Pad().steerStick == 2 && m.Pad().steerCenterTime == 1.2f && !m.Pad().drive,
+              m.Pad().steerFollowTime == 0.5f && m.Pad().steerStick == 2 && m.Pad().steerCenterTime == 0.3f && !m.Pad().drive,
               "Driving changed");
         const float mouseSpeed = m.Pad().mouseSpeed;
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) && click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) &&
-              m.Pad().steerFollowTime == 0.25f && m.Pad().steerCenterTime == 0.8f && m.Pad().steerStick == 1 && m.Pad().drive &&
+              m.Pad().steerFollowTime == 0.4f && m.Pad().steerCenterTime == 0.0f && m.Pad().steerStick == 1 && m.Pad().drive &&
               m.Pad().mouseSpeed == mouseSpeed,
               "Driving tab reset (the Mouse tab untouched)");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 3), "Look tab again");
@@ -601,6 +600,39 @@ int main(int argc, char** argv) {
             press(VrMenu::kPanMenu, VrMenu::eTab, t);
             settle(away);
             WriteBmp(shots + L"\\" + kTab[t] + L".bmp", ms, VrMenu::kPanMenu);
+        }
+        {                                                // pointing at a row (its label) or a button: the bottom line explains it
+            auto helpLine = [&]() -> std::string {
+                for (const VrMenu::Elem& e : ms.Pan(VrMenu::kPanMenu).el)
+                    if (e.kind == VrMenu::eInfo && e.arg == VrMenu::kHelpArg) return e.text;
+                return std::string();
+            };
+            V3 at;
+            CHECK(ms.ElemCentre(VrMenu::kPanMenu, VrMenu::eInfo, 105, &at), "Driving: the 'Wheel follows the stick' label");
+            settle(at);
+            const std::string h1 = helpLine();
+            CHECK(h1.find("Smoothing") != std::string::npos, "pointing at a row label: its help in the bottom line (%s)", h1.c_str());
+            WriteBmp(shots + L"\\menu-driving-help.bmp", ms, VrMenu::kPanMenu);
+            CHECK(ms.ElemCentre(VrMenu::kPanMenu, VrMenu::eSet, 152, &at), "Driving: the at-90 km/h minus");
+            settle(at);
+            const std::string h2 = helpLine();
+            CHECK(h2.find("90 km/h") != std::string::npos, "pointing at a button: its row's help (%s)", h2.c_str());
+            CHECK(ms.ElemCentre(VrMenu::kPanMenu, VrMenu::eTab, 1, &at), "the Mouse tab");
+            settle(at);
+            CHECK(helpLine().find("air mouse") != std::string::npos, "a tab: its help (%s)", helpLine().c_str());
+            settle(away);
+            CHECK(helpLine().empty(), "pointing away: the usual hint again");
+            int missing = 0;                             // every element one can point at has a help (all tabs)
+            for (int t = 0; t < 5; ++t) {
+                press(VrMenu::kPanMenu, VrMenu::eTab, t);
+                settle(away);
+                for (const VrMenu::Elem& e : ms.Pan(VrMenu::kPanMenu).el)
+                    if (e.kind != VrMenu::eInfo && e.kind != VrMenu::eBar && e.help.empty()) {
+                        ++missing;
+                        printf("   (no help: tab %d kind %d arg %d \"%s\")\n", t, e.kind, e.arg, e.text.c_str());
+                    }
+            }
+            CHECK(missing == 0, "every button / row / tab has a help text (%d without)", missing);
         }
         press(VrMenu::kPanMenu, VrMenu::eTab, 0);
         press(VrMenu::kPanMenu, VrMenu::eSet, 121);         // the modifier layer (default: right grip + right trigger = right click)

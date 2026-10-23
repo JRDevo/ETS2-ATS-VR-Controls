@@ -167,6 +167,22 @@ public:
         const std::wstring ws = Wide(s);
         DrawTextW(dc_, ws.c_str(), (int)ws.size(), &r, align | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
     }
+    // up to two lines, word-wrapped and centred in the box; a smaller font (down to 70 %) when it does not fit
+    void TextWrap(int x, int y, int w, int h, const std::string& s, int px, COLORREF c) {
+        if (s.empty()) return;
+        const std::wstring ws = Wide(s);
+        RECT m{};
+        for (int min = px * 7 / 10;; px -= 1) {
+            SelectObject(dc_, Font(px, false));
+            m = RECT{ 0, 0, w, 0 };
+            DrawTextW(dc_, ws.c_str(), (int)ws.size(), &m, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX);
+            if (m.bottom <= h || px <= min) break;
+        }
+        SetTextColor(dc_, c);
+        const int top = y + (h - (m.bottom < h ? m.bottom : h)) / 2;
+        RECT r{ x, top, x + w, y + h };
+        DrawTextW(dc_, ws.c_str(), (int)ws.size(), &r, DT_WORDBREAK | DT_NOPREFIX | DT_END_ELLIPSIS);
+    }
     // the picture's area [x0, x1) x [y0, y1) into `out` (w x h) with `alpha` (0..255) everywhere, premultiplied (GDI leaves
     // alpha 0); `out` of another size: all of it
     void CopyTo(std::vector<uint32_t>& out, int alpha, int x0, int y0, int x1, int y1) {
@@ -648,16 +664,27 @@ void VrMenu::LayoutMenu() {
         e.kind = kind; e.arg = arg; e.x = x; e.y = y; e.w = w; e.h = h; e.text = t; e.on = on; e.dim = dim; e.sub = sub;
         el.push_back(e);
     };
+    // the help of everything added since `from` (a row: its label, buttons and value)
+    auto tip = [&](size_t from, const std::string& t) { for (size_t i = from; i < el.size(); ++i) el[i].help = t; };
+    size_t m0 = 0;
+    std::string openCombo;                              // the menu's open / close buttons ("Left grip + Right grip + ...")
+    for (int cb : gate_.btns) openCombo += (openCombo.empty() ? "" : " + ") + std::string(BtnLabel(cb));
     const bool picking = pickBtn_ >= 0;
     const std::string what = picking ? (pickMod_ && pad_.modBtn >= 0 ? std::string(BtnLabel(pad_.modBtn)) + " + " : std::string()) + BtnLabel(pickBtn_)
                                      : std::string();
     add(eBar, 0, 0, 0, kMenuW, 72, picking ? "Set " + what + ": pick a key" : "ETS2 ATS VR Controls", picking);
-    add(eSmaller, 0, 600, 11, 64, 50, "\xE2\x88\x92");
-    add(eBigger, 0, 672, 11, 64, 50, "+");
-    add(eKbBtn, 0, 744, 11, 170, 50, "Keyboard", pan_[kPanKb].show);
-    add(eClose, 0, 924, 11, 64, 50, "\xC3\x97");
+    m0 = el.size(); add(eSmaller, 0, 600, 11, 64, 50, "\xE2\x88\x92"); tip(m0, "Make this menu smaller.");
+    m0 = el.size(); add(eBigger, 0, 672, 11, 64, 50, "+"); tip(m0, "Make this menu bigger.");
+    m0 = el.size(); add(eKbBtn, 0, 744, 11, 170, 50, "Keyboard", pan_[kPanKb].show); tip(m0, "Show or hide the VR keyboard.");
+    m0 = el.size(); add(eClose, 0, 924, 11, 64, 50, "\xC3\x97");
+    tip(m0, "Close this menu. To open it again: hold " + openCombo + ".");
     static const char* const kTabs[5] = { "Buttons", "Mouse", "Panels", "Look", "Driving" };
-    for (int t = 0; t < 5; ++t) add(eTab, t, 24 + t * 193, 84, 181, 56, kTabs[t], tab_ == t);
+    static const char* const kTabHelp[5] = { "Choose what each controller button does.",
+                                             "The stick mouse and the air mouse (point with the controller).",
+                                             "Size and place of this menu and the keyboard.",
+                                             "Colours, how see-through the panels are, and pointer smoothing.",
+                                             "Steering, gas and brake: how the truck's wheel follows your stick." };
+    for (int t = 0; t < 5; ++t) { m0 = el.size(); add(eTab, t, 24 + t * 193, 84, 181, 56, kTabs[t], tab_ == t); tip(m0, kTabHelp[t]); }
     char b[96];
     if (tab_ == 0) {
         static const int kLeft[10] = { VrPad::kLTrig, VrPad::kLGrip, VrPad::kX, VrPad::kY, VrPad::kLStick, VrPad::kMenu,
@@ -665,9 +692,12 @@ void VrMenu::LayoutMenu() {
         static const int kRight[9] = { VrPad::kRTrig, VrPad::kRGrip, VrPad::kA, VrPad::kB, VrPad::kRStick, VrPad::kRUp,
                                        VrPad::kRDown, VrPad::kRLeft, VrPad::kRRight };
         // Normal / With modifier: which mapping the rows show and set; the modifier button itself (a click cycles it)
-        add(eSet, 120, 24, 150, 230, 44, "Normal", layer_ == 0);
-        add(eSet, 121, 264, 150, 230, 44, "With modifier", layer_ == 1);
-        add(eSet, 122, 504, 150, 472, 44, pad_.modBtn >= 0 ? std::string("Modifier: ") + BtnLabel(pad_.modBtn) : "Modifier: off");
+        m0 = el.size(); add(eSet, 120, 24, 150, 230, 44, "Normal", layer_ == 0);
+        tip(m0, "Show and set what each button does normally.");
+        m0 = el.size(); add(eSet, 121, 264, 150, 230, 44, "With modifier", layer_ == 1);
+        tip(m0, "Show and set what each button does while you hold the modifier button (a second job for it).");
+        m0 = el.size(); add(eSet, 122, 504, 150, 472, 44, pad_.modBtn >= 0 ? std::string("Modifier: ") + BtnLabel(pad_.modBtn) : "Modifier: off");
+        tip(m0, "The modifier button: hold it, and other buttons do their second job. Press here to choose another button.");
         for (int col = 0; col < 2; ++col)
             for (int i = 0; i < (col ? 9 : 10); ++i) {
                 const int btn = col ? kRight[i] : kLeft[i];
@@ -678,17 +708,26 @@ void VrMenu::LayoutMenu() {
                 else if (btn >= VrPad::kLUp && pad_.mouseStick == (btn >= VrPad::kRUp ? 2 : 1)) { val = "moves the mouse"; dim = true; }
                 else if (DrivingUses(pad_, btn)) { val = "steers"; dim = true; }
                 else if (layer_ && (pad_.modBtn < 0 || pad_.modMap[btn].kind == VrPad::kNone)) { val = "as normal"; dim = true; }
-                bool combo = false;
+                bool combo = false;                  // (one of the menu's open / close buttons)
                 for (int cb : gate_.btns) combo = combo || cb == btn;
                 add(eRow, btn, col ? 508 : 24, 202 + i * 49, 468, 45, BtnLabel(btn), pickBtn_ == btn, dim,
                     combo && !layer_ ? val + "  (+menu)" : val);
+                std::string h = std::string(BtnLabel(btn)) + (layer_ ? " with the modifier: " : ": ");
+                if (dim) h += val + " (set elsewhere).";
+                else h += "now " + val + ". Point here, pull the trigger, then pick a key on the keyboard or a choice below.";
+                if (combo && !layer_) h += " Also part of the menu's open buttons.";
+                el.back().help = h;
             }
         if (picking) {
             static const int kOuts[9] = { VrPad::kMouseL, VrPad::kMouseR, VrPad::kMouseM, VrPad::kWheelUp, VrPad::kWheelDown,
                                           VrPad::kGas, VrPad::kBrake, VrPad::kKeyboard, VrPad::kNone };
             static const char* const kOutNames[9] = { "Mouse L", "Mouse R", "Mouse M", "Wheel up", "Wheel dn", "Gas", "Brake",
                                                       "Keyboard", "None" };
-            for (int i = 0; i < 9; ++i) add(ePickOut, kOuts[i], 24 + i * 92, 704, 86, 54, kOutNames[i]);
+            static const char* const kOutHelp[9] = { "Left mouse click.", "Right mouse click.", "Middle mouse click.",
+                                                     "Mouse wheel up (one step per press).", "Mouse wheel down (one step per press).",
+                                                     "Gas pedal: press harder = more gas.", "Brake: press harder = more brake.",
+                                                     "Shows / hides the VR keyboard.", "Nothing." };
+            for (int i = 0; i < 9; ++i) { add(ePickOut, kOuts[i], 24 + i * 92, 704, 86, 54, kOutNames[i]); el.back().help = kOutHelp[i]; }
             add(ePickCancel, 0, 852, 704, 124, 54, "Cancel");
         } else {
             add(eInfo, 0, 24, 704, 742, 54, !status_.empty() ? status_
@@ -706,21 +745,27 @@ void VrMenu::LayoutMenu() {
             add(eInfo, 200 + r, 570, 162 + r * 88, 306, 70, value);
             add(eSet, base + 1, 886, 162 + r * 88, 90, 70, "+");
         };
-        row(0, "Stick that moves the mouse");
+        m0 = el.size(); row(0, "Stick that moves the mouse");
         opts(0, 0, { "Left", "Right", "Off" }, pad_.mouseStick == 1 ? 0 : pad_.mouseStick == 2 ? 1 : 2);
-        row(1, "Stick mouse speed");
+        tip(m0, "Which stick moves the mouse pointer (for the game's menus and map). Off = no stick mouse.");
+        m0 = el.size(); row(1, "Stick mouse speed");
         snprintf(b, sizeof(b), "%.0f px/s", (double)pad_.mouseSpeed);
         plusMinus(1, 10, b);
-        row(2, "Stick dead zone");
+        tip(m0, "How fast the pointer moves with the stick pushed all the way, in pixels per second.");
+        m0 = el.size(); row(2, "Stick dead zone");
         snprintf(b, sizeof(b), "%.2f", (double)pad_.deadzone);
         plusMinus(2, 20, b);
-        row(3, "Air mouse button");
+        tip(m0, "How far you must push the stick before the pointer moves. More = no creeping pointer.");
+        m0 = el.size(); row(3, "Air mouse button");
         opts(3, 30, { "Right grip", "Left grip", "Off" }, pad_.airBtn == VrPad::kRGrip ? 0 : pad_.airBtn == VrPad::kLGrip ? 1 : pad_.airBtn < 0 ? 2 : -1);
-        row(4, "Air mouse works while");
+        tip(m0, "Hold this button and turn the controller: the pointer follows, like a laser pointer. Off = no air mouse.");
+        m0 = el.size(); row(4, "Air mouse works while");
         opts(4, 40, { "Button held", "Toggled on" }, pad_.airToggle ? 1 : 0);
-        row(5, "Air mouse speed");
+        tip(m0, "Button held: only while you hold the button. Toggled on: one press switches it on, the next press off.");
+        m0 = el.size(); row(5, "Air mouse speed");
         snprintf(b, sizeof(b), "%.0f px/deg", (double)pad_.airGain);
         plusMinus(5, 50, b);
+        tip(m0, "How far the pointer moves when you turn the controller, in pixels per degree.");
         add(eInfo, 0, 24, 704, 742, 54, status_.empty() ? "Changes work at once and are saved." : status_);
     } else if (tab_ == 2) {
         auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 156 + r * 76, 440, 64, label); };
@@ -731,49 +776,57 @@ void VrMenu::LayoutMenu() {
             add(eSet, base + 1, glyph ? 886 : 846, 156 + r * 76, glyph ? 90 : 130, 64, plus);
         };
         const V3 from = lastHeadOk_ ? lastHead_.p : V3{ 0, 0, 0 };
-        row(0, "Menu size");
+        m0 = el.size(); row(0, "Menu size");
         snprintf(b, sizeof(b), "%.2f m wide", pan_[kPanMenu].width);
         plusMinus(0, 60, b, "\xE2\x88\x92", "+");
-        row(1, "Menu distance");
+        tip(m0, "How big this menu is (its width in metres).");
+        m0 = el.size(); row(1, "Menu distance");
         snprintf(b, sizeof(b), "%.2f m", Len(pan_[kPanMenu].pose.p - from));
         plusMinus(1, 62, b, "Closer", "Farther");
-        row(2, "Keyboard size");
+        tip(m0, "How far this menu is from your head.");
+        m0 = el.size(); row(2, "Keyboard size");
         snprintf(b, sizeof(b), "%.2f m wide", pan_[kPanKb].width);
         plusMinus(2, 70, b, "\xE2\x88\x92", "+");
-        row(3, "Keyboard distance");
+        tip(m0, "How big the VR keyboard is (its width in metres).");
+        m0 = el.size(); row(3, "Keyboard distance");
         if (pan_[kPanKb].show) snprintf(b, sizeof(b), "%.2f m", Len(pan_[kPanKb].pose.p - from));
         else snprintf(b, sizeof(b), "(hidden)");
         plusMinus(3, 72, b, "Closer", "Farther");
-        row(4, "Keyboard");
+        tip(m0, "How far the VR keyboard is from your head.");
+        m0 = el.size(); row(4, "Keyboard");
         add(eSet, 80, 470, 460, 119, 64, "Show", pan_[kPanKb].show);
         add(eSet, 81, 599, 460, 119, 64, "Hide", !pan_[kPanKb].show);
         add(eSet, 82, 738, 460, 114, 64, "Full", !look_.kbCompact);
         add(eSet, 83, 862, 460, 114, 64, "Compact", look_.kbCompact);
-        add(eHere, 0, 24, 540, 952, 64, "Bring the menu and the keyboard in front of me");
-        std::string combo;
-        for (int cb : gate_.btns) combo += (combo.empty() ? "" : " + ") + std::string(BtnLabel(cb));
+        tip(m0, "Show / hide the VR keyboard. Full = every key; Compact = only the main keys (narrower).");
+        m0 = el.size(); add(eHere, 0, 24, 540, 952, 64, "Bring the menu and the keyboard in front of me");
+        tip(m0, "Moves the menu and the keyboard to where you look now.");
         snprintf(b, sizeof(b), " for %.1f s", gate_.hold);
-        add(eInfo, 300, 24, 612, 952, 46, "Menu open / close: hold " + combo + b);
+        add(eInfo, 300, 24, 612, 952, 46, "Menu open / close: hold " + openCombo + b);
         add(eInfo, 301, 24, 656, 952, 46, "Move: point at a panel, hold the grip, move. Its stick: farther / closer.");
         add(eInfo, 0, 24, 704, 742, 54, status_.empty() ? "The keyboard stays when the menu closes (its x hides it)." : status_);
     } else if (tab_ == 3) {
         auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 162 + r * 88, 440, 70, label); };
-        row(0, "Colours");
+        m0 = el.size(); row(0, "Colours");
         for (int i = 0; i < kThemeCount; ++i)
             add(eSet, 100 + i, 470 + (i % 3) * 172, 162 + (i / 3) * 80, 162, 70, kThemeLabel[i], look_.theme == i);
-        row(2, "Menu see-through");
+        tip(m0, "The colours of the menu and the keyboard.");
+        m0 = el.size(); row(2, "Menu see-through");
         add(eSet, 90, 470, 338, 90, 70, "\xE2\x88\x92");
         snprintf(b, sizeof(b), "%d %% solid", (int)(look_.menuOpacity * 100.0f + 0.5f));
         add(eInfo, 202, 570, 338, 306, 70, b);
         add(eSet, 91, 886, 338, 90, 70, "+");
-        row(3, "Keyboard see-through");
+        tip(m0, "How solid this menu is. - = more see-through, + = more solid.");
+        m0 = el.size(); row(3, "Keyboard see-through");
         add(eSet, 92, 470, 426, 90, 70, "\xE2\x88\x92");
         snprintf(b, sizeof(b), "%d %% solid", (int)(look_.kbOpacity * 100.0f + 0.5f));
         add(eInfo, 203, 570, 426, 306, 70, b);
         add(eSet, 93, 886, 426, 90, 70, "+");
-        row(4, "Pointer smoothing");
+        tip(m0, "How solid the VR keyboard is. - = more see-through, + = more solid.");
+        m0 = el.size(); row(4, "Pointer smoothing");
         static const char* const kSm[4] = { "Off", "Low", "Medium", "High" };
         for (int i = 0; i < 4; ++i) add(eSet, 110 + i, 470 + i * 129, 514, 119, 70, kSm[i], look_.smoothing == i);
+        tip(m0, "Calms a shaky hand: the menu pointer and the air mouse. Higher = steadier, but it follows a bit later.");
         add(eInfo, 302, 24, 596, 952, 56, "Smoothing calms a shaky hand (menu pointer and air mouse).");
         add(eInfo, 0, 24, 704, 742, 54, status_.empty() ? "- = more see-through, + = more solid." : status_);
     } else {                                            // Driving (scs_input.h): steering here, gas / brake on any button
@@ -788,49 +841,66 @@ void VrMenu::LayoutMenu() {
             add(eInfo, 200 + r, 570, 150 + r * 61, 306, 54, value);
             add(eSet, base + 1, 886, 150 + r * 61, 90, 54, "+");
         };
-        row(0, "Driving");
+        m0 = el.size(); row(0, "Driving");
         opts(0, 147, { "On", "Off" }, pad_.drive ? 0 : 1);
-        row(1, "Stick that steers");
+        tip(m0, "On: the stick steers and the gas / brake buttons drive. Off: no driving; the stick's left / right send keys again.");
+        m0 = el.size(); row(1, "Stick that steers");
         opts(1, 130, { "Left", "Right", "Off" }, pad_.steerStick == 1 ? 0 : pad_.steerStick == 2 ? 1 : 2);
-        row(2, "Steering dead zone");
+        tip(m0, "Which stick steers the truck (left / right). Its up / down stay free for other buttons.");
+        m0 = el.size(); row(2, "Steering dead zone");
         snprintf(b, sizeof(b), "%.2f", (double)pad_.steerDeadzone);
         plusMinus(2, 133, b);
-        row(3, "Steering curve");
+        tip(m0, "How far you must push the stick before the wheel turns. More = a calm middle, less = it reacts sooner.");
+        m0 = el.size(); row(3, "Steering curve");
         snprintf(b, sizeof(b), pad_.steerCurve < 1.01f ? "%.2f (straight)" : "%.2f", (double)pad_.steerCurve);
         plusMinus(3, 135, b);
-        row(4, "Full stick turns the wheel");
+        tip(m0, "1 = even all the way (best for most). More = finer near the middle, but much touchier near the edge.");
+        m0 = el.size(); row(4, "Full stick turns the wheel");
         snprintf(b, sizeof(b), "%d %%", (int)(pad_.steerMax * 100.0f + 0.5f));
         plusMinus(4, 137, b);
-        row(5, "Wheel follows the stick");
+        tip(m0, "How far the wheel turns with the stick pushed all the way. 100 % = full lock.");
+        m0 = el.size(); row(5, "Wheel follows the stick");
         if (pad_.steerFollowTime <= 0.0f) snprintf(b, sizeof(b), "at once");
         else snprintf(b, sizeof(b), "%.3g s", (double)pad_.steerFollowTime);
         plusMinus(5, 143, b);
-        row(6, "Let go: back to the middle");
+        tip(m0, "Smoothing while you hold the stick: how quickly the wheel goes where the stick points. More = smoother, calmer.");
+        m0 = el.size(); row(6, "Let go: back to the middle");
         if (pad_.steerCenterTime <= 0.0f) snprintf(b, sizeof(b), "at once");
         else snprintf(b, sizeof(b), "%.3g s", (double)pad_.steerCenterTime);
         plusMinus(6, 145, b);
-        row(7, "Wheel speed at most");
+        tip(m0, "Let go of the stick: how the wheel comes back to straight. At once = at the wheel speed below. More = a slow glide.");
+        m0 = el.size(); row(7, "Wheel speed at most");
         if (pad_.steerRate <= 0.0f) snprintf(b, sizeof(b), "no limit");
         else snprintf(b, sizeof(b), "%.2g s to full", 1.0 / (double)pad_.steerRate);
         plusMinus(7, 139, b);
+        tip(m0, "The fastest the wheel turns (full push; a small push turns it slower): seconds from straight to full lock.");
         {                                               // speed-sensitive: [On / Off] [-] value [+]
             const int r = 8, y = 150 + r * 61;
+            m0 = el.size();
             row(r, "At 90 km/h: steering");
             add(eSet, 154, 470, y, 110, 54, pad_.steerSpeedSens ? "On" : "Off", pad_.steerSpeedSens);
             snprintf(b, sizeof(b), "%d %%", (int)(pad_.steerAtSpeed * 100.0f + 0.5f));
             add(eSet, 152, 590, y, 80, 54, "\xE2\x88\x92");
             add(eInfo, 200 + r, 680, y, 196, 54, pad_.steerSpeedSens ? b : "(off)");
             add(eSet, 153, 886, y, 90, 54, "+");
+            tip(m0, "On: at speed the stick turns the wheel less, for calm highway driving. The % = how much at 90 km/h.");
         }
         add(eInfo, 0, 24, 704, 742, 54, !status_.empty() ? status_ : !pad_.drive ? "Driving off: no steering, gas or brake."
                                         : "The stick's place = the wheel's place. Let go = straight.");
     }
     if (!(tab_ == 0 && picking))                        // every tab: back to the defaults (a second press does it)
         add(eSet, kResetArg, 776, 704, 200, 54, resetArm_ == tab_ ? "Sure? Reset" : "Reset tab", resetArm_ == tab_);
+    if (!el.empty() && el.back().kind == eSet && el.back().arg == kResetArg)
+        el.back().help = "Puts this tab back to the default settings. Press twice to be sure.";
     // the project, the copyright and the licence (as the DLAA mod and VR EyeCapture show them; text only: a link would open a
     // browser on the desktop and take the focus from the game)
     add(eInfo, kFootArg, 24, 764, 952, 30,
         "github.com/JRDevo/ETS2-ATS-VR-Controls  \xC2\xB7  (c) 2026 JRDevo  \xC2\xB7  License: PolyForm Noncommercial");
+    // a pointer on something with a help: the hint line shows it (the pick bar of the Buttons tab has no hint line)
+    const std::string help = HoverHelp();
+    if (!help.empty())
+        for (Elem& e : el)
+            if (e.kind == eInfo && e.arg == 0) { e.text = help; e.arg = kHelpArg; break; }
 }
 
 void VrMenu::LayoutKb() {
@@ -968,6 +1038,7 @@ void VrMenu::DrawElem(MenuCanvas& c, int theme, const Elem& e, int st) {
         c.Text(e.x + 24, e.y, e.w - 24, e.h, e.text, 34, true, e.on ? T.accent : T.text, DT_LEFT);
         break;
     case eInfo: {
+        if (e.arg == kHelpArg) { c.TextWrap(e.x + 4, e.y, e.w - 4, e.h, e.text, 24, T.text); break; }   // a pointed-at help
         const bool label = e.arg >= 100 && e.arg < 200, value = e.arg >= 200 && e.arg < 300, foot = e.arg == kFootArg;
         c.Text(e.x + (value || foot ? 0 : 4), e.y, e.w, e.h, e.text, foot ? 19 : label ? 28 : value ? 30 : 26, value,
                label || value ? T.text : T.dim, value || foot ? DT_CENTER : DT_LEFT);
@@ -1023,7 +1094,7 @@ bool VrMenu::Hit(const VrPad::Frame&, int h, Ref* r, double* uo, double* vo) {
         for (size_t i = pn.el.size(); i-- > 0;) {       // the last drawn is on top
             const Elem& e = pn.el[i];
             if (x < e.x || y < e.y || x >= e.x + e.w || y >= e.y + e.h) continue;
-            if (e.kind == eInfo) break;                  // text: nothing to press
+            if (e.kind == eInfo && e.help.empty()) break;   // text: nothing to press (a row label: its help only)
             r->kind = e.kind;
             r->arg = e.arg;
             break;
@@ -1142,7 +1213,7 @@ void VrMenu::SetValue(int arg) {
         break;
     }
     case 143: case 144: case 145: case 146: {          // follow / back-to-the-middle time, in steps (seconds; 0 = at once)
-        static const float kFollow[] = { 0.0f, 0.1f, 0.15f, 0.25f, 0.35f, 0.5f, 0.75f, 1.0f, 1.5f, 2.0f };
+        static const float kFollow[] = { 0.0f, 0.1f, 0.15f, 0.25f, 0.35f, 0.4f, 0.5f, 0.75f, 1.0f, 1.5f };
         static const float kCenter[] = { 0.0f, 0.3f, 0.5f, 0.8f, 1.2f, 1.6f, 2.0f, 3.0f, 4.0f, 5.0f };
         constexpr int kLast = (int)(sizeof(kFollow) / sizeof(kFollow[0])) - 1;
         static_assert(sizeof(kFollow) == sizeof(kCenter), "same number of steps");
@@ -1246,6 +1317,7 @@ void VrMenu::ResetTab() {
 }
 
 void VrMenu::Activate(int h, const Ref& r, const VrPad::Frame&, VrPad::Sink& sink) {
+    if (r.kind == eInfo) return;                         // a row label: only its help (nothing to press)
     if (!(r.kind == eSet && r.arg == kResetArg)) resetArm_ = -1;   // (anything else pressed: Reset is not armed any more)
     Press& ps = press_[h];
     ps = Press();
@@ -1440,7 +1512,17 @@ std::string VrMenu::ContentKey(int p) const {
     snprintf(dr, sizeof(dr), "|%d%d|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|", pad_.drive ? 1 : 0, pad_.steerStick,
              pad_.steerDeadzone, pad_.steerCurve, pad_.steerMax, pad_.steerFollowTime, pad_.steerCenterTime, pad_.steerRate,
              pad_.steerSpeedSens ? pad_.steerAtSpeed : -pad_.steerAtSpeed);
-    return std::string(b) + std::to_string(resetArm_) + "|" + status_ + dr + DescribePad(pad_);
+    return std::string(b) + std::to_string(resetArm_) + "|" + status_ + dr + DescribePad(pad_) + "|" + HoverHelp();
+}
+
+const std::string& VrMenu::HoverHelp() const {
+    static const std::string kNone;
+    for (int h = 1; h >= 0; --h) {                      // (the right hand first: it points most)
+        if (hov_[h].pan != kPanMenu || hov_[h].kind == eNone) continue;
+        const Elem* e = Find(kPanMenu, hov_[h].kind, hov_[h].arg);
+        if (e && !e->help.empty()) return e->help;
+    }
+    return kNone;
 }
 
 }  // namespace ck
