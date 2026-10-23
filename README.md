@@ -61,9 +61,13 @@ VR EyeCapture starts a recording on that.
   keyboard (or pick Mouse L / Mouse R / Wheel / None at the bottom). For Shift + F: press Shift, then F.
 - **Mouse** tab: which stick moves the mouse, its speed and dead zone, the air mouse button, hold or toggle, its speed.
 - **Panels** tab: menu size, keyboard size, show / hide the keyboard, bring both in front of you.
+- **Panels** tab also: the distance of each panel (Closer / Farther).
+- **Look** tab: colours (Dark, Blue, Grey, Light, Black, Green) and how see-through the menu and the keyboard are.
 - **Keyboard** (button at the top of the menu): a full keyboard with F-keys, arrows and number pad. A key goes down when
   you pull the trigger and up when you let go. Shift, Ctrl and Alt stay on for the next key.
-- **Move** a panel: point at its top bar, hold the trigger and move the controller. **Size**: the - and + at the top.
+  The keyboard **stays** when the menu closes, also at the next game start (put it at the side of your cab). Its x hides it.
+- **Move** a panel: point at it, **hold the grip** and move the controller. While you hold it, push that controller's stick
+  up / down to move it farther / closer. **Size**: the - and + at the top.
 
 Every change works at once and is saved in `config.ini`. The menu uses no keyboard key, so it never clashes with the
 ETS2 / ATS DLAA mod's menu (`Delete`). The menu and keyboard float in the room: after a recenter they move with it.

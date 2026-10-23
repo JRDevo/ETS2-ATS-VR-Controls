@@ -147,10 +147,14 @@ public:
         const std::wstring ws = Wide(s);
         DrawTextW(dc_, ws.c_str(), (int)ws.size(), &r, align | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
     }
-    void CopyTo(std::vector<uint32_t>& out) {
+    // the picture with `alpha` (0..255) everywhere, premultiplied (GDI leaves alpha 0)
+    void CopyTo(std::vector<uint32_t>& out, int alpha) {
         GdiFlush();
         out.assign(static_cast<const uint32_t*>(bits_), static_cast<const uint32_t*>(bits_) + (size_t)w_ * h_);
-        for (uint32_t& p : out) p |= 0xFF000000u;   // opaque (GDI leaves alpha 0)
+        if (alpha >= 255) { for (uint32_t& p : out) p |= 0xFF000000u; return; }
+        const uint32_t a = (uint32_t)(alpha < 0 ? 0 : alpha);
+        for (uint32_t& p : out)
+            p = (a << 24) | ((((p >> 16) & 0xFFu) * a / 255u) << 16) | ((((p >> 8) & 0xFFu) * a / 255u) << 8) | ((p & 0xFFu) * a / 255u);
     }
 private:
     HFONT Font(int px, bool bold) {
@@ -170,9 +174,17 @@ private:
 
 namespace {
 
-const COLORREF kBg = RGB(24, 27, 33), kBarC = RGB(38, 43, 52), kElemC = RGB(50, 56, 66), kHoverC = RGB(66, 88, 120),
-               kOnC = RGB(46, 108, 186), kPressC = RGB(96, 156, 236), kTextC = RGB(232, 234, 237), kDimC = RGB(128, 136, 148),
-               kAccentC = RGB(242, 169, 59);
+// the colour themes (config.ini theme = ThemeNames()): background, bar, element, hover, selected, pressed, text, dim text, accent
+struct Theme { COLORREF bg, bar, elem, hover, on, press, text, dim, accent; };
+const Theme kThemes[kThemeCount] = {
+    { RGB(24, 27, 33), RGB(38, 43, 52), RGB(50, 56, 66), RGB(66, 88, 120), RGB(46, 108, 186), RGB(96, 156, 236), RGB(232, 234, 237), RGB(128, 136, 148), RGB(242, 169, 59) },   // dark
+    { RGB(14, 28, 52), RGB(22, 44, 80), RGB(30, 58, 102), RGB(46, 86, 146), RGB(0, 120, 212), RGB(80, 170, 255), RGB(230, 240, 255), RGB(130, 150, 180), RGB(255, 196, 64) },  // blue
+    { RGB(58, 60, 64), RGB(76, 79, 84), RGB(92, 96, 102), RGB(116, 122, 132), RGB(70, 130, 200), RGB(120, 170, 230), RGB(245, 245, 245), RGB(170, 174, 180), RGB(255, 190, 80) },   // grey
+    { RGB(232, 234, 238), RGB(206, 210, 218), RGB(250, 250, 252), RGB(200, 220, 245), RGB(60, 130, 220), RGB(30, 100, 200), RGB(28, 30, 36), RGB(110, 116, 126), RGB(200, 110, 0) },   // light
+    { RGB(0, 0, 0), RGB(20, 20, 20), RGB(34, 34, 34), RGB(70, 70, 70), RGB(200, 140, 0), RGB(255, 190, 40), RGB(255, 255, 255), RGB(150, 150, 150), RGB(255, 190, 40) },          // black
+    { RGB(18, 34, 26), RGB(28, 52, 40), RGB(38, 70, 54), RGB(56, 100, 78), RGB(40, 150, 90), RGB(90, 200, 130), RGB(232, 245, 236), RGB(130, 160, 140), RGB(250, 200, 70) },      // green
+};
+const char* const kThemeLabel[kThemeCount] = { "Dark", "Blue", "Grey", "Light", "Black", "Green" };
 
 }  // namespace
 
@@ -237,8 +249,14 @@ VrMenu::VrMenu(const Config& cfg, const std::wstring& path) : pad_(cfg.pad), pat
     place_[kPanKb] = cfg.kbPlace;
     pan_[kPanMenu].pw = kMenuW; pan_[kPanMenu].ph = kMenuH; pan_[kPanMenu].width = 0.6;
     pan_[kPanKb].pw = kKbW; pan_[kPanKb].ph = kKbH; pan_[kPanKb].width = 0.9;
+    look_ = cfg.look;
+    if (look_.theme < 0 || look_.theme >= kThemeCount) look_.theme = 0;
     for (int p = 0; p < kPanCount; ++p)
-        if (place_[p].set) pan_[p].width = place_[p].width;
+        if (place_[p].set) { pan_[p].width = place_[p].width; Place(p, false, Pose(), false); }
+    if (look_.kbShow) {                                 // the keyboard stays from the last game (at its place; else in front of
+        if (place_[kPanKb].set) pan_[kPanKb].show = true;   //   the head at the first frame that has the head)
+        else kbPending_ = true;
+    }
     // the pointer dot: white with a dark ring, soft edge, premultiplied alpha
     cursorPx_.resize((size_t)kCursorPx * kCursorPx);
     for (int y = 0; y < kCursorPx; ++y)
@@ -292,15 +310,33 @@ void VrMenu::Place(int p, bool headOk, const Pose& head, bool force) {
 void VrMenu::Open(bool headOk, const Pose& head) {
     Place(kPanMenu, headOk, head, false);
     pan_[kPanMenu].show = true;
-    if (kbWanted_) { Place(kPanKb, headOk, head, false); pan_[kPanKb].show = true; }
     status_.clear();
     RedrawAll();
     LOGI("VR menu open (%s)", Describe().c_str());
 }
 
+void VrMenu::ShowKb(bool on) {
+    if (on && !pan_[kPanKb].show) Place(kPanKb, lastHeadOk_, lastHead_, false);
+    if (!on) pickBtn_ = -1;
+    pan_[kPanKb].show = on;
+    kbPending_ = false;
+    if (look_.kbShow != on) { look_.kbShow = on; Save(); }
+}
+
+void VrMenu::Push(int p, double metres) {
+    Panel& pn = pan_[p];
+    const V3 from = lastHeadOk_ ? lastHead_.p : V3{ 0, 0, 0 };
+    const V3 v = pn.pose.p - from;
+    const double len = Len(v);
+    if (len < 1e-6) return;
+    double nl = len + metres;
+    nl = nl < 0.2 ? 0.2 : nl > 3.0 ? 3.0 : nl;
+    pn.pose.p = from + v * (nl / len);
+    SavePlaces();
+}
+
 void VrMenu::Close() {
-    kbWanted_ = pan_[kPanKb].show;
-    pan_[kPanMenu].show = pan_[kPanKb].show = false;
+    pan_[kPanMenu].show = false;
     pickBtn_ = -1;
     for (bool& l : latch_) l = false;
     LOGI("VR menu closed");
@@ -323,8 +359,8 @@ void VrMenu::LayoutMenu() {
     add(eBigger, 0, 672, 11, 64, 50, "+");
     add(eKbBtn, 0, 744, 11, 170, 50, "Keyboard", pan_[kPanKb].show);
     add(eClose, 0, 924, 11, 64, 50, "\xC3\x97");
-    static const char* const kTabs[3] = { "Buttons", "Mouse", "Panels" };
-    for (int t = 0; t < 3; ++t) add(eTab, t, 24 + t * 322, 84, 310, 56, kTabs[t], tab_ == t);
+    static const char* const kTabs[4] = { "Buttons", "Mouse", "Panels", "Look" };
+    for (int t = 0; t < 4; ++t) add(eTab, t, 24 + t * 241, 84, 229, 56, kTabs[t], tab_ == t);
     char b[96];
     if (tab_ == 0) {
         static const int kLeft[10] = { VrPad::kLTrig, VrPad::kLGrip, VrPad::kX, VrPad::kY, VrPad::kLStick, VrPad::kMenu,
@@ -379,28 +415,54 @@ void VrMenu::LayoutMenu() {
         snprintf(b, sizeof(b), "%.0f px/deg", (double)pad_.airGain);
         plusMinus(5, 50, b);
         add(eInfo, 0, 24, 716, 952, 64, status_.empty() ? "Changes work at once and are saved." : status_);
-    } else {
-        auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 162 + r * 88, 440, 70, label); };
+    } else if (tab_ == 2) {
+        auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 156 + r * 76, 440, 64, label); };
+        auto plusMinus = [&](int r, int base, const std::string& value, const char* minus, const char* plus) {
+            const bool glyph = !strcmp(minus, "\xE2\x88\x92");
+            add(eSet, base, 470, 156 + r * 76, glyph ? 90 : 130, 64, minus);
+            add(eInfo, 200 + r, glyph ? 570 : 610, 156 + r * 76, glyph ? 306 : 226, 64, value);
+            add(eSet, base + 1, glyph ? 886 : 846, 156 + r * 76, glyph ? 90 : 130, 64, plus);
+        };
+        const V3 from = lastHeadOk_ ? lastHead_.p : V3{ 0, 0, 0 };
         row(0, "Menu size");
-        add(eSet, 60, 470, 162, 90, 70, "\xE2\x88\x92");
         snprintf(b, sizeof(b), "%.2f m wide", pan_[kPanMenu].width);
-        add(eInfo, 200, 570, 162, 306, 70, b);
-        add(eSet, 61, 886, 162, 90, 70, "+");
-        row(1, "Keyboard size");
-        add(eSet, 70, 470, 250, 90, 70, "\xE2\x88\x92");
+        plusMinus(0, 60, b, "\xE2\x88\x92", "+");
+        row(1, "Menu distance");
+        snprintf(b, sizeof(b), "%.2f m", Len(pan_[kPanMenu].pose.p - from));
+        plusMinus(1, 62, b, "Closer", "Farther");
+        row(2, "Keyboard size");
         snprintf(b, sizeof(b), "%.2f m wide", pan_[kPanKb].width);
-        add(eInfo, 201, 570, 250, 306, 70, b);
-        add(eSet, 71, 886, 250, 90, 70, "+");
-        row(2, "Keyboard");
-        add(eSet, 80, 470, 338, 248, 70, "Show", pan_[kPanKb].show);
-        add(eSet, 81, 728, 338, 248, 70, "Hide", !pan_[kPanKb].show);
-        add(eHere, 0, 24, 434, 952, 70, "Bring the menu and the keyboard in front of me");
+        plusMinus(2, 70, b, "\xE2\x88\x92", "+");
+        row(3, "Keyboard distance");
+        if (pan_[kPanKb].show) snprintf(b, sizeof(b), "%.2f m", Len(pan_[kPanKb].pose.p - from));
+        else snprintf(b, sizeof(b), "(hidden)");
+        plusMinus(3, 72, b, "Closer", "Farther");
+        row(4, "Keyboard");
+        add(eSet, 80, 470, 460, 248, 64, "Show", pan_[kPanKb].show);
+        add(eSet, 81, 728, 460, 248, 64, "Hide", !pan_[kPanKb].show);
+        add(eHere, 0, 24, 540, 952, 64, "Bring the menu and the keyboard in front of me");
         std::string combo;
         for (int cb : gate_.btns) combo += (combo.empty() ? "" : " + ") + std::string(BtnLabel(cb));
         snprintf(b, sizeof(b), " for %.1f s", gate_.hold);
-        add(eInfo, 300, 24, 530, 952, 56, "Open / close: hold " + combo + b);
-        add(eInfo, 301, 24, 590, 952, 56, "Move a panel: point at its top bar, hold the trigger, move.");
-        add(eInfo, 0, 24, 716, 952, 64, status_.empty() ? "Saved in config.ini at once." : status_);
+        add(eInfo, 300, 24, 612, 952, 46, "Menu open / close: hold " + combo + b);
+        add(eInfo, 301, 24, 656, 952, 46, "Move: point at a panel, hold the grip, move. Its stick: farther / closer.");
+        add(eInfo, 0, 24, 716, 952, 64, status_.empty() ? "The keyboard stays when the menu closes (its x hides it)." : status_);
+    } else {
+        auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 162 + r * 88, 440, 70, label); };
+        row(0, "Colours");
+        for (int i = 0; i < kThemeCount; ++i)
+            add(eSet, 100 + i, 470 + (i % 3) * 172, 162 + (i / 3) * 80, 162, 70, kThemeLabel[i], look_.theme == i);
+        row(2, "Menu see-through");
+        add(eSet, 90, 470, 338, 90, 70, "\xE2\x88\x92");
+        snprintf(b, sizeof(b), "%d %% solid", (int)(look_.menuOpacity * 100.0f + 0.5f));
+        add(eInfo, 202, 570, 338, 306, 70, b);
+        add(eSet, 91, 886, 338, 90, 70, "+");
+        row(3, "Keyboard see-through");
+        add(eSet, 92, 470, 426, 90, 70, "\xE2\x88\x92");
+        snprintf(b, sizeof(b), "%d %% solid", (int)(look_.kbOpacity * 100.0f + 0.5f));
+        add(eInfo, 203, 570, 426, 306, 70, b);
+        add(eSet, 93, 886, 426, 90, 70, "+");
+        add(eInfo, 0, 24, 716, 952, 64, status_.empty() ? "- = more see-through, + = more solid." : status_);
     }
 }
 
@@ -426,11 +488,12 @@ void VrMenu::LayoutKb() {
 }
 
 void VrMenu::Draw(int p) {
+    const Theme& T = kThemes[look_.theme];
     Panel& pn = pan_[p];
     if (!cv_[p]) cv_[p] = std::make_unique<MenuCanvas>(pn.pw, pn.ph);
     MenuCanvas& c = *cv_[p];
     if (!c.Ok()) return;
-    c.Round(0, 0, pn.pw, pn.ph, 0, kBg);
+    c.Round(0, 0, pn.pw, pn.ph, 0, T.bg);
     elState_[p].assign(pn.el.size(), 0);
     for (size_t i = 0; i < pn.el.size(); ++i) {
         elState_[p][i] = (uint8_t)ElemState(p, pn.el[i]);
@@ -441,6 +504,7 @@ void VrMenu::Draw(int p) {
 
 int VrMenu::ElemState(int p, const Elem& e) const {
     int st = 0;
+    if (e.kind == eBar) return 0;                       // the bar never changes its look (a shaky pointer on it made it blink)
     for (int h = 0; h < 2; ++h) {
         if (hov_[h].pan == p && hov_[h].kind == e.kind && hov_[h].arg == e.arg) st |= 1;
         if (press_[h].pan == p && press_[h].kind == e.kind && press_[h].arg == e.arg) st |= 2;
@@ -450,6 +514,7 @@ int VrMenu::ElemState(int p, const Elem& e) const {
 
 // A pointer moving over the keys changes two elements: only those are drawn again (a full panel is ~2 ms of GDI).
 bool VrMenu::DrawChanged(int p) {
+    const Theme& T = kThemes[look_.theme];
     Panel& pn = pan_[p];
     if (!cv_[p] || elState_[p].size() != pn.el.size()) return false;
     MenuCanvas& c = *cv_[p];
@@ -460,7 +525,7 @@ bool VrMenu::DrawChanged(int p) {
         if (st == elState_[p][i]) continue;
         if (e.kind == eBar) return false;            // the bar lies under its buttons: all again
         elState_[p][i] = (uint8_t)st;
-        c.Round(e.x, e.y, e.w, e.h, 0, e.y < 72 ? kBarC : kBg);
+        c.Round(e.x, e.y, e.w, e.h, 0, e.y < 72 ? T.bar : T.bg);
         DrawElem(c, e, st);
         any = true;
     }
@@ -469,7 +534,8 @@ bool VrMenu::DrawChanged(int p) {
 }
 
 void VrMenu::Publish(int p) {
-    cv_[p]->CopyTo(pan_[p].px);
+    const float op = p == kPanMenu ? look_.menuOpacity : look_.kbOpacity;
+    cv_[p]->CopyTo(pan_[p].px, (int)(op * 255.0f + 0.5f));
     ++pan_[p].version;
 }
 
@@ -480,35 +546,36 @@ void VrMenu::Redraw(int p) {
 }
 
 void VrMenu::DrawElem(MenuCanvas& c, const Elem& e, int st) {
+    const Theme& T = kThemes[look_.theme];
     const bool hov = (st & 1) != 0, prs = (st & 2) != 0;
     switch (e.kind) {
     case eBar:
-        c.Round(e.x, e.y, e.w, e.h, 0, hov || prs ? RGB(48, 55, 68) : kBarC);
-        c.Text(e.x + 24, e.y, e.w - 24, e.h, e.text, 34, true, e.on ? kAccentC : kTextC, DT_LEFT);
+        c.Round(e.x, e.y, e.w, e.h, 0, T.bar);
+        c.Text(e.x + 24, e.y, e.w - 24, e.h, e.text, 34, true, e.on ? T.accent : T.text, DT_LEFT);
         break;
     case eInfo: {
         const bool label = e.arg >= 100 && e.arg < 200, value = e.arg >= 200 && e.arg < 300;
-        c.Text(e.x + (value ? 0 : 4), e.y, e.w, e.h, e.text, label ? 28 : value ? 30 : 26, value, label || value ? kTextC : kDimC,
+        c.Text(e.x + (value ? 0 : 4), e.y, e.w, e.h, e.text, label ? 28 : value ? 30 : 26, value, label || value ? T.text : T.dim,
                value ? DT_CENTER : DT_LEFT);
         break;
     }
     case eRow: {
-        c.Round(e.x, e.y, e.w, e.h, 12, prs ? kPressC : e.on ? kOnC : hov ? kHoverC : kElemC);
-        c.Text(e.x + 16, e.y, 200, e.h, e.text, 24, false, e.dim ? kDimC : kTextC, DT_LEFT);
-        c.Text(e.x + 210, e.y, e.w - 226, e.h, e.sub, 26, true, e.dim ? kDimC : kTextC, DT_RIGHT);
+        c.Round(e.x, e.y, e.w, e.h, 12, prs ? T.press : e.on ? T.on : hov ? T.hover : T.elem);
+        c.Text(e.x + 16, e.y, 200, e.h, e.text, 24, false, e.dim ? T.dim : T.text, DT_LEFT);
+        c.Text(e.x + 210, e.y, e.w - 226, e.h, e.sub, 26, true, e.dim ? T.dim : T.text, DT_RIGHT);
         break;
     }
     case eKey: {
-        c.Round(e.x, e.y, e.w, e.h, 10, prs ? kPressC : e.on ? kOnC : hov ? kHoverC : kElemC);
+        c.Round(e.x, e.y, e.w, e.h, 10, prs ? T.press : e.on ? T.on : hov ? T.hover : T.elem);
         const bool one = e.text.size() == 1 || (unsigned char)e.text[0] >= 0x80;   // a letter / digit / arrow: bigger
-        c.Text(e.x, e.y, e.w, e.h, e.text, one ? 30 : 21, true, kTextC, DT_CENTER);
+        c.Text(e.x, e.y, e.w, e.h, e.text, one ? 30 : 21, true, T.text, DT_CENTER);
         break;
     }
     default: {
-        c.Round(e.x, e.y, e.w, e.h, 12, prs ? kPressC : e.on ? kOnC : hov ? kHoverC : kElemC);
+        c.Round(e.x, e.y, e.w, e.h, 12, prs ? T.press : e.on ? T.on : hov ? T.hover : T.elem);
         const bool glyph = e.text == "+" || e.text == "\xE2\x88\x92" || e.text == "\xC3\x97";   // + - x: bigger
         c.Text(e.x, e.y, e.w, e.h, e.text, glyph ? 40 : e.kind == ePickOut ? 24 : 28,
-               true, kTextC, DT_CENTER);
+               true, T.text, DT_CENTER);
         break;
     }
     }
@@ -610,6 +677,17 @@ void VrMenu::SetValue(int arg) {
         break;
     case 40: case 41: pad_.airToggle = arg == 41; break;
     case 50: case 51: mul(pad_.airGain, arg == 51, 1.0f, 500.0f); break;
+    case 62: case 63: Push(kPanMenu, arg == 63 ? 0.05 : -0.05); return;
+    case 72: case 73: if (pan_[kPanKb].show) Push(kPanKb, arg == 73 ? 0.05 : -0.05); return;
+    case 90: case 91: case 92: case 93: {                // see-through, in steps of 10 %
+        float& o = arg < 92 ? look_.menuOpacity : look_.kbOpacity;
+        o += (arg & 1) ? 0.1f : -0.1f;
+        o = o < 0.2f ? 0.2f : o > 1.0f ? 1.0f : o;
+        o = (float)(int)(o * 10.0f + 0.5f) / 10.0f;
+        needRedraw_ = true;
+        break;
+    }
+    case 100: case 101: case 102: case 103: case 104: case 105: look_.theme = arg - 100; needRedraw_ = true; break;
     case 60: case 61: case 70: case 71: {
         Panel& pn = pan_[arg < 70 ? kPanMenu : kPanKb];
         pn.width *= (arg & 1) ? 1.12 : 1 / 1.12;
@@ -617,8 +695,8 @@ void VrMenu::SetValue(int arg) {
         SavePlaces();
         return;
     }
-    case 80: if (!pan_[kPanKb].show) { Place(kPanKb, lastHeadOk_, lastHead_, false); pan_[kPanKb].show = true; } return;
-    case 81: pan_[kPanKb].show = false; pickBtn_ = -1; return;
+    case 80: ShowKb(true); return;
+    case 81: ShowKb(false); return;
     default: return;
     }
     status_ = "Saved.";
@@ -645,12 +723,11 @@ void VrMenu::Activate(int h, const Ref& r, const VrPad::Frame&, VrPad::Sink& sin
         SavePlaces();
         break;
     case eClose:
-        if (r.pan == kPanMenu) { Close(); kbWanted_ = false; }
-        else { pan_[kPanKb].show = false; kbWanted_ = false; pickBtn_ = -1; }
+        if (r.pan == kPanMenu) Close();
+        else ShowKb(false);
         break;
     case eKbBtn:
-        if (!pan_[kPanKb].show) { Place(kPanKb, lastHeadOk_, lastHead_, false); pan_[kPanKb].show = true; }
-        else { pan_[kPanKb].show = false; pickBtn_ = -1; }
+        ShowKb(!pan_[kPanKb].show);
         break;
     case eTab: tab_ = r.arg; status_.clear(); break;
     case eRow:
@@ -661,7 +738,7 @@ void VrMenu::Activate(int h, const Ref& r, const VrPad::Frame&, VrPad::Sink& sin
         }
         pickBtn_ = pickBtn_ == r.arg ? -1 : r.arg;
         for (bool& l : latch_) l = false;
-        if (pickBtn_ >= 0 && !pan_[kPanKb].show) { Place(kPanKb, lastHeadOk_, lastHead_, false); pan_[kPanKb].show = true; }
+        if (pickBtn_ >= 0 && !pan_[kPanKb].show) ShowKb(true);
         break;
     case ePickOut: { VrPad::Out o; o.kind = (uint8_t)r.arg; Pick(o); break; }
     case ePickCancel: pickBtn_ = -1; for (bool& l : latch_) l = false; break;
@@ -707,19 +784,29 @@ void VrMenu::Release(int h, VrPad::Sink& sink) {
 }
 
 void VrMenu::ReleaseAll(VrPad::Sink& sink) {
-    for (int h = 0; h < 2; ++h) if (press_[h].pan >= 0) Release(h, sink);
+    bool held = false;
+    for (int h = 0; h < 2; ++h) {
+        if (press_[h].pan >= 0) Release(h, sink);
+        held = held || grab_[h].pan >= 0;
+        grab_[h] = Grab();
+        gripDown_[h] = false;
+    }
+    if (held) SavePlaces();
 }
 
 void VrMenu::Update(VrPad::Frame& f, bool live, bool headOk, const Pose& head, double now, VrPad::Sink& sink) {
     lastHeadOk_ = headOk;
     if (headOk) lastHead_ = head;
+    const double dt = lastNow_ < 0 ? 0.0 : (now - lastNow_ > 0.1 ? 0.1 : now - lastNow_);
+    lastNow_ = now;
+    if (kbPending_ && headOk) ShowKb(true);
     if (!live) {
         ReleaseAll(sink);
         hov_[0] = hov_[1] = Ref();
         trigDown_[0] = trigDown_[1] = false;
     } else {
         if (gate_.Step(f, now)) {
-            if (AnyShown()) Close();
+            if (pan_[kPanMenu].show) Close();
             else Open(headOk, head);
         }
         for (int h = 0; h < 2; ++h) {
@@ -729,17 +816,40 @@ void VrMenu::Update(VrPad::Frame& f, bool live, bool headOk, const Pose& head, d
                 aim_[h].p = V3{ f.p[h][0], f.p[h][1], f.p[h][2] };
             }
             Press& ps = press_[h];
-            if (ps.drag && aimOk_[h] && pan_[ps.pan].show) {     // the panel hangs on the controller, kept level (no roll)
-                const Pose np = PMul(aim_[h], ps.grab);
+            Grab& g = grab_[h];
+            if (g.pan >= 0 && (!pan_[g.pan].show || !aimOk_[h])) { g = Grab(); SavePlaces(); }
+            if (g.pan >= 0) {                                     // its stick pushes the held panel away / pulls it closer
+                const double len = Len(g.off.p);
+                const double sy = std::fabs(f.sy[h]) > 0.2 ? f.sy[h] : 0.0;
+                if (len > 1e-6 && sy != 0.0) {
+                    double nl = len + sy * 0.8 * dt;
+                    nl = nl < 0.15 ? 0.15 : nl > 3.0 ? 3.0 : nl;
+                    g.off.p = g.off.p * (nl / len);
+                }
+            }
+            const Pose* hold = g.pan >= 0 ? &g.off : ps.drag ? &ps.grab : nullptr;
+            const int heldPan = g.pan >= 0 ? g.pan : ps.drag ? ps.pan : -1;
+            if (hold && aimOk_[h] && pan_[heldPan].show) {      // the panel hangs on the controller, kept level (no roll)
+                const Pose np = PMul(aim_[h], *hold);
                 double yaw, pitch;
                 YawPitchOf(QRot(np.q, V3{ 0, 0, -1 }), &yaw, &pitch);
-                pan_[ps.pan].pose.p = np.p;
-                pan_[ps.pan].pose.q = QYawPitch(yaw, pitch);
+                pan_[heldPan].pose.p = np.p;
+                pan_[heldPan].pose.q = QYawPitch(yaw, pitch);
             }
             Ref r;
             double u, v;
             if (!AnyShown() || !Hit(f, h, &r, &u, &v)) r = Ref();
             hov_[h] = r;
+            const bool grip = gripDown_[h] ? f.grip[h] > VrPad::kReleaseAt : f.grip[h] > VrPad::kPressAt;
+            if (grip && !gripDown_[h] && r.pan >= 0 && g.pan < 0 && !ps.drag) {
+                g.pan = r.pan;
+                g.off = PMul(PInv(aim_[h]), pan_[r.pan].pose);
+                LOGI("VR menu: %s hand grabs the %s", h ? "right" : "left", r.pan == kPanMenu ? "menu" : "keyboard");
+            }
+            if (!grip && g.pan >= 0) { g = Grab(); SavePlaces(); }
+            gripDown_[h] = grip;
+            if (r.pan >= 0 || g.pan >= 0) f.grip[h] = 0.0f;                         // pointing at / holding a panel: no air mouse
+            if (g.pan >= 0) { f.sx[h] = f.sy[h] = 0.0f; }                            // holding: the stick moves the panel
             const bool down = trigDown_[h] ? f.trig[h] > VrPad::kReleaseAt : f.trig[h] > VrPad::kPressAt;
             if (down && !trigDown_[h] && r.pan >= 0) Activate(h, r, f, sink);
             if (!down && press_[h].pan >= 0) Release(h, sink);
@@ -756,7 +866,7 @@ void VrMenu::Update(VrPad::Frame& f, bool live, bool headOk, const Pose& head, d
     needRedraw_ = false;
     if (saveAt_ >= 0) {
         saveAt_ = -1;
-        if (SaveConfigValues(path_, MenuValues(pad_, place_[kPanMenu], place_[kPanKb])))
+        if (SaveConfigValues(path_, MenuValues(pad_, place_[kPanMenu], place_[kPanKb], look_)))
             LOGI("VR menu: settings saved to %ls", path_.c_str());
         else if (!path_.empty()) {
             LOGW("VR menu: could not write %ls -- the change works until the game ends", path_.c_str());
@@ -770,7 +880,9 @@ std::string VrMenu::ContentKey() const {
     char b[160];
     snprintf(b, sizeof(b), "%d%d|%d|%d|%d%d%d|%.3f,%.3f|", pan_[0].show, pan_[1].show, tab_, pickBtn_, latch_[0], latch_[1], latch_[2],
              pan_[0].width, pan_[1].width);
-    return std::string(b) + status_ + "|" + DescribePad(pad_);
+    char l[64];
+    snprintf(l, sizeof(l), "%d|%.2f|%.2f|", look_.theme, look_.menuOpacity, look_.kbOpacity);
+    return std::string(b) + l + status_ + "|" + DescribePad(pad_);
 }
 
 }  // namespace ck

@@ -222,11 +222,63 @@ int main(int argc, char** argv) {
     click(1, VrMenu::kPanKb, VrMenu::eBigger, 0);
     CHECK(m.Pan(VrMenu::kPanKb).width > w0 * 1.1, "keyboard bigger");
     for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
+    // grab the keyboard with the right GRIP: it follows the controller, its stick pushes it away; the grip and the stick are
+    // taken out of the frame meanwhile (no air mouse, no stick mouse / arrows)
+    {
+        V3 at;
+        m.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("g"), &at);
+        const V3 before = m.Pan(VrMenu::kPanKb).pose.p;
+        const double d0 = Len(before);
+        VrPad::Frame f = Aim(1, at, 0.0f);
+        upd(f);
+        f = Aim(1, at, 0.0f);
+        f.grip[1] = 1.0f;
+        upd(f);
+        CHECK(f.grip[1] == 0.0f, "the grip on a panel is the menu's (no air mouse)");
+        const V3 turned = QRot(QYawPitch(-15.0 * 3.14159265358979 / 180.0, 0), at);   // 15 deg right
+        for (int i = 0; i < 5; ++i) { f = Aim(1, turned, 0.0f); f.grip[1] = 1.0f; upd(f); }
+        CHECK(m.Pan(VrMenu::kPanKb).pose.p.x > before.x + 0.1, "the held keyboard follows the controller (x %.2f -> %.2f)",
+              before.x, m.Pan(VrMenu::kPanKb).pose.p.x);
+        for (int i = 0; i < 30; ++i) { f = Aim(1, turned, 0.0f); f.grip[1] = 1.0f; f.sy[1] = 1.0f; upd(f); }
+        CHECK(f.sy[1] == 0.0f, "the stick of the holding hand is the menu's");
+        const double d1 = Len(m.Pan(VrMenu::kPanKb).pose.p);
+        CHECK(d1 > d0 + 0.15, "stick up while holding = farther (%.2f -> %.2f m)", d0, d1);
+        f = Aim(1, turned, 0.0f);
+        upd(f);
+        CHECK(!m.HandOnPanel(1) || m.Pan(VrMenu::kPanKb).show, "let go");
+    }
+    // Panels tab: the menu 5 cm farther; Look tab: theme blue, the menu more see-through
+    {
+        click(1, VrMenu::kPanMenu, VrMenu::eTab, 2);
+        const double d0 = Len(m.Pan(VrMenu::kPanMenu).pose.p);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 63), "Farther shown");
+        CHECK(std::fabs(Len(m.Pan(VrMenu::kPanMenu).pose.p) - d0 - 0.05) < 0.005, "menu 5 cm farther");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 3), "Look tab");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 101), "Blue shown");
+        CHECK(m.Look().theme == 1, "theme blue");
+        for (int i = 0; i < 3; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 90);
+        CHECK(std::fabs(m.Look().menuOpacity - 0.7f) < 0.01f, "menu 70 %% solid (%.2f)", (double)m.Look().menuOpacity);
+        for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
+        const uint32_t px0 = m.Pan(VrMenu::kPanMenu).px[(size_t)400 * 1000 + 10];
+        CHECK((px0 >> 24) == 179, "the picture is 70 %% solid (alpha %u)", px0 >> 24);
+    }
     WriteBmp(dir + L"\\menu.bmp", m.Pan(VrMenu::kPanMenu));
     WriteBmp(dir + L"\\keyboard.bmp", m.Pan(VrMenu::kPanKb));
-    // close: the menu's x; the keyboard stays hidden too (it is reopened with the menu only when it was shown)
+    // close: the menu's x; the keyboard STAYS (it is its own panel)
     click(1, VrMenu::kPanMenu, VrMenu::eClose, 0);
-    CHECK(!m.Pan(VrMenu::kPanMenu).show, "closed");
+    CHECK(!m.Pan(VrMenu::kPanMenu).show && m.Pan(VrMenu::kPanKb).show, "menu closed, the keyboard stays");
+    for (int i = 0; i < 3; ++i) { VrPad::Frame f = idle; upd(f); }
+    {
+        V3 at;
+        CHECK(m.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("f5"), &at), "F5 still there");
+        VrPad::Frame f = Aim(1, at, 0.0f);
+        upd(f);
+        f = Aim(1, at, 1.0f);
+        upd(f);
+        f = Aim(1, at, 0.0f);
+        upd(f);
+        CHECK(sink.Take() == "k03fv k03f^", "the keyboard works with the menu closed");
+    }
 
     printf("(3) config.ini\n");
     const std::string text = ReadFile(cfgPath);
@@ -241,12 +293,17 @@ int main(int argc, char** argv) {
     CHECK(back.pad.airToggle && back.pad.mouseSpeed > 1000.0f, "read back: toggle, speed");
     CHECK(back.menuPlace.set && std::fabs(back.menuPlace.x - m.Pan(VrMenu::kPanMenu).pose.p.x) < 0.002, "read back: the menu place");
     CHECK(std::fabs(back.kbPlace.width - m.Pan(VrMenu::kPanKb).width) < 0.002, "read back: the keyboard width");
+    CHECK(back.look.kbShow && back.look.theme == 1 && std::fabs(back.look.menuOpacity - 0.7f) < 0.01f, "read back: keyboard shown, blue, 70 %%");
     VrMenu m2(back, std::wstring());
+    CHECK(m2.Pan(VrMenu::kPanKb).show, "a new game: the keyboard is there at once (keyboard_show)");
+    CHECK(std::fabs(m2.Pan(VrMenu::kPanKb).pose.p.x - m.Pan(VrMenu::kPanKb).pose.p.x) < 0.002, "... at its saved place");
     m2.Open(true, head);
     CHECK(std::fabs(m2.Pan(VrMenu::kPanMenu).pose.p.x - m.Pan(VrMenu::kPanMenu).pose.p.x) < 0.002, "a new menu opens at the saved place");
     // cost of one keyboard redraw (it happens when the pointer moves onto another key): printed, not checked
     {
-        VrMenu m3(back, std::wstring());
+        Config c3 = back;
+        c3.look.kbShow = false;                         // (its menu button shows it below)
+        VrMenu m3(c3, std::wstring());
         Rec s3;
         auto u3 = [&](VrPad::Frame f) { m3.Update(f, true, true, head, now, s3); now += 0.011; };
         m3.Open(true, head);

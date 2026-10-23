@@ -85,6 +85,18 @@ Config ParseConfig(const std::string& text) {
             else bad("use hold or toggle");
             continue;
         }
+        if (key == "theme") {
+            int t = -1;
+            for (int i = 0; i < kThemeCount; ++i) if (lv == ThemeNames()[i]) t = i;
+            if (t < 0) bad("dark, blue, grey, light, black or green"); else c.look.theme = t;
+            continue;
+        }
+        if (key == "menu_opacity" || key == "keyboard_opacity") {
+            if (!Num(val, 0.2, 1.0, &d)) { bad("a number 0.2 .. 1 (1 = solid)"); continue; }
+            (key == "menu_opacity" ? c.look.menuOpacity : c.look.kbOpacity) = (float)d;
+            continue;
+        }
+        if (key == "keyboard_show") { c.look.kbShow = lv == "1" || lv == "on" || lv == "yes"; continue; }
         if (key == "vr_menu") { c.menu = lv != "0" && lv != "off" && lv != "no"; continue; }
         if (key == "menu_hold") { if (Num(val, 0.3, 5, &d)) c.menuHold = (float)d; else bad("a number of seconds (0.3 .. 5)"); continue; }
         if (key == "menu_combo") {
@@ -171,7 +183,8 @@ std::string PlaceString(const PanelPlace& p) {
     return b;
 }
 
-std::vector<std::pair<std::string, std::string>> MenuValues(const VrPad::Config& p, const PanelPlace& menu, const PanelPlace& kb) {
+std::vector<std::pair<std::string, std::string>> MenuValues(const VrPad::Config& p, const PanelPlace& menu, const PanelPlace& kb,
+                                                            const MenuLook& look) {
     std::vector<std::pair<std::string, std::string>> kv;
     char b[64];
     for (int i = 0; i < VrPad::kBtnCount; ++i) {
@@ -189,6 +202,12 @@ std::vector<std::pair<std::string, std::string>> MenuValues(const VrPad::Config&
     kv.push_back({ "air_speed", b });
     if (menu.set) kv.push_back({ "menu_place", PlaceString(menu) });
     if (kb.set) kv.push_back({ "keyboard_place", PlaceString(kb) });
+    kv.push_back({ "theme", ThemeNames()[look.theme < 0 || look.theme >= kThemeCount ? 0 : look.theme] });
+    snprintf(b, sizeof(b), "%.2f", (double)look.menuOpacity);
+    kv.push_back({ "menu_opacity", b });
+    snprintf(b, sizeof(b), "%.2f", (double)look.kbOpacity);
+    kv.push_back({ "keyboard_opacity", b });
+    kv.push_back({ "keyboard_show", look.kbShow ? "1" : "0" });
     return kv;
 }
 

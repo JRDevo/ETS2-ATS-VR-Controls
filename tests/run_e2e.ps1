@@ -206,12 +206,12 @@ if (-not $Only -or $Only -eq 'restore') {
     Check 'restore' ($last -match 'touch_controller 3:') "the last Touch suggestion is the game's 3 bindings ($last)"
     Check 'restore' ($r.game -match 'game select right down') 'the game keeps its select'
 }
-# ---- menu: the VR menu on a D3D11 session. The menu opens 0.75 m ahead, 8 deg down: the Mouse tab is at aim yaw 0 / pitch 5,
+# ---- menu: the VR menu on a D3D11 session. The menu opens 0.75 m ahead, 8 deg down: the Mouse tab (2nd of 4) is at aim yaw -5.4 / pitch 5,
 # "Toggled on" (air mouse) at yaw 16.1 / pitch -14.2 (vr_menu.cpp layout; mock: + yaw = right)
 if (-not $Only -or $Only -eq 'menu') {
     $menuScript = '1.0-2.6:/user/hand/left/input/squeeze/value=1;1.0-2.6:/user/hand/right/input/squeeze/value=1;' +
                   '1.2-2.6:/user/hand/left/input/thumbstick/click=1;' +
-                  '2.6-3.6:/user/hand/right/input/aim/pose=0,5,0,5;' +
+                  '2.6-3.6:/user/hand/right/input/aim/pose=-5.4,5,-5.4,5;' +
                   '3.0-3.3:/user/hand/right/input/trigger/value=0.9;3.0-3.3:/user/hand/right/input/select/click=1;' +
                   '3.7-4.6:/user/hand/right/input/aim/pose=16.1,-14.2,16.1,-14.2;' +
                   '4.0-4.3:/user/hand/right/input/trigger/value=0.9;4.0-4.3:/user/hand/right/input/select/click=1;' +

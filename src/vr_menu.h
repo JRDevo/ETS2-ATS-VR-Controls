@@ -11,9 +11,14 @@
 //   * Keyboard panel: a full-size keyboard (main block, F-keys, arrows / navigation, number pad). A key goes down on the
 //     trigger and up when it is let go. Shift / Ctrl / Alt latch: they go with the next key. While a button is being set, the
 //     keyboard picks its key instead (with the latched modifiers: shift+f).
-//   * Move: point at a panel's top bar, hold the trigger and move the controller (it hangs on the controller, kept level).
-//     Size: the - / + on the bar. Every change is written to config.ini at once (menu_place / keyboard_place in the room's LOCAL
-//     space: a recenter moves them with the room).
+//   * Move: point at a panel and hold the GRIP (or the trigger on its top bar) and move the controller: it hangs on the
+//     controller, kept level; that controller's stick up / down pushes it away / pulls it closer meanwhile. While a controller
+//     points at a panel its grip is the menu's (no air mouse); while it holds one, its stick too. Size: the - / + on the bar.
+//     Panels tab: size and distance of each. Look tab: colour theme, see-through (opacity) of each panel.
+//   * The keyboard is its own panel: the combo opens / closes only the menu; the keyboard stays where it is (shown or not,
+//     also at the next game start: keyboard_show) until its x -- e.g. fixed at the side of the cab, always there.
+//   * Every change is written to config.ini at once (menu_place / keyboard_place in the room's LOCAL space: a recenter moves
+//     them with the room).
 // Pure logic + GDI drawing into memory: no OpenXR / D3D here (tests/vr_menu_test.cpp drives it with made-up frames).
 #pragma once
 #include <cstdint>
@@ -66,11 +71,12 @@ public:
     // the menu uses is taken out before the Mapper sees it). live: input may be sent (else everything held is let go).
     // headOk / head: the head (VIEW) pose in LOCAL. Keyboard keys go to `sink`.
     void Update(VrPad::Frame& f, bool live, bool headOk, const Pose& head, double now, VrPad::Sink& sink);
-    void ReleaseAll(VrPad::Sink& sink);           // let go of a held keyboard key
+    void ReleaseAll(VrPad::Sink& sink);           // let go of a held keyboard key / a held panel
 
     const VrPad::Config& Pad() const { return pad_; }   // the mapping in use (the menu edits it)
     bool AnyShown() const { return pan_[0].show || pan_[1].show; }
-    bool HandOnPanel(int h) const { return h >= 0 && h < 2 && (hov_[h].pan >= 0 || press_[h].pan >= 0); }
+    bool HandOnPanel(int h) const { return h >= 0 && h < 2 && (hov_[h].pan >= 0 || press_[h].pan >= 0 || grab_[h].pan >= 0); }
+    const MenuLook& Look() const { return look_; }
     const Panel& Pan(int i) const { return pan_[i]; }
     // the pointer dot of hand h: shown + its pose (on the panel, facing out)
     bool Cursor(int h, Pose* p) const;
@@ -86,7 +92,7 @@ public:
     enum Kind { eNone, eBar, eClose, eSmaller, eBigger, eKbBtn, eTab, eRow, ePickOut, ePickCancel, eSet, eKey, eHere, eInfo };
     void Open(bool headOk, const Pose& head);     // as the combo does (tests)
     static int KeyIndex(const char* name);        // tests: the eKey arg of a keyboard key ("f1", "shift"); -1 = none
-    void Close();
+    void Close();                                 // the menu (the keyboard stays as it is)
 
 private:
     struct Ref { int pan = -1, kind = eNone, arg = 0; };
@@ -108,6 +114,8 @@ private:
     void Activate(int h, const Ref& r, const VrPad::Frame& f, VrPad::Sink& sink);
     void Release(int h, VrPad::Sink& sink);
     void SetValue(int arg);
+    void Push(int p, double metres);              // the panel along the line from the head: + = farther
+    void ShowKb(bool on);
     void Pick(const VrPad::Out& o);
     void Save();
     void SavePlaces();
@@ -119,7 +127,12 @@ private:
     PanelPlace    place_[kPanCount];
     int           tab_ = 0;               // 0 Buttons, 1 Mouse, 2 Panels
     int           pickBtn_ = -1;          // the button being set (a key / mouse button is picked next)
-    bool          kbWanted_ = false;      // the keyboard comes back with the menu
+    MenuLook      look_;
+    bool          kbPending_ = false;     // keyboard_show without a saved place: shown at the first frame with the head
+    struct Grab { int pan = -1; Pose off; };
+    Grab          grab_[2];               // a panel held by the grip
+    bool          gripDown_[2] = {};
+    double        lastNow_ = -1;
     bool          latch_[3] = {};         // Shift, Ctrl, Alt latched (left / right alike)
     Ref           hov_[2];
     Press         press_[2];
