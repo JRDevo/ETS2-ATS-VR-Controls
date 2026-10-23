@@ -32,6 +32,20 @@ static void QuatYawPitch(double yawDeg, double pitchDeg, double q[4]) {   // yaw
     q[3] = qy[3] * qx[3] - qy[0] * qx[0] - qy[1] * qx[1] - qy[2] * qx[2];
 }
 
+// the mapping these checks were written for (the defaults before 2026-10-23): trigger = left click, left trigger = right click,
+// A = Enter, left stick = mouse at 900 px/s, right grip + right trigger = right click
+static VrPad::Config OldDefaults() {
+    VrPad::Config c = VrPad::DefaultConfig();
+    VrPad::ParseOut("mouse_left", &c.map[VrPad::kRTrig]);
+    VrPad::ParseOut("mouse_right", &c.map[VrPad::kLTrig]);
+    VrPad::ParseOut("enter", &c.map[VrPad::kA]);
+    c.mouseStick = 1;
+    c.mouseSpeed = 900.0f;
+    c.modMap[VrPad::kB] = VrPad::Out();
+    VrPad::ParseOut("mouse_right", &c.modMap[VrPad::kRTrig]);
+    return c;
+}
+
 int main() {
     using namespace VrPad;
     printf("(1) names and parser\n");
@@ -58,7 +72,7 @@ int main() {
 
     printf("(2) mapper\n");
     {   // the modifier (default: right grip + right trigger = right click; the grip stays the air mouse)
-        Config c = DefaultConfig();
+        Config c = OldDefaults();
         ParseOut("f1", &c.modMap[kA]);
         Mapper m; Rec r; Frame f;
         f.hand[0] = f.hand[1] = true;
@@ -94,8 +108,29 @@ int main() {
         m.Step(f, true, 0.011, c, r);
         CHECK(r.Take() == "m0v m0^", "modifier off: the trigger is the left click");
     }
-    {   // edges, hysteresis, the hold button, combos
+    {   // the defaults since 2026-10-23: A = left click, B = Esc, right grip (air mouse, the modifier) + B = right click
         Config c = DefaultConfig();
+        Mapper m; Rec r; Frame f;
+        f.hand[0] = f.hand[1] = true;
+        f.prim[1] = true; m.Step(f, true, 0.011, c, r);
+        f.prim[1] = false; m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "m0v m0^", "A = left click");
+        f.sec[1] = true; m.Step(f, true, 0.011, c, r);
+        f.sec[1] = false; m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "k001v k001^", "B alone = Esc");
+        f.grip[1] = 1.0f; m.Step(f, true, 0.011, c, r);
+        f.sec[1] = true; m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "m1v", "right grip + B = right click down (drag the map)");
+        f.sec[1] = false; m.Step(f, true, 0.011, c, r);
+        f.prim[1] = true; m.Step(f, true, 0.011, c, r);
+        f.prim[1] = false; f.grip[1] = 0.0f; m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "m1^ m0v m0^", "... up; right grip + A = left click as normal");
+        f.trig[1] = 1.0f; m.Step(f, true, 0.011, c, r);
+        f.trig[1] = 0.0f; m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "m1v m1^", "right trigger = right click");
+    }
+    {   // edges, hysteresis, the hold button, combos
+        Config c = OldDefaults();
         ParseOut("shift+f", &c.map[kX]);
         ParseOut("delete", &c.map[kMenu]);
         Mapper m; Rec r; Frame f;
@@ -134,7 +169,7 @@ int main() {
         CHECK(r.Take().empty(), "released only once");
     }
     {   // stick directions vs the mouse stick
-        Config c = DefaultConfig();                    // left stick = mouse, right stick = arrows
+        Config c = OldDefaults();                    // left stick = mouse, right stick = arrows
         Mapper m; Rec r; Frame f;
         f.hand[0] = f.hand[1] = true;
         f.sx[1] = 0.9f;
@@ -169,7 +204,7 @@ int main() {
         CHECK(r.Take().empty() && r.mx == 0 && r.my == 0 && m.Down(kLUp), "mouse off: left up is a button (unmapped)");
     }
     {   // air mouse
-        Config c = DefaultConfig();
+        Config c = OldDefaults();
         Mapper m; Rec r; Frame f;
         f.hand[0] = f.hand[1] = true;
         f.aim[1] = true;

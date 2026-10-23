@@ -145,8 +145,8 @@ inline void OutToString(const Out& o, char* buf, size_t cap) {
 
 struct Config {
     Out   map[kBtnCount];
-    int   mouseStick = 1;                              // 0 off, 1 left stick, 2 right stick moves the mouse
-    float mouseSpeed = 900.0f;                         // pixels / s at full stick
+    int   mouseStick = 2;                              // 0 off, 1 left stick, 2 right stick moves the mouse
+    float mouseSpeed = 1800.0f;                        // pixels / s at full stick
     float deadzone = 0.15f;                            // stick
     int   airBtn = kRGrip;                             // held = air mouse (the button's own mapping is not sent); -1 = off
     int   airHand = 1;                                 // the hand whose aim moves the mouse (follows airBtn's hand)
@@ -160,20 +160,22 @@ struct Config {
 };
 inline Config DefaultConfig() {
     Config c;
-    ParseOut("mouse_left", &c.map[kRTrig]);
-    ParseOut("mouse_right", &c.map[kLTrig]);
-    ParseOut("enter", &c.map[kA]);
+    // (the user's own mapping, made the default 2026-10-23: one controller does the mouse -- right stick or air mouse to point,
+    //  A = left click, right trigger = right click, right grip + B = right click as well, to drag the map with the grip held)
+    ParseOut("mouse_right", &c.map[kRTrig]);
+    ParseOut("wheel_up", &c.map[kLTrig]);
+    ParseOut("mouse_left", &c.map[kA]);
     ParseOut("esc", &c.map[kB]);
     ParseOut("[", &c.map[kX]);                         // ETS2 / ATS default: left indicator
     ParseOut("]", &c.map[kY]);                         // right indicator
     ParseOut("h", &c.map[kRStick]);                    // horn
     ParseOut("f", &c.map[kLStick]);                    // hazard lights
     // kMenu: none -- ETS2 / ATS use the menu button themselves (their only other controller input is the trigger)
-    ParseOut("up", &c.map[kRUp]);
+    ParseOut("up", &c.map[kRUp]);                      // (used when the right stick does not move the mouse: mouse_stick)
     ParseOut("down", &c.map[kRDown]);
     ParseOut("left", &c.map[kRLeft]);
     ParseOut("right", &c.map[kRRight]);
-    ParseOut("mouse_right", &c.modMap[kRTrig]);        // right grip (air mouse) + right trigger = right click: map dragging
+    ParseOut("mouse_right", &c.modMap[kB]);            // right grip (air mouse) + B = right click: drag the map
     return c;
 }
 inline int HandOfBtn(int b) {
