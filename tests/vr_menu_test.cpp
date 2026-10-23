@@ -329,14 +329,16 @@ int main(int argc, char** argv) {
         CHECK(kb.pw < pw0 * 0.75 && std::fabs(kb.width / kb.pw - wk / pw0) < 1e-9, "compact: narrower, same key size (%d px, %.3f m)", kb.pw, kb.width);
         CHECK(!m.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("home"), &at) &&
               !m.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("num5"), &at), "compact: no navigation / number pad");
-        V3 x, mi, pl, en;
-        CHECK(m.ElemCentre(VrMenu::kPanKb, VrMenu::eClose, 0, &x) && m.ElemCentre(VrMenu::kPanKb, VrMenu::eSmaller, 0, &mi) &&
-              m.ElemCentre(VrMenu::kPanKb, VrMenu::eBigger, 0, &pl) && m.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("enter"), &en),
-              "compact: x / - / + and Enter there");
+        V3 x, bs, f12, tmp;
+        CHECK(m.ElemCentre(VrMenu::kPanKb, VrMenu::eClose, 0, &x) && m.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("backspace"), &bs) &&
+              m.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("f12"), &f12), "compact: x, Backspace, F12 there");
+        CHECK(!m.ElemCentre(VrMenu::kPanKb, VrMenu::eSmaller, 0, &tmp) && !m.ElemCentre(VrMenu::kPanKb, VrMenu::eBigger, 0, &tmp),
+              "compact: no - / + (the Panels tab sets its size)");
         const Q4 iq = QConj(kb.pose.q);
-        const V3 lx = QRot(iq, x - kb.pose.p), lm = QRot(iq, mi - kb.pose.p), lp = QRot(iq, pl - kb.pose.p), le = QRot(iq, en - kb.pose.p);
-        CHECK(std::fabs(lx.x - lm.x) < 1e-6 && std::fabs(lm.x - lp.x) < 1e-6 && lx.y > lm.y && lm.y > lp.y && lx.x > le.x,
-              "compact: x, -, + in one column (top down) right of Enter");
+        const V3 lx = QRot(iq, x - kb.pose.p), lb = QRot(iq, bs - kb.pose.p), lf = QRot(iq, f12 - kb.pose.p);
+        const double keyM = kb.width / kb.pw * ((1600 - 16) / 22.3);   // one key (vr_menu.cpp kKbUnit) in metres
+        CHECK(lx.y > lb.y && std::fabs(lx.y - lf.y) < 1e-6 && lx.x > lb.x && lx.x - lb.x < keyM && lx.x > lf.x + keyM,
+              "compact: x in the top row, above the right half of Backspace, right of F12");
         CHECK(m.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("f5"), &at), "compact: F-keys there");
         WriteBmp(dir + L"\\keyboard_compact.bmp", kb);
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 82), "Full shown");

@@ -68,7 +68,7 @@ VR EyeCapture starts a recording on that.
   you pull the trigger and up when you let go. Shift, Ctrl and Alt stay on for the next key.
   The keyboard **stays** when the menu closes, also at the next game start (put it at the side of your cab). Its x hides it.
   **Full or Compact** (Panels tab): Compact has only the main keys (Esc / F-keys down to Enter, Shift, Ctrl), with its
-  - / + / x in a column next to Enter: about 30 % narrower.
+  only an x (above Backspace) to hide it: about 30 % narrower. Its size: Panels tab > Keyboard size.
 - **Move** a panel: point at it, **hold the grip** and move the controller. While you hold it, push that controller's stick
   up / down to move it farther / closer. **Size**: the - and + at the top.
 

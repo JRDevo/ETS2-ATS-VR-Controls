@@ -14,10 +14,10 @@ constexpr double kPi = 3.14159265358979;
 constexpr double kDeg = kPi / 180.0;
 constexpr int kMenuW = 1000, kMenuH = 800, kKbW = 1600, kKbH = 450;
 // keyboard: every gap between key groups is kGap of a key; the full keyboard is 22.3 x 6.1 key units in kKbW pixels; the
-// compact one (main block + a column for - / + / x) keeps the same key size, so it is narrower in pixels and in metres
+// compact one (the main block only, 15 key units) keeps the same key size, so it is narrower in pixels and in metres
 constexpr double kGap = 0.15;
 constexpr double kKbUnit = (kKbW - 16) / (23.0 - 2 * (0.5 - kGap));
-constexpr int kKbCompactW = (int)(16 + kKbUnit * (16.0 + kGap) + 0.5);
+constexpr int kKbCompactW = (int)(16 + kKbUnit * 15.0 + 0.5);
 
 // ---- the keyboard (units of one key; x 0..15 main block, 15.5..18.5 navigation, 19..23 number pad)
 struct KeyDef { const char* label; const char* name; float x, y, w, h; };
@@ -501,8 +501,8 @@ void VrMenu::LayoutKb() {
         e.kind = kind; e.arg = arg; e.x = x; e.y = y; e.w = w; e.h = h; e.text = t; e.on = on;
         el.push_back(e);
     };
-    // one flat block, no title bar: - / + / x sit in the empty space above the number pad (compact: in a column at the right
-    // edge, next to Enter); move it with the grip anywhere. Picking a key for a button: the whole keyboard gets an accent
+    // one flat block, no title bar: - / + / x sit in the empty space above the number pad (compact: only x, above Backspace;
+    // its size is set in the Panels tab); move it with the grip anywhere. Picking a key for a button: the whole keyboard gets an accent
     // frame (the menu's bar says which button). kKeys is a real keyboard's layout (gaps of 1 / 0.5 key between the groups);
     // here every gap between groups is only kGap of a key: still visible, less wasted room. 2 px of gap around each key.
     const bool compact = look_.kbCompact;
@@ -510,7 +510,7 @@ void VrMenu::LayoutKb() {
     auto mapX = [&](double kx, double ky) {
         if (kx >= 19) return kx - 1.0 + 2 * kGap;                       // number pad
         if (kx >= 15.5) return kx - 0.5 + kGap;                         // navigation / arrows
-        if (ky != 0 || kx >= 15) return kx;                             // (the compact column stays at 15 + kGap)
+        if (ky != 0 || kx >= 15) return kx;
         if (kx >= 11) return kx - 2.0 + 3 * kGap;                       // F9 .. F12
         if (kx >= 6.5) return kx - 1.5 + 2 * kGap;                      // F5 .. F8
         if (kx >= 2) return kx - 1.0 + kGap;                            // F1 .. F4
@@ -520,10 +520,8 @@ void VrMenu::LayoutKb() {
         const double ux = mapX(kx, ky), uy = ky >= 1 ? ky - (0.25 - kGap * 2.0 / 3.0) : ky;   // F-row gap 0.1 of a key
         add(kind, arg, (int)(x0 + ux * u + 2), (int)(y0 + uy * u + 2), (int)(kw * u - 4), (int)(kh * u - 4), t, on);
     };
-    if (compact) {                                       // x on top, then - and + (the column right of the main block)
-        at(eClose, 0, 15 + kGap, 0, 1, 1, "\xC3\x97");
-        at(eSmaller, 0, 15 + kGap, 1.25, 1, 1, "\xE2\x88\x92");
-        at(eBigger, 0, 15 + kGap, 2.25, 1, 1, "+");
+    if (compact) {                                       // only x, in the free top-row corner above Backspace (no - / +:
+        add(eClose, 0, (int)(x0 + 14 * u + 2), (int)(y0 + 2), (int)(u - 4), (int)(u - 4), "\xC3\x97");   //   Panels tab)
     } else {
         at(eSmaller, 0, 19, 0, 1, 1, "\xE2\x88\x92");
         at(eBigger, 0, 20, 0, 1, 1, "+");
