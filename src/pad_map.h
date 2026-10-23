@@ -1,7 +1,8 @@
-// Phase 70: VR CONTROLLERS -> keys and mouse (dlaa.ini vr_controls / vr_ctl_*). The pure part: the button table, the ini key
-// names, the output parser ("H", "Shift+F", "mouse_left", "wheel_up" ...) and the per-frame Mapper (thresholds with
-// hysteresis, stick -> mouse, air mouse = the aim's yaw / pitch change while a hold button is down). No Windows input calls:
-// vr_controls.cpp sends the Mapper's events with SendInput. Header only, so tests\vr_pad_test.cpp checks it without a game.
+// pad_map -- VR CONTROLLERS -> keys, mouse and driving (config.ini). The pure part: the button table, the config.ini key
+// names, the output parser ("H", "Shift+F", "mouse_left", "wheel_up", "gas" ...) and the per-frame Mapper (thresholds with
+// hysteresis, the modifier, stick -> mouse, air mouse = the aim's yaw / pitch change while a hold button is down, steering
+// and gas / brake). No Windows input calls: output.h sends the Mapper's events with SendInput, scs_input.h hands the driving
+// values to the game. Header only, so tests\pad_map_test.cpp checks it without a game.
 #pragma once
 #include <cctype>
 #include <cmath>
@@ -278,6 +279,7 @@ public:
             }
             if (want[b]) {                             // the modifier held: its entry for this button, if it has one
                 sent_[b] = modOn && b != c.modBtn && c.modMap[b].kind != kNone ? c.modMap[b] : c.map[b];
+                notPedal_[b] = sent_[b].kind != kGas && sent_[b].kind != kBrake;   // (a click: no gas until let go)
                 Send(sent_[b], true, s);
             } else {
                 Send(sent_[b], false, s);              // (released as it was pressed, whatever the modifier does now)
@@ -343,13 +345,18 @@ public:
             dv[0] = sh == 0 || sh == 1 ? st : 0.0f;
             for (int b = 0; b < kBtnCount; ++b) {      // gas / brake: the most pressed button mapped to each
                 if (b == c.airBtn) continue;
+                const float v = Pressed(f, c, b);
+                if (notPedal_[b]) {                    // pressed as a key / click (e.g. grip + trigger = click, then the
+                    if (v <= 0.0f && !down_[b]) notPedal_[b] = false;   // grip let go first): no gas until fully let go
+                    continue;
+                }
                 const Out& o = modOn && b != c.modBtn && c.modMap[b].kind != kNone ? c.modMap[b] : c.map[b];
                 if (o.kind != kGas && o.kind != kBrake) continue;
-                const float v = Pressed(f, c, b);
                 float& d = dv[o.kind == kGas ? 1 : 2];
                 if (v > d) d = v;
             }
         }
+        if (!active) for (bool& n : notPedal_) n = false;
         if (dv[0] != drive_[0] || dv[1] != drive_[1] || dv[2] != drive_[2]) {
             for (int i = 0; i < 3; ++i) drive_[i] = dv[i];
             s.Drive(dv[0], dv[1], dv[2]);
@@ -420,6 +427,7 @@ private:
         }
     }
     bool   down_[kBtnCount] = {};
+    bool   notPedal_[kBtnCount] = {};                  // pressed as a key / click: not a pedal until fully let go
     Out    sent_[kBtnCount];                           // what each held button sent when it went down
     bool   airOn_ = false;
     bool   airLatch_ = false;                          // toggle mode: the air mouse is switched on

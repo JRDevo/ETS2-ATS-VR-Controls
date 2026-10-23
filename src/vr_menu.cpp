@@ -627,6 +627,7 @@ void VrMenu::Push(int p, double metres) {
 void VrMenu::Close() {
     pan_[kPanMenu].show = false;
     pickBtn_ = -1;
+    resetArm_ = -1;                                     // ("Sure? Reset" does not wait for the next open)
     for (bool& l : latch_) l = false;
     LOGI("VR menu closed");
 }
@@ -1420,7 +1421,10 @@ std::string VrMenu::ContentKey(int p) const {
     // the menu: everything its tabs show (not whether it is shown itself)
     snprintf(b, sizeof(b), "%d|%d|%d|%d%d|%.3f,%.3f|%d|%.2f|%.2f|%d|%d|", pan_[1].show, tab_, pickBtn_, pickMod_, layer_, pan_[0].width,
              pan_[1].width, look_.theme, look_.menuOpacity, look_.kbOpacity, look_.smoothing, look_.kbCompact);
-    return std::string(b) + std::to_string(resetArm_) + "|" + status_ + "|" + DescribePad(pad_);
+    char dr[160];                                       // the Driving tab's values (DescribePad leaves them out while off)
+    snprintf(dr, sizeof(dr), "|%d%d%d|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|", pad_.drive ? 1 : 0, pad_.steerStick, pad_.steerMode,
+             pad_.steerDeadzone, pad_.steerCurve, pad_.steerMax, pad_.steerSpeed, pad_.steerTurnTime, pad_.steerReturnTime);
+    return std::string(b) + std::to_string(resetArm_) + "|" + status_ + dr + DescribePad(pad_);
 }
 
 }  // namespace ck

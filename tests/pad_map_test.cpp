@@ -140,6 +140,16 @@ int main() {
         CHECK(r.Take() == "m0v" && r.drv[1] == 0.0f, "right grip + right trigger = left click, no gas");
         f.trig[1] = 0.0f; f.grip[1] = 0.0f; m.Step(f, true, 0.011, c, r);
         CHECK(r.Take() == "m0^", "... released");
+        f.grip[1] = 1.0f; m.Step(f, true, 0.011, c, r);   // click with grip + trigger, then the grip let go FIRST
+        f.trig[1] = 1.0f; m.Step(f, true, 0.011, c, r);
+        f.grip[1] = 0.0f; m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "m0v" && r.drv[1] == 0.0f, "grip let go, trigger still held: still the click, no gas");
+        f.trig[1] = 0.3f; m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "m0^" && r.drv[1] == 0.0f, "trigger mostly let go: the click up, still no gas");
+        f.trig[1] = 0.0f; m.Step(f, true, 0.011, c, r);
+        f.trig[1] = 0.525f; m.Step(f, true, 0.011, c, r);
+        CHECK(std::fabs(r.drv[1] - 0.5f) < 1e-4f && r.Take().empty(), "fully let go, pressed again: gas");
+        f.trig[1] = 0.0f; m.Step(f, true, 0.011, c, r);
         f.trig[0] = 1.0f; m.Step(f, true, 0.011, c, r);
         CHECK(r.Take().empty() && r.drv[2] == 1.0f, "left trigger = brake");
     }

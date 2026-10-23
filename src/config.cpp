@@ -206,7 +206,7 @@ Config ParseConfig(const std::string& text) {
         if (b >= 0) {
             VrPad::Out o;
             if (VrPad::ParseOut(val.c_str(), &o)) c.pad.map[b] = o;
-            else bad("not a key name / mouse_left / mouse_right / mouse_middle / wheel_up / wheel_down / none");
+            else bad("not a key name / mouse_left / mouse_right / mouse_middle / wheel_up / wheel_down / gas / brake / none");
             continue;
         }
         c.notes.push_back("line " + std::to_string(lineNo) + ": unknown key '" + key + "' -- ignored");

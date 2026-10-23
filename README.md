@@ -3,9 +3,9 @@
 Use your VR controllers as a keyboard and mouse in **Euro Truck Simulator 2** and **American Truck Simulator** (OpenXR VR).
 Press a controller button, and the game gets a key press. Move a stick or point the controller, and the mouse pointer moves.
 
-> Status: v0.2.0. Phase 1 (buttons, pointer and click) works in the game. New in v0.2.0 (phase 2): **a VR menu and a full
-> keyboard in the headset**, now being tested in the game. Planned: phase 3, single buttons you place anywhere (for example
-> over a cab switch) that press a key.
+> Status: v0.2.0. New in v0.2.0: **a VR menu and a full keyboard in the headset**, and **driving with the controllers**
+> (smooth steering, gas and brake). Planned: the keyboard pinned to the cab, and single buttons you place anywhere (for
+> example over a cab switch) that press a key.
 
 > **OpenXR only.** The mod works when the game runs in its **OpenXR** VR mode (`-openxr`). It does not work in the game's
 > `-openvr` (SteamVR native) or `-oculus` (Oculus native) modes. Every headset can use OpenXR, see
@@ -188,7 +188,7 @@ a laser pointer. A **white dot** appears where you point, and the key under it l
 - **Look** tab: colours (Dark, Blue, Grey, Light, Black, Green), how see-through the menu and the keyboard are, and
   **pointer smoothing** (Off / Low / Medium / High): calms a shaky hand, for the menu pointer and the air mouse.
 - **Reset tab** (bottom right of every tab): puts that tab's settings back to the defaults. Press it twice (the first
-  press asks "Sure?"). Only that tab changes. On the Panels tab it also brings both panels in front of you.
+  press asks "Sure?"). Only that tab changes. On the Panels tab it also brings the menu (and the keyboard, if it is shown) in front of you.
 - **Keyboard** (button at the top of the menu): a full keyboard with F-keys, arrows and number pad. A key goes down when
   you pull the trigger and up when you let go. Shift, Ctrl and Alt stay on for the next key.
   The keyboard **stays** when the menu closes, also at the next game start (put it at the side of your cab). Its x hides it.

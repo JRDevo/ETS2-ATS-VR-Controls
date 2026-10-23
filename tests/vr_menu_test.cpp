@@ -380,6 +380,10 @@ int main(int argc, char** argv) {
               "Reset pressed once: nothing reset yet");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 120) && click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) &&
               m.Pad().map[VrPad::kLGrip].kind == VrPad::kMouseR, "another press in between: Reset armed again only");
+        m.Close();                                       // closing the menu disarms it
+        m.Open(true, head);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kMouseR,
+              "after close / open: the first press only arms Reset again");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kNone &&
               m.Pad().map[VrPad::kLTrig].kind == VrPad::kBrake && m.Pad().modMap[VrPad::kRTrig].kind == VrPad::kMouseL,
               "Buttons tab reset: the default buttons");
