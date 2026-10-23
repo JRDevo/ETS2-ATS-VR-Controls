@@ -55,6 +55,24 @@ Hold **both grips**, then press and hold the **left stick click**, for 1 second.
 to close it. (Grips first: the left stick click alone is still the hazard lights.) It is not both stick clicks, because
 VR EyeCapture starts a recording on that.
 
+### Two different pointers (read this first)
+
+There are **two** pointers, and only one of them works on the menu and the keyboard:
+
+| | The game's mouse pointer | The VR pointer (white dot) |
+|---|---|---|
+| What it is | Windows' mouse arrow, inside the game's own screens | A white dot that this mod draws on its own panels |
+| How it moves | The left stick, or the **air mouse**: hold the **right grip** and turn the controller | Just **point** a controller at the menu or the keyboard. No button needed. |
+| Where it works | Only inside the game's picture (game menus, map, ...). It can **not** reach the VR menu or keyboard. | Only on the VR menu and the keyboard |
+| How it clicks | Right trigger = left mouse click | **Trigger** while the dot is on a key / button |
+
+So for the menu and the keyboard: **do not use the air mouse** (do not hold the grip). Aim the controller at the panel like
+a laser pointer. A **white dot** appears where you point, and the key under it lights up. Then pull the trigger.
+
+![The white pointer dot on the G key of the keyboard](docs/images/keyboard-pointer.png)
+
+(While a controller points at a panel, its grip does not start the air mouse, and the game does not get its trigger.)
+
 - **Point** with either controller. A white dot shows where. **Pull the trigger** to press.
   While you point at the menu, the game does not get that trigger.
 - **Buttons** tab: every controller button and what it sends. Point at one, pull the trigger, then press a key on the
