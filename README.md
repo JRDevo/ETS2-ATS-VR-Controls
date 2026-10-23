@@ -204,12 +204,13 @@ Values: a key (`h`, `f1`, `space`, `[`), up to 3 keys with `+` (`shift+f`), `mou
 ## Problems
 
 The log is `logs\ets2_ats_vr_controls.log` next to the DLL. It says which controller the VR system uses, which buttons are mapped,
-and every problem. Set `log_inputs = 1` in `config.ini` to see every key the layer sends.
+and every problem. The log is **off by default** (no file, nothing measured: the lightest). Set `log = 1` in `config.ini`
+to write it, and also `log_inputs = 1` to see every key the layer sends.
 
 <a name="reporting-a-problem-what-to-upload"></a>
 ### Reporting a problem (what to upload)
 
-1. In `config.ini` (next to `ets2_ats_vr_controls.dll`) set `log_inputs = 1`.
+1. In `config.ini` (next to `ets2_ats_vr_controls.dll`) set `log = 1` (and `log_inputs = 1` if a button does the wrong thing).
 2. Start the game in VR and do what goes wrong for 1 to 2 minutes.
 3. Quit the game.
 4. Open a [bug report](../../issues/new/choose) and drag `logs\ets2_ats_vr_controls.log` and `config.ini` into it.

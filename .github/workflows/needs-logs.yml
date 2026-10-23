@@ -65,7 +65,7 @@ jobs:
 
             To find out what happens, I need your log file. It only takes a minute (the steps are also in the README, [Reporting a problem (what to upload)](https://github.com/${owner}/${repo}#reporting-a-problem-what-to-upload)):
 
-            1. In \`config.ini\` (in the mod's folder, next to \`ets2_ats_vr_controls.dll\`), change \`log_inputs = 0\` to \`log_inputs = 1\`.
+            1. In \`config.ini\` (in the mod's folder, next to \`ets2_ats_vr_controls.dll\`), change \`log = 0\` to \`log = 1\` (and \`log_inputs = 0\` to \`1\`).
             2. Start the game in VR and do what goes wrong for 1 to 2 minutes.
             3. Quit the game.
             4. Drag \`logs\\ets2_ats_vr_controls.log\` and \`config.ini\` into a comment here. (Attach them as files; please do not paste the text.)

@@ -31,7 +31,9 @@ struct Config {
     bool                      enabled = true;      // enabled = 0: the layer passes everything through
     std::vector<std::wstring> apps;                // lower-case exe names; "*" = every OpenXR program
     VrPad::Config             pad = VrPad::DefaultConfig();
-    bool                      logInputs = false;   // log_inputs = 1: every key / mouse event in the log
+    bool                      log = false;         // log = 1: write logs\ets2_ats_vr_controls.log (bug reports); 0: no file, no
+                                                   //   measuring (the release default: the lightest)
+    bool                      logInputs = false;   // log_inputs = 1 (with log = 1): every key / mouse event in the log
     bool                      menu = true;         // vr_menu = 0: no VR menu / keyboard (and no combo)
     std::vector<int>          menuCombo = { VrPad::kLGrip, VrPad::kRGrip, VrPad::kLStick };   // menu_combo: all held = open / close
     float                     menuHold = 1.0f;     // menu_hold: seconds

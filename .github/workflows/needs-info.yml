@@ -121,7 +121,7 @@ jobs:
                 core.info(`#${n}: closed after ${days.toFixed(1)} days`);
               } else if (days >= REMIND_DAYS && !reminded) {
                 const ask = needLog
-                  ? `Hi @${who}, thanks for opening this issue! To find out what happens, I need your \`logs\\ets2_ats_vr_controls.log\` and \`config.ini\`. The steps are in [Reporting a problem (what to upload)](${HOWTO}): set \`log_inputs = 1\` in \`config.ini\`, play 1 to 2 minutes in VR where the problem shows, quit the game, and drag both files into a comment here.
+                  ? `Hi @${who}, thanks for opening this issue! To find out what happens, I need your \`logs\\ets2_ats_vr_controls.log\` and \`config.ini\`. The steps are in [Reporting a problem (what to upload)](${HOWTO}): set \`log = 1\` (and \`log_inputs = 1\`) in \`config.ini\`, play 1 to 2 minutes in VR where the problem shows, quit the game, and drag both files into a comment here.
 
             Every log helps make the mod better for everyone, so thank you!`
                   : `Hi @${who}, just a friendly reminder: there is an answer above for you (a fix or a new build to try, or a question). When you have a moment, please try it and tell us here whether it works.

@@ -93,13 +93,24 @@ void PadInput::SessionCreated(XrSession s, ID3D11Device* dev) {
 }
 
 void PadInput::SessionDestroyed(XrSession s) {
+    std::unique_ptr<Overlay> ov;
+    {
+        std::lock_guard<std::mutex> lk(m_);
+        auto it = sessions_.find(s);
+        if (it == sessions_.end()) return;
+        ov = std::move(it->second.ov);
+    }
+    {
+        std::lock_guard<std::mutex> lk(ovM_);                       // (not while xrEndFrame uses it)
+        ov.reset();                                                  // our swapchains go before the session
+    }
     std::lock_guard<std::mutex> lk(m_);
     auto it = sessions_.find(s);
     if (it == sessions_.end()) return;
     SessionData& sd = it->second;
     sd.mapper.Step(VrPad::Frame(), false, 0.0, cfg_.pad, Sink());   // nothing stays held
     if (menu_) menu_->ReleaseAll(Sink());
-    sd.ov.reset();                                                   // our swapchains go before the session
+    menuShown_ = false; handOwn_[0] = handOwn_[1] = false;
     for (XrSpace* sp : { &sd.local, &sd.view, &sd.aim[0], &sd.aim[1] })
         if (*sp != XR_NULL_HANDLE) { d_.DestroySpace(*sp); *sp = XR_NULL_HANDLE; }
     LOGI("session %p ends: %llu frames read, %llu own syncs, %llu read failures", (void*)s, (unsigned long long)sd.ticks,
@@ -121,6 +132,7 @@ void PadInput::SessionState(XrSession s, XrSessionState st) {
     if (!f) {                                                          // now, not at the next frame (there may be none)
         sd.mapper.Step(VrPad::Frame(), false, 0.0, cfg_.pad, Sink());
         if (menu_) menu_->ReleaseAll(Sink());
+        handOwn_[0] = handOwn_[1] = false;
     }
 }
 
@@ -345,6 +357,7 @@ XrResult PadInput::Attach(XrSession s, const XrSessionActionSetsAttachInfo* ai) 
     const XrResult r = d_.AttachSessionActionSets(s, &a2);
     if (XR_SUCCEEDED(r)) {
         frozen_ = true;
+        trigReady_ = true;                           // (gameTrig_ no longer changes: the filters may read it without m_)
         sd.ours = true;
         sd.gameActive.clear();                       // until the game's first sync: all of its attached sets count as active
         for (uint32_t k = 0; k < ai->countActionSets; ++k) sd.gameActive.push_back({ai->actionSets[k], XR_NULL_PATH});
@@ -429,6 +442,10 @@ void PadInput::ReadLocked(XrSession s, SessionData& sd, VrPad::Frame& f) {
     }
     int fails = 0;
     XrResult firstFail = XR_SUCCESS;
+    // the aim poses: for the menu / keyboard pointer, the air mouse (its button may be on either hand: located for both hands
+    // whenever the air mouse could run) -- with the menu closed and no air mouse, 2 runtime calls fewer per frame
+    const bool needAim = (menu_ && (menu_->AnyShown() || menu_->Pending())) || (cfg_.pad.airBtn >= 0 &&
+                         (cfg_.pad.airToggle || sd.mapper.AirOn() || sd.airHeld));
     auto note = [&](XrResult r) { if (XR_FAILED(r) && !fails++) firstFail = r; };
     for (int h = 0; h < 2; ++h) {
         XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};
@@ -455,7 +472,7 @@ void PadInput::ReadLocked(XrSession s, SessionData& sd, VrPad::Frame& f) {
         note(d_.GetActionStateVector2f(s, &gi, &sv));
         if (sv.isActive) { f.sx[h] = sv.currentState.x; f.sy[h] = sv.currentState.y; act = true; }
         f.hand[h] = act;
-        if (sd.aim[h] != XR_NULL_HANDLE && sd.displayTime > 0) {
+        if (sd.aim[h] != XR_NULL_HANDLE && sd.displayTime > 0 && needAim) {
             XrSpaceLocation loc{XR_TYPE_SPACE_LOCATION};
             const XrResult r = d_.LocateSpace(sd.aim[h], sd.local, sd.displayTime, &loc);
             note(r);
@@ -563,6 +580,7 @@ void PadInput::BeginFrame(XrSession s) {
         }
         if (synced && !sd.off) {
             ReadLocked(s, sd, f);
+            sd.airHeld = cfg_.pad.airBtn >= 0 && BtnDown(f, cfg_.pad.airBtn);   // (its aim pose is located from the next frame)
             ++sd.ticks;
             ProfilesLocked(s, sd, f, now);
             live = !sd.off && cfg_.enabled && GameInFront();
@@ -573,48 +591,92 @@ void PadInput::BeginFrame(XrSession s) {
     if (menu_) {                                                     // first: it takes what it uses out of the frame
         menu_->Update(f, live, sd.headOk, sd.head, now, Sink());
         cfg_.pad = menu_->Pad();
+        menuShown_ = menu_->AnyShown();
+        handOwn_[0] = menu_->HandOnPanel(0);
+        handOwn_[1] = menu_->HandOnPanel(1);
     }
     sd.mapper.Step(f, live, dt, cfg_.pad, Sink());   // (not live = everything held is released)
 }
 
 bool PadInput::EndFrame(XrSession s, const XrFrameEndInfo* in, XrFrameEndInfo* out, std::vector<const XrCompositionLayerBaseHeader*>& layers) {
     if (!menu_ || !in) return false;
-    std::lock_guard<std::mutex> lk(m_);
-    auto it = sessions_.find(s);
-    if (it == sessions_.end()) return false;
-    SessionData& sd = it->second;
-    if (!sd.ov || sd.ov->Dead() || sd.local == XR_NULL_HANDLE) return false;
-    // ahead of time: ~3 s into the session (usually still loading) the swapchains are made and filled once with the hidden
-    // panels, so opening the menu later costs no swapchain creation and no full upload in a VR frame
-    const bool warm = !menu_->AnyShown() && !sd.ovWarm && ++sd.endFrames > 270;
-    if (!menu_->AnyShown() && !warm) return false;
-    std::vector<QuadIn> quads;
-    for (int p = 0; p < VrMenu::kPanCount; ++p) {
-        const VrMenu::Panel& pn = menu_->Pan(p);
-        if ((!pn.show && !warm) || pn.px.empty()) continue;
-        QuadIn q;
-        q.slot = p; q.pose = pn.pose; q.w = pn.width; q.h = pn.Height(); q.pw = pn.pw; q.ph = pn.ph; q.px = pn.px.data(); q.version = pn.version;
-        menu_->TakeDirty(p, q.dirty);
-        if (sd.headOk) {                       // its width in the headset: angle x pixels per degree (overlay.h)
-            const double dist = Len(pn.pose.p - sd.head.p);
-            if (dist > 0.05) q.wantPx = 2.0 * std::atan(0.5 * pn.width / dist) * 57.29577951308232 * kHeadsetPxPerDeg;
+    // 1. under m_ (no runtime / D3D call): what to show, at what size; each hidden panel's swapchain (and the pointer's) is
+    //    made and filled ahead of time ~3 s into the session, one per frame, so opening the menu costs neither in a VR frame
+    Overlay* ov = nullptr;
+    XrSpace space = XR_NULL_HANDLE;
+    QuadIn panel[VrMenu::kPanCount];
+    bool want[VrMenu::kPanCount] = {}, show[VrMenu::kPanCount] = {}, ready[VrMenu::kPanCount] = {};
+    std::vector<QuadIn> quads, warmQ;
+    int warmSlot = -1;
+    {
+        std::lock_guard<std::mutex> lk(m_);
+        auto it = sessions_.find(s);
+        if (it == sessions_.end()) return false;
+        SessionData& sd = it->second;
+        if (!sd.ov || sd.ov->Dead() || sd.local == XR_NULL_HANDLE) return false;
+        ov = sd.ov.get();
+        space = sd.local;
+        const bool warmTime = ++sd.endFrames > 270;
+        for (int w = 0; w < 3 && warmTime && warmSlot < 0; ++w)
+            if (!sd.warm[w] && (w == 2 || !menu_->Pan(w).show)) warmSlot = w;
+            else if (!sd.warm[w]) sd.warm[w] = true;                     // (shown already: made when it was shown)
+        if (!menu_->AnyShown() && warmSlot < 0) return false;
+        const bool rgba = ov->Rgba();                                    // (the format is asked once)
+        for (int p = 0; p < VrMenu::kPanCount; ++p) {
+            const VrMenu::Panel& pn = menu_->Pan(p);
+            show[p] = pn.show;
+            want[p] = pn.show || warmSlot == p;
+            if (!want[p]) continue;
+            double wantPx = 0;
+            if (sd.headOk) {                   // its width in the headset: angle x pixels per degree (overlay.h)
+                const double dist = Len(pn.pose.p - sd.head.p);
+                if (dist > 0.05) wantPx = 2.0 * std::atan(0.5 * pn.width / dist) * 57.29577951308232 * kHeadsetPxPerDeg;
+            }
+            ready[p] = menu_->Output(p, wantPx, rgba);
+            QuadIn& q = panel[p];
+            q.slot = p; q.pose = pn.pose; q.w = pn.width; q.h = pn.Height();
         }
-        quads.push_back(q);
+        for (int h = 0; h < 2; ++h) {
+            QuadIn q;
+            if (!menu_->Cursor(h, &q.pose)) continue;
+            q.slot = 2; q.w = q.h = VrMenu::kCursorM; q.pw = q.ph = VrMenu::kCursorPx; q.px = menu_->CursorPixels().data(); q.version = 1;
+            quads.push_back(q);
+        }
+        if (warmSlot == 2) {
+            QuadIn q;
+            q.slot = 2; q.w = q.h = VrMenu::kCursorM; q.pw = q.ph = VrMenu::kCursorPx; q.px = menu_->CursorPixels().data(); q.version = 1;
+            warmQ.push_back(q);
+            sd.warm[2] = true;
+        }
+        if (warmSlot >= 0 && warmSlot < 2 && ready[warmSlot]) sd.warm[warmSlot] = true;   // (not ready: the painter is on it, next frame)
     }
-    for (int h = 0; h < 2; ++h) {
-        QuadIn q;
-        if (!menu_->Cursor(h, &q.pose)) continue;
-        q.slot = 2; q.w = q.h = VrMenu::kCursorM; q.pw = q.ph = VrMenu::kCursorPx; q.px = menu_->CursorPixels().data(); q.version = 1;
-        quads.push_back(q);
+    // 2. outside m_: the overlay (ovM_ keeps it alive), the pictures under the painter's lock (copied as they are, no work)
+    std::lock_guard<std::mutex> olk(ovM_);
+    {
+        std::lock_guard<std::mutex> lk(m_);                              // (still this session's overlay?)
+        auto it = sessions_.find(s);
+        if (it == sessions_.end() || it->second.ov.get() != ov) return false;
     }
     std::vector<const XrCompositionLayerBaseHeader*> ours;
-    if (warm) {
-        sd.ovWarm = true;
-        sd.ov->Frame(quads, sd.local, ours, false);
-        LOGI("VR menu: swapchains made and filled ahead of time (the menu opens without a hitch)");
-        return false;
+    {
+        std::unique_lock<std::mutex> pl = menu_->LockPictures();
+        for (int p = 0; p < VrMenu::kPanCount; ++p) {
+            if (!want[p] || !ready[p]) continue;
+            VrMenu::Picture& pic = menu_->PictureLocked(p);
+            if (pic.px.empty()) continue;
+            QuadIn q = panel[p];
+            q.pw = pic.w; q.ph = pic.h; q.px = pic.px.data(); q.version = pic.version;
+            for (int i = 0; i < 4; ++i) { q.dirty[i] = pic.dirty[i]; pic.dirty[i] = 0; }
+            if (show[p]) quads.insert(quads.begin(), q);
+            else warmQ.push_back(q);
+        }
+        if (!warmQ.empty()) {
+            ov->Frame(warmQ, space, ours, false);
+            LOGI("VR menu: %s swapchain made and filled ahead of time", warmQ[0].slot == 0 ? "menu" : warmQ[0].slot == 1 ? "keyboard" : "pointer");
+        }
+        if (!show[0] && !show[1]) return false;
+        ov->Frame(quads, space, ours);
     }
-    sd.ov->Frame(quads, sd.local, ours);
     if (ours.empty() || in->layerCount + ours.size() > 16) return false;   // (16 = the least any runtime allows)
     layers.assign(in->layers, in->layers + (in->layers ? in->layerCount : 0));
     layers.insert(layers.end(), ours.begin(), ours.end());
@@ -625,6 +687,7 @@ bool PadInput::EndFrame(XrSession s, const XrFrameEndInfo* in, XrFrameEndInfo* o
 }
 
 void PadInput::EndFrameRefused(XrSession s, XrResult r) {
+    std::lock_guard<std::mutex> olk(ovM_);
     std::lock_guard<std::mutex> lk(m_);
     auto it = sessions_.find(s);
     if (it == sessions_.end() || !it->second.ov) return;
@@ -633,23 +696,22 @@ void PadInput::EndFrameRefused(XrSession s, XrResult r) {
     it->second.ov->Kill(b);
 }
 
-bool PadInput::MenuOwnsLocked(XrSession, XrAction a, XrPath sub) {
-    if (!menu_ || !menu_->AnyShown() || !gameTrig_.count(a)) return false;
-    if (sub == hand_[0]) return menu_->HandOnPanel(0);
-    if (sub == hand_[1]) return menu_->HandOnPanel(1);
-    return menu_->HandOnPanel(0) || menu_->HandOnPanel(1);
+bool PadInput::MenuOwns(XrAction a, XrPath sub) {
+    if (!menuShown_ && !handOwn_[0] && !handOwn_[1]) return false;
+    if (!trigReady_ || !gameTrig_.count(a)) return false;
+    if (sub == hand_[0]) return handOwn_[0];
+    if (sub == hand_[1]) return handOwn_[1];
+    return handOwn_[0] || handOwn_[1];
 }
 
-void PadInput::FilterBool(XrSession s, const XrActionStateGetInfo* gi, XrActionStateBoolean* st) {
+void PadInput::FilterBool(XrSession, const XrActionStateGetInfo* gi, XrActionStateBoolean* st) {
     if (!menu_ || !gi || !st) return;
-    std::lock_guard<std::mutex> lk(m_);
-    if (MenuOwnsLocked(s, gi->action, gi->subactionPath)) { st->currentState = XR_FALSE; st->changedSinceLastSync = XR_FALSE; }
+    if (MenuOwns(gi->action, gi->subactionPath)) { st->currentState = XR_FALSE; st->changedSinceLastSync = XR_FALSE; }
 }
 
-void PadInput::FilterFloat(XrSession s, const XrActionStateGetInfo* gi, XrActionStateFloat* st) {
+void PadInput::FilterFloat(XrSession, const XrActionStateGetInfo* gi, XrActionStateFloat* st) {
     if (!menu_ || !gi || !st) return;
-    std::lock_guard<std::mutex> lk(m_);
-    if (MenuOwnsLocked(s, gi->action, gi->subactionPath)) { st->currentState = 0.0f; st->changedSinceLastSync = XR_FALSE; }
+    if (MenuOwns(gi->action, gi->subactionPath)) { st->currentState = 0.0f; st->changedSinceLastSync = XR_FALSE; }
 }
 
 }  // namespace ck

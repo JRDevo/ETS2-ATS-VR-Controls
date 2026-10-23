@@ -2,15 +2,12 @@
 // one swapchain per picture (menu, keyboard, pointer dot). The game's own layers and graphics are never changed.
 //   * Only for a game whose session uses D3D11 (ETS2 / ATS do): the device comes from the game's xrCreateSession
 //     (XrGraphicsBindingD3D11KHR). Any other graphics API: no menu pictures (logged once), the controls work as before.
-//   * A picture is uploaded only when it changed (CPU pixels -> UpdateSubresource on the device's immediate context, at the
-//     game's xrEndFrame = its render thread); the runtime keeps showing the last released image of a swapchain.
-//   * Size: a panel seen smaller than its picture (a 1081 px keyboard 0.2 m wide = ~450 headset pixels) shimmers when the
-//     compositor squeezes it -- and a runtime may ignore mipmaps (Virtual Desktop did). So the picture is first SHRUNK on the
-//     CPU to about the size it has in the headset (QuadIn::wantPx, from its angular size; an area filter in linear light), in
-//     steps of 10 % with some hysteresis (a new size = a new swapchain). Then a mip chain from that (down to ~16 px, 2x2 box
-//     in linear light) for a runtime that does use mipmaps; one that refuses mipCount > 1 gets one level.
-//   * Light: only the changed area (QuadIn::dirty, e.g. two keys under a moving pointer) is shrunk, mipped and uploaded --
-//     into each of the swapchain's images (they rotate) the area changed since that image was last written (Sc::pending).
+//   * The pictures come finished (vr_menu.h Painter, a background thread): already at the size they have in the headset (a
+//     small panel shimmered when the compositor squeezed a big picture -- Virtual Desktop ignored mipmaps), in the swapchain's
+//     channel order (Rgba). So the game's xrEndFrame only copies: the changed area (QuadIn::dirty, e.g. two keys under a moving
+//     pointer) via UpdateSubresource with a box on the device's immediate context -- into each of the swapchain's images (they
+//     rotate) the area changed since that image was last written (Sc::pending). Nothing changed: no call at all; the runtime
+//     keeps showing the last released image. A new size = a new swapchain (one level, no mipmaps).
 //   * Any failure (create / acquire / wait / release, or the runtime refusing the frame with our layers): the pictures are off
 //     for this session (logged); PadInput then re-sends the game's frame unchanged.
 #pragma once
@@ -42,9 +39,8 @@ struct QuadIn {
     Pose            pose;              // in `space`
     double          w = 0, h = 0;      // metres
     int             pw = 0, ph = 0;    // pixels
-    const uint32_t* px = nullptr;      // BGRA premultiplied, top-down
+    const uint32_t* px = nullptr;      // premultiplied, top-down, the swapchain's channel order (Rgba)
     uint64_t        version = 0;       // uploaded again when it changes
-    double          wantPx = 0;        // the width it has in the headset (pixels); 0 = use the picture as it is
     int             dirty[4] = {};     // x0, y0, x1, y1 of px changed since the last call (empty: x1 <= x0)
 };
 
@@ -56,6 +52,7 @@ public:
     void Abandon() { abandoned_ = true; }   // the session / instance is gone already: no OpenXR calls in the destructor
     bool Dead() const { return dead_; }
     void Kill(const char* why);      // pictures off for this session
+    bool Rgba();                     // the swapchains are R8G8B8A8 (else B8G8R8A8): the pictures' channel order
     // At the game's xrEndFrame: upload what changed, then the layers to append (valid until the next call). submit = false:
     // only make the swapchains and upload (ahead of time, while the panels are hidden), no layers.
     void Frame(const std::vector<QuadIn>& quads, XrSpace space, std::vector<const XrCompositionLayerBaseHeader*>& out,
@@ -66,16 +63,13 @@ private:
         XrSwapchain sc = XR_NULL_HANDLE;
         int w = 0, h = 0;
         std::vector<ID3D11Texture2D*> img;
-        uint32_t mips = 1;
-        double   scale = 0;            // the picture is shrunk by this (0 = not yet chosen)
-        std::vector<std::vector<uint32_t>> lv;   // what each mip level holds (swapchain size and channel order), kept
-        std::vector<std::array<int, 4>> pending; // per swapchain image: the level-0 area not yet written into it
-        bool     built = false;
+        std::vector<std::array<int, 4>> pending; // per swapchain image: the area not yet written into it
         uint64_t uploaded = ~0ull;
         bool released = false;         // an image was released once (it may be shown)
     };
+    bool Format();
     bool Create(int slot, int w, int h);
-    bool Upload(int slot, const QuadIn& q, bool full);
+    bool Upload(int slot, const QuadIn& q);
 
     XrSession       s_;
     ID3D11Device*   dev_ = nullptr;

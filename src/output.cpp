@@ -1,6 +1,7 @@
 // output -- see output.h.
 #include "output.h"
 #include <windows.h>
+#include <atomic>
 #include <cstdio>
 #include <mutex>
 #include "log.h"
@@ -91,11 +92,19 @@ void InputSink::Move(int dx, int dy) {
 
 bool GameInFront() {
     if (Sink().TestMode()) return true;
+    // asked at most every 0.1 s (it runs every frame; two window calls each time were wasted)
+    static std::atomic<long long> last{ 0 };
+    static std::atomic<bool> front{ false };
+    LARGE_INTEGER now, fq;
+    QueryPerformanceCounter(&now);
+    QueryPerformanceFrequency(&fq);
+    if (now.QuadPart - last.load() < fq.QuadPart / 10) return front.load();
     HWND w = GetForegroundWindow();
-    if (!w) return false;
     DWORD pid = 0;
-    GetWindowThreadProcessId(w, &pid);
-    return pid == GetCurrentProcessId();
+    if (w) GetWindowThreadProcessId(w, &pid);
+    front = w && pid == GetCurrentProcessId();
+    last = now.QuadPart;
+    return front.load();
 }
 
 InputSink& Sink() {

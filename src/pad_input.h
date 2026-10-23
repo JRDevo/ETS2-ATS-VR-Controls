@@ -34,6 +34,7 @@
 //     controller points at a panel, the game's own actions bound to that trigger read "not pressed" (FilterBool / FilterFloat).
 // The layer calls the next layer's functions directly; our hooks never see our own calls.
 #pragma once
+#include <atomic>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -118,7 +119,8 @@ private:
         Pose     head;
         std::unique_ptr<Overlay> ov;      // the menu's pictures (D3D11 sessions)
         uint64_t endFrames = 0;           // the game's xrEndFrame calls (the swapchains are made ahead of time after 3 s)
-        bool     ovWarm = false;
+        bool     warm[3] = {};
+        bool     airHeld = false;         // the air mouse button was down last frame (its aim pose is located then)            // menu / keyboard / pointer swapchain made + filled ahead of time (one per frame)
         bool     spacesFailed = false;
         VrPad::Mapper mapper;
         uint64_t ticks = 0, readFails = 0, ownSyncs = 0;
@@ -131,7 +133,7 @@ private:
     bool PrepareLocked(const std::vector<XrActionSet>& appSets);
     void OffLocked(SessionData& sd, const char* what, XrResult r);
     void ReadLocked(XrSession s, SessionData& sd, VrPad::Frame& f);
-    bool MenuOwnsLocked(XrSession s, XrAction a, XrPath sub);
+    bool MenuOwns(XrAction a, XrPath sub);           // lock-free (the game reads its actions from any thread)
     void ProfilesLocked(XrSession s, SessionData& sd, const VrPad::Frame& f, double now);
     std::string PathString(XrPath p);
     XrPath Path(const std::string& s);
@@ -141,6 +143,8 @@ private:
     Config      cfg_;
     bool        enabled_ = true;
     std::mutex  m_;
+    std::mutex  ovM_;                 // an Overlay in use at xrEndFrame (outside m_: no lock held across the runtime / D3D calls)
+    std::atomic<bool> menuShown_{false}, handOwn_[2] = {}, trigReady_{false};   // what FilterBool / FilterFloat need
     // the game's input (this instance)
     std::map<XrActionSet, uint32_t> appSets_;                                // priority
     std::map<XrAction, XrActionSet> appActions_;

@@ -55,6 +55,7 @@ Config ParseConfig(const std::string& text) {
         auto bad = [&](const char* why) { c.notes.push_back("line " + std::to_string(lineNo) + ": " + key + " = " + val + " -- " + why); };
         double d = 0;
         if (key == "enabled") { c.enabled = lv != "0" && lv != "off" && lv != "no"; continue; }
+        if (key == "log") { c.log = lv == "1" || lv == "on" || lv == "yes"; continue; }
         if (key == "log_inputs") { c.logInputs = lv == "1" || lv == "on" || lv == "yes"; continue; }
         if (key == "apps") {
             c.apps.clear();

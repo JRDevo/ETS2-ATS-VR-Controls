@@ -37,18 +37,21 @@ static std::string ReadFile(const std::wstring& p) {
     fclose(f);
     return t;
 }
-static void WriteBmp(const std::wstring& path, const ck::VrMenu::Panel& p) {
+// panel `pan` of `m` as drawn (full size, BGRA; waits for the painter thread)
+static void WriteBmp(const std::wstring& path, ck::VrMenu& m, int pan) {
+    const std::vector<uint32_t>& px = m.FullPicture(pan);
+    const ck::VrMenu::Panel& p = m.Pan(pan);
     FILE* f = nullptr;
-    if (_wfopen_s(&f, path.c_str(), L"wb") || !f) return;
+    if (px.size() != (size_t)p.pw * p.ph || _wfopen_s(&f, path.c_str(), L"wb") || !f) return;
     BITMAPFILEHEADER fh{};
     BITMAPINFOHEADER ih{};
     ih.biSize = sizeof(ih); ih.biWidth = p.pw; ih.biHeight = -p.ph; ih.biPlanes = 1; ih.biBitCount = 32; ih.biCompression = BI_RGB;
     fh.bfType = 0x4D42;
     fh.bfOffBits = sizeof(fh) + sizeof(ih);
-    fh.bfSize = fh.bfOffBits + (DWORD)(p.px.size() * 4);
+    fh.bfSize = fh.bfOffBits + (DWORD)(px.size() * 4);
     fwrite(&fh, sizeof(fh), 1, f);
     fwrite(&ih, sizeof(ih), 1, f);
-    fwrite(p.px.data(), 4, p.px.size(), f);
+    fwrite(px.data(), 4, px.size(), f);
     fclose(f);
 }
 
@@ -175,7 +178,7 @@ int main(int argc, char** argv) {
     for (int i = 0; i < 3; ++i) { VrPad::Frame f = idle; upd(f); }
     const VrMenu::Panel& mp = m.Pan(VrMenu::kPanMenu);
     CHECK(mp.pose.p.z < -0.6 && mp.pose.p.z > -0.9 && std::fabs(mp.pose.p.x) < 0.01, "in front of the head (%.2f %.2f %.2f)", mp.pose.p.x, mp.pose.p.y, mp.pose.p.z);
-    CHECK(mp.px.size() == (size_t)mp.pw * mp.ph && mp.version > 0, "the menu picture is drawn");
+    CHECK(m.FullPicture(VrMenu::kPanMenu).size() == (size_t)mp.pw * mp.ph, "the menu picture is drawn (by the painter thread)");
     // press = aim at the element, trigger down one frame, up the next; returns the frame the menu saw (trigger taken out?)
     auto click = [&](int h, int pan, int kind, int arg, bool* taken = nullptr) {
         V3 at;
@@ -203,8 +206,8 @@ int main(int argc, char** argv) {
     for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
     const VrMenu::Panel& kp = m.Pan(VrMenu::kPanKb);
     CHECK(kp.pose.p.y < mp.pose.p.y - 0.15, "the keyboard below the menu (%.2f vs %.2f)", kp.pose.p.y, mp.pose.p.y);
-    WriteBmp(dir + L"\\keyboard_pick.bmp", kp);
-    WriteBmp(dir + L"\\menu_pick.bmp", mp);
+    WriteBmp(dir + L"\\keyboard_pick.bmp", m, VrMenu::kPanKb);
+    WriteBmp(dir + L"\\menu_pick.bmp", m, VrMenu::kPanMenu);
     CHECK(click(1, VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("shift")), "Shift key");
     CHECK(click(1, VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("f")), "F key");
     char out[64];
@@ -304,6 +307,7 @@ int main(int argc, char** argv) {
         twisted(30, 0.0f);                                   // let go: saved
         for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
         CHECK(up.x < -0.3, "the held keyboard twists with the wrist (its up %.2f %.2f %.2f)", up.x, up.y, up.z);
+        m.Flush();                                       // (config.ini is written on the painter thread)
         const Config c2 = ParseConfig(ReadFile(cfgPath));
         CHECK(std::fabs(c2.kbPlace.roll - 30.0) < 5.0, "the twist is saved (about the tilted panel's own axis) (keyboard_place roll %.1f deg)", c2.kbPlace.roll);
         VrMenu m4(c2, std::wstring());
@@ -326,11 +330,11 @@ int main(int argc, char** argv) {
         for (int i = 0; i < 3; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 90);
         CHECK(std::fabs(m.Look().menuOpacity - 0.7f) < 0.01f, "menu 70 %% solid (%.2f)", (double)m.Look().menuOpacity);
         for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
-        const uint32_t px0 = m.Pan(VrMenu::kPanMenu).px[(size_t)400 * 1000 + 10];
+        const uint32_t px0 = m.FullPicture(VrMenu::kPanMenu)[(size_t)400 * 1000 + 10];
         CHECK((px0 >> 24) == 179, "the picture is 70 %% solid (alpha %u)", px0 >> 24);
     }
-    WriteBmp(dir + L"\\menu.bmp", m.Pan(VrMenu::kPanMenu));
-    WriteBmp(dir + L"\\keyboard.bmp", m.Pan(VrMenu::kPanKb));
+    WriteBmp(dir + L"\\menu.bmp", m, VrMenu::kPanMenu);
+    WriteBmp(dir + L"\\keyboard.bmp", m, VrMenu::kPanKb);
     // the pointer on the top bar first, then onto a button on the bar: the button gets it (the bar used to keep it)
     {
         V3 bar, minus;
@@ -353,7 +357,7 @@ int main(int argc, char** argv) {
         const int pw0 = kb.pw;
         const double wk = kb.width;
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 83), "Compact shown");
-        WriteBmp(dir + L"\\menu_panels.bmp", m.Pan(VrMenu::kPanMenu));
+        WriteBmp(dir + L"\\menu_panels.bmp", m, VrMenu::kPanMenu);
         for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
         V3 at;
         CHECK(kb.pw < pw0 * 0.75 && std::fabs(kb.width / kb.pw - wk / pw0) < 1e-9, "compact: narrower, same key size (%d px, %.3f m)", kb.pw, kb.width);
@@ -370,13 +374,31 @@ int main(int argc, char** argv) {
         CHECK(lx.y > lb.y && std::fabs(lx.y - lf.y) < 1e-6 && lx.x > lb.x && lx.x - lb.x < keyM && lx.x > lf.x + keyM,
               "compact: x in the top row, above the right half of Backspace, right of F12");
         CHECK(m.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("f5"), &at), "compact: F-keys there");
-        WriteBmp(dir + L"\\keyboard_compact.bmp", kb);
+        WriteBmp(dir + L"\\keyboard_compact.bmp", m, VrMenu::kPanKb);
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 82), "Full shown");
         for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
         CHECK(kb.pw == pw0 && std::fabs(kb.width - wk) < 1e-9, "full again: the old size");
     }
     // close: the menu's x; the keyboard STAYS (it is its own panel)
-    click(1, VrMenu::kPanMenu, VrMenu::eClose, 0);
+    // ... by its x, the trigger still held a moment after: it stays the menu's (no click leaks into the game) until let go
+    {
+        V3 at;
+        m.ElemCentre(VrMenu::kPanMenu, VrMenu::eClose, 0, &at);
+        VrPad::Frame f = Aim(1, at, 0.0f);
+        upd(f);
+        f = Aim(1, at, 1.0f);
+        upd(f);
+        bool leak = false;
+        for (int i = 0; i < 10; ++i) { f = Aim(1, at, 1.0f); upd(f); leak = leak || f.trig[1] > 0.0f || !m.HandOnPanel(1); }
+        CHECK(!leak, "the trigger that closed the menu stays the menu's while held");
+        f = Aim(1, at, 0.0f);
+        upd(f);
+        f = Aim(1, V3{ 0, 2, 0.5 }, 1.0f);                // (pressed again away from the panels: the game's again)
+        upd(f);
+        CHECK(f.trig[1] == 1.0f && !m.HandOnPanel(1), "after letting go the trigger is the game's again");
+        f = Aim(1, V3{ 0, 2, 0.5 }, 0.0f);
+        upd(f);
+    }
     CHECK(!m.Pan(VrMenu::kPanMenu).show && m.Pan(VrMenu::kPanKb).show, "menu closed, the keyboard stays");
     for (int i = 0; i < 3; ++i) { VrPad::Frame f = idle; upd(f); }
     {
@@ -392,6 +414,7 @@ int main(int argc, char** argv) {
     }
 
     printf("(3) config.ini\n");
+    m.Flush();                                           // (config.ini is written on the painter thread)
     const std::string text = ReadFile(cfgPath);
     CHECK(text.find("# test\r\n") == 0, "comments kept, CRLF kept");
     CHECK(text.find("a = shift+f\r\n") != std::string::npos, "a = shift+f written in place");
@@ -431,13 +454,7 @@ int main(int argc, char** argv) {
         c3.look.kbShow = false;                         // (its menu button shows it below)
         VrMenu m3(c3, std::wstring());
         Rec s3;
-        auto u3 = [&](VrPad::Frame f) {                  // (+ the changed area taken every frame, as the layer's xrEndFrame does)
-            m3.Update(f, true, true, head, now, s3);
-            now += 0.011;
-            int dd[4];
-            m3.TakeDirty(VrMenu::kPanMenu, dd);
-            m3.TakeDirty(VrMenu::kPanKb, dd);
-        };
+        auto u3 = [&](VrPad::Frame f) { m3.Update(f, true, true, head, now, s3); now += 0.011; };
         m3.Open(true, head);
         V3 a1, a2;
         m3.ElemCentre(VrMenu::kPanMenu, VrMenu::eKbBtn, 0, &a1);
@@ -447,15 +464,16 @@ int main(int argc, char** argv) {
         const bool ok = m3.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("g"), &a1) &&
                         m3.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("h"), &a2);
         CHECK(ok, "keyboard shown by its menu button");
-        LARGE_INTEGER q0, q1, fq;
+        LARGE_INTEGER q0, q1, q2, fq;
         QueryPerformanceFrequency(&fq);
-        const uint64_t v0 = m3.Pan(VrMenu::kPanKb).version;
+        m3.Flush();
         QueryPerformanceCounter(&q0);
         for (int i = 0; ok && i < 20; ++i) u3(Aim(1, (i & 1) ? a1 : a2, 0.0f));
         QueryPerformanceCounter(&q1);
-        const uint64_t n = m3.Pan(VrMenu::kPanKb).version - v0;
-        CHECK(n >= 20, "a hover change redraws (%llu)", (unsigned long long)n);
-        printf("   one hover change (only the changed keys drawn): %.2f ms\n", (q1.QuadPart - q0.QuadPart) * 1000.0 / fq.QuadPart / 20);
+        m3.Flush();
+        QueryPerformanceCounter(&q2);
+        printf("   one hover change: game thread %.3f ms, painter thread %.3f ms\n", (q1.QuadPart - q0.QuadPart) * 1000.0 / fq.QuadPart / 20,
+               (q2.QuadPart - q1.QuadPart) * 1000.0 / fq.QuadPart / 20);
     }
     // the README screenshots (default look, solid): <work folder>\shots\*.bmp -- every tab, the keyboard full / compact, and the
     // keyboard with the pointer on G (shot_pointer.txt = G's centre in pixels, for the dot)
@@ -480,20 +498,20 @@ int main(int argc, char** argv) {
         for (int t = 0; t < 4; ++t) {
             press(VrMenu::kPanMenu, VrMenu::eTab, t);
             settle(away);
-            WriteBmp(shots + L"\\" + kTab[t] + L".bmp", ms.Pan(VrMenu::kPanMenu));
+            WriteBmp(shots + L"\\" + kTab[t] + L".bmp", ms, VrMenu::kPanMenu);
         }
         press(VrMenu::kPanMenu, VrMenu::eTab, 0);
         press(VrMenu::kPanMenu, VrMenu::eRow, VrPad::kA);   // picking a key for A: the keyboard opens with its frame
         settle(away);
-        WriteBmp(shots + L"\\menu-pick.bmp", ms.Pan(VrMenu::kPanMenu));
-        WriteBmp(shots + L"\\keyboard-pick.bmp", ms.Pan(VrMenu::kPanKb));
+        WriteBmp(shots + L"\\menu-pick.bmp", ms, VrMenu::kPanMenu);
+        WriteBmp(shots + L"\\keyboard-pick.bmp", ms, VrMenu::kPanKb);
         press(VrMenu::kPanMenu, VrMenu::ePickCancel, 0);
         settle(away);
-        WriteBmp(shots + L"\\keyboard.bmp", ms.Pan(VrMenu::kPanKb));
+        WriteBmp(shots + L"\\keyboard.bmp", ms, VrMenu::kPanKb);
         V3 g;
         if (ms.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("g"), &g)) {
             settle(g);
-            WriteBmp(shots + L"\\keyboard-pointer.bmp", ms.Pan(VrMenu::kPanKb));
+            WriteBmp(shots + L"\\keyboard-pointer.bmp", ms, VrMenu::kPanKb);
             const VrMenu::Panel& kb = ms.Pan(VrMenu::kPanKb);
             const V3 l = QRot(QConj(kb.pose.q), g - kb.pose.p);
             FILE* f = nullptr;
@@ -505,7 +523,7 @@ int main(int argc, char** argv) {
         press(VrMenu::kPanMenu, VrMenu::eTab, 2);
         press(VrMenu::kPanMenu, VrMenu::eSet, 83);       // compact
         settle(away);
-        WriteBmp(shots + L"\\keyboard-compact.bmp", ms.Pan(VrMenu::kPanKb));
+        WriteBmp(shots + L"\\keyboard-compact.bmp", ms, VrMenu::kPanKb);
     }
     printf("%d checks, %d failed\n", g_checks, g_fails);
     return g_fails ? 1 : 0;

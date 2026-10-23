@@ -141,9 +141,10 @@ double Now() {
 
 // scripted value of input `path` at t seconds; false = not pressed / not moved
 bool Scripted(const std::string& path, double t, std::vector<double>& vals) {
-    char spec[4096] = "";
-    GetEnvironmentVariableA("VRC_MOCK_INPUT", spec, sizeof(spec));
-    std::string s = spec;
+    static std::vector<char> spec(32768);              // (a long script: the performance test switches tabs for a minute)
+    spec[0] = 0;
+    if (GetEnvironmentVariableA("VRC_MOCK_INPUT", spec.data(), (DWORD)spec.size()) >= spec.size()) spec[0] = 0;
+    std::string s = spec.data();
     size_t pos = 0;
     while (pos < s.size()) {
         size_t semi = s.find(';', pos);

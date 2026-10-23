@@ -5,7 +5,8 @@
 
 namespace ck {
 void LogInit(const std::wstring& dllDir, const std::wstring& exeName);
-void LogWrite(char level, const char* fmt, ...);
+void LogWrite(char level, const char* fmt, ...);   // only buffered: a background thread writes (log.cpp)
+void LogFlush();                                   // write what is buffered now (the game ends its VR: not in a frame)
 std::wstring LogPath();
 }  // namespace ck
 

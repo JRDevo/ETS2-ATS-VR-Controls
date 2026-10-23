@@ -24,14 +24,20 @@
 //     also keeps the pointer until it is 8 px outside it (no jumping between two keys at their edge).
 //   * The keyboard is its own panel: the combo opens / closes only the menu; the keyboard stays where it is (shown or not,
 //     also at the next game start: keyboard_show) until its x -- e.g. fixed at the side of the cab, always there.
-//   * Light: both panels are drawn once when the game starts (no drawing when the menu opens); a redraw only when what a panel
-//     shows changes (ContentKey per panel); a hover change draws, copies and marks (TakeDirty) only the changed elements.
+//   * Light: the game's threads never draw. A background thread at low priority (Painter, vr_menu.cpp) draws the panels (GDI),
+//     shrinks them to the size they have in the headset (Output: an area filter in linear light, 10 % steps with hysteresis;
+//     none at 80 % or more), puts them in the swapchain's channel order and publishes them (Picture: the pixels + the area
+//     changed since the overlay last took it); it also writes config.ini. The game's xrBeginFrame only lays out and posts a job
+//     (the whole panel when what it shows changed -- ContentKey per panel -- else only the elements whose hover / press look
+//     changed); its xrEndFrame only copies the changed area to the swapchain (overlay.h). Both panels are drawn once when the
+//     game starts, so opening the menu draws nothing.
 //   * Every change is written to config.ini at once (menu_place / keyboard_place in the room's LOCAL space: a recenter moves
 //     them with the room).
 // Pure logic + GDI drawing into memory: no OpenXR / D3D here (tests/vr_menu_test.cpp drives it with made-up frames).
 #pragma once
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 #include "config.h"
@@ -56,6 +62,7 @@ bool BtnDown(const VrPad::Frame& f, int b);   // kLTrig .. kMenu (not the stick 
 void BtnSet(VrPad::Frame& f, int b, bool on);
 
 class MenuCanvas;   // vr_menu.cpp: the GDI picture of one panel (kept between redraws)
+class Painter;      // vr_menu.cpp: the background thread that draws / shrinks / publishes the pictures and saves config.ini
 
 class VrMenu {
 public:
@@ -67,11 +74,11 @@ public:
         double   width = 0.6;         // metres (height from the pixel aspect)
         int      pw = 0, ph = 0;      // pixels
         std::vector<Elem>     el;
-        std::vector<uint32_t> px;     // BGRA, premultiplied, top-down
-        uint64_t version = 0;         // + 1 on every redraw
-        int      dirty[4] = {};       // x0, y0, x1, y1 changed since TakeDirty (empty: x1 <= x0)
         double   Height() const { return width * ph / pw; }
     };
+    // a panel's picture as the overlay gets it (PictureLocked): the size it is shown at, the swapchain's channel order,
+    // premultiplied, top-down; version + 1 on every change; dirty = the area changed since the overlay last took it
+    struct Picture { std::vector<uint32_t> px; int w = 0, h = 0; uint64_t version = 0; int dirty[4] = {}; };
 
     // cfg: the start settings; path: the config.ini that changes are written to (empty = not saved)
     VrMenu(const Config& cfg, const std::wstring& path);
@@ -85,11 +92,17 @@ public:
 
     const VrPad::Config& Pad() const { return pad_; }   // the mapping in use (the menu edits it)
     bool AnyShown() const { return pan_[0].show || pan_[1].show; }
-    bool HandOnPanel(int h) const { return h >= 0 && h < 2 && (hov_[h].pan >= 0 || press_[h].pan >= 0 || grab_[h].pan >= 0); }
+    bool HandOnPanel(int h) const { return h >= 0 && h < 2 && (hov_[h].pan >= 0 || press_[h].pan >= 0 || grab_[h].pan >= 0 || own_[h]); }
+    bool Pending() const { return kbPending_; }  // the keyboard waits for the head pose to be placed
     const MenuLook& Look() const { return look_; }
     const Panel& Pan(int i) const { return pan_[i]; }
-    // the area of panel p that changed since the last call (x0, y0, x1, y1; empty: x1 <= x0), then cleared (overlay.h)
-    void TakeDirty(int p, int out[4]);
+    // xrEndFrame: the size panel p is shown at, from its width in the headset (pixels; 0 = unknown) and the swapchain's channel
+    // order; true = the picture already has that size (Painter works on it otherwise)
+    bool Output(int p, double wantPx, bool rgba);
+    std::unique_lock<std::mutex> LockPictures();  // hold it while reading / taking a picture
+    Picture& PictureLocked(int p);
+    void Flush();                                 // tests: wait until the painter is done
+    const std::vector<uint32_t>& FullPicture(int p);   // tests: the full-size BGRA picture (after Flush)
     // the pointer dot of hand h: shown + its pose (on the panel, facing out)
     bool Cursor(int h, Pose* p) const;
     const std::vector<uint32_t>& CursorPixels() const { return cursorPx_; }
@@ -115,9 +128,9 @@ private:
     void LayoutKb();
     void Draw(int p);                               // the whole panel
     bool DrawChanged(int p);                        // only the elements whose hover / press look changed; false = Draw needed
-    void DrawElem(MenuCanvas& c, const Elem& e, int st);
+    static void DrawElem(MenuCanvas& c, int theme, const Elem& e, int st);   // (on the painter's thread)
     int  ElemState(int p, const Elem& e) const;     // 1 hovered, 2 pressed
-    void Publish(int p);
+    friend class Painter;
     void Redraw(int p);
     void RedrawAll() { Redraw(kPanMenu); Redraw(kPanKb); }
     bool Hit(const VrPad::Frame& f, int h, Ref* r, double* u, double* v);
@@ -151,17 +164,21 @@ private:
     Ref           hov_[2];
     Press         press_[2];
     bool          trigDown_[2] = {};
+    bool          own_[2] = {};           // a trigger pressed on a panel stays the menu's until it is let go (also after the
+                                          //   press closed the panel: no click leaks into the game)
     bool          aimOk_[2] = {};
     Pose          aim_[2];
     double        hitT_[2] = {};
     bool          lastHeadOk_ = false;
     Pose          lastHead_;
     bool          needRedraw_ = false;
-    std::unique_ptr<MenuCanvas> cv_[kPanCount];
+    std::unique_ptr<Painter> painter_;
+    double        scale_[kPanCount] = {};           // Output: the shrink step in use (0 = none yet)
+    int           scaleOf_[kPanCount] = {};         // ... for this picture width
     std::string   content_[kPanCount];              // ContentKey at the last full draw
     std::vector<uint8_t> elState_[kPanCount];       // ElemState of each element as drawn
     std::vector<uint32_t> cursorPx_;
-    double        saveAt_ = -1;
+    bool          saveDue_ = false;
     std::string   status_;                // the bar's last message ("Saved", "Set: A = enter")
 };
 

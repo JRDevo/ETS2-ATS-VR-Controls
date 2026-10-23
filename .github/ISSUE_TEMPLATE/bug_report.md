@@ -5,7 +5,7 @@ title: "[Bug] "
 labels: bug
 ---
 
-<!-- BEFORE you write: in config.ini (next to ets2_ats_vr_controls.dll) change  log_inputs = 0  to  log_inputs = 1 . -->
+<!-- BEFORE you write: in config.ini (next to ets2_ats_vr_controls.dll) change  log = 0  to  log = 1  (and log_inputs = 1). -->
 <!-- Start the game in VR, do what goes wrong (1-2 minutes), QUIT the game, then attach the files below. -->
 
 ## What happens
@@ -24,6 +24,6 @@ labels: bug
 
 Both are in the mod's folder (where you ran `install.ps1`).
 
-- [ ] `logs\ets2_ats_vr_controls.log` (**required**, made with `log_inputs = 1`; no file = the mod did not load, say so)
+- [ ] `logs\ets2_ats_vr_controls.log` (**required**, made with `log = 1`; no file although log = 1 = the mod did not load, say so)
 - [ ] `config.ini` (**required**)
 - [ ] A screenshot or short video (optional)

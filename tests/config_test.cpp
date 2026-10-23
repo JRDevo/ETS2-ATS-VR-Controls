@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
     for (int b = 0; b < VrPad::kBtnCount; ++b) CHECK(SameOut(c.pad.map[b], d.pad.map[b]), "button %s differs from the default", VrPad::BtnNames()[b]);
     CHECK(c.pad.mouseStick == d.pad.mouseStick && c.pad.mouseSpeed == d.pad.mouseSpeed && c.pad.deadzone == d.pad.deadzone &&
           c.pad.airBtn == d.pad.airBtn && c.pad.airGain == d.pad.airGain, "mouse settings differ from the defaults");
-    CHECK(c.enabled && !c.logInputs, "enabled, no input log");
+    CHECK(c.enabled && !c.logInputs && !c.log, "enabled, no log file, no input log");
     CHECK(AppAllowed(c, L"EuroTrucks2.exe") && AppAllowed(c, L"amtrucks.exe") && !AppAllowed(c, L"hl2.exe"), "apps");
 
     const Config e = ParseConfig("apps = *\nmouse_stick = sideways\nmouse_speed = abc\nb = nokey\nair_mouse = lgrip\nfoo = 1\nnoequals\n"

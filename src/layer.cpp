@@ -11,8 +11,9 @@
 //   xrAttachSessionActionSets / xrSyncActions   our action set appended to the game's
 //   xrEndFrame                            the VR menu's quad layers after the game's (only while it is shown)
 //   xrGetActionStateBoolean / Float       the game's trigger reads released while it points at the VR menu
-// Its own cost is measured (CPU time in our part of xrBeginFrame + xrEndFrame, not the game's or the runtime's) and logged
-// once a minute: "performance: ..." -- so anyone can see in the log how light it is.
+// With log = 1 its own cost is measured (CPU time in our part of xrBeginFrame + xrEndFrame, not the game's or the runtime's)
+// and logged once a minute: "performance: ..." -- so anyone can see in the log how light it is. log = 0 (the default): no log
+// file at all and nothing measured.
 #include <windows.h>
 #include <d3d11.h>
 #include <cstring>
@@ -62,6 +63,7 @@ std::map<XrInstance, std::unique_ptr<InstanceData>> g_instances;
 std::map<XrSession, InstanceData*>   g_sessions;
 std::map<XrActionSet, InstanceData*> g_sets;
 PFN_xrGetInstanceProcAddr g_anyNextGipa = nullptr;
+bool                      g_measure = false;  // log = 1: the layer's own cost per frame is measured and logged
 
 // the layer's own CPU time per frame (see the header); one frame = our part of xrBeginFrame + our part of xrEndFrame
 struct Cost {
@@ -121,7 +123,8 @@ void EnsureInit() {
         g_cfg = LoadConfig(g_dllDir);
         g_on = g_cfg.enabled && AppAllowed(g_cfg, g_exe);
         if (!g_on) return;                           // not our game: no log file, nothing touched
-        LogInit(g_dllDir, g_exe);
+        g_measure = g_cfg.log;                       // (log = 0: no file, and the per-frame cost is not even measured)
+        if (g_cfg.log) LogInit(g_dllDir, g_exe);
         LOGI("ETS2 ATS VR Controls " VRC_VERSION " (%s) loaded into this game", kLayerName);
         LOGI("config: %ls", g_cfg.loadedFrom.empty() ? L"(none, defaults)" : g_cfg.loadedFrom.c_str());
         for (const std::string& n : g_cfg.notes) LOGW("config: %s", n.c_str());
@@ -163,6 +166,7 @@ XrResult XRAPI_CALL Hook_DestroyInstance(XrInstance instance) {
     if (!next) return XR_ERROR_HANDLE_INVALID;
     if (dead && dead->pad) dead->pad->ReleaseAll();   // a game that skips xrDestroySession: nothing stays held
     LOGI("instance %p destroyed", (void*)instance);
+    LogFlush();
     return next(instance);   // (dead is freed after the call returns)
 }
 
@@ -188,6 +192,7 @@ XrResult XRAPI_CALL Hook_DestroySession(XrSession session) {
     InstanceData* id = FindSession(session);
     if (!id || !id->DestroySession) return XR_ERROR_HANDLE_INVALID;
     if (id->pad) id->pad->SessionDestroyed(session);
+    LogFlush();
     {
         std::lock_guard<std::mutex> lk(g_lock);
         g_sessions.erase(session);
@@ -218,9 +223,9 @@ XrResult XRAPI_CALL Hook_BeginFrame(XrSession session, const XrFrameBeginInfo* b
     InstanceData* id = FindSession(session);
     if (!id || !id->BeginFrame) return XR_ERROR_HANDLE_INVALID;
     if (id->pad) {
-        const double t = NowS();
+        const double t = g_measure ? NowS() : 0.0;
         try { id->pad->BeginFrame(session); } catch (...) { LOGE("frame tick failed (exception) -- skipped"); }
-        CostBegin(NowS() - t);
+        if (g_measure) CostBegin(NowS() - t);
     }
     return id->BeginFrame(session, bi);
 }
@@ -232,9 +237,9 @@ XrResult XRAPI_CALL Hook_EndFrame(XrSession session, const XrFrameEndInfo* fe) {
         std::vector<const XrCompositionLayerBaseHeader*> layers;
         XrFrameEndInfo mine{};
         bool ours = false;
-        const double t = NowS();
+        const double t = g_measure ? NowS() : 0.0;
         try { ours = id->pad->EndFrame(session, fe, &mine, layers); } catch (...) { LOGE("menu layers failed (exception) -- skipped"); }
-        CostEnd(NowS() - t, ours);
+        if (g_measure) CostEnd(NowS() - t, ours);
         if (ours) {
             const XrResult r = id->EndFrame(session, &mine);
             if (XR_SUCCEEDED(r)) return r;

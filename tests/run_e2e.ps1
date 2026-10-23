@@ -78,7 +78,7 @@ function RunCase($name, $apps, $gameArgs, $seconds, [hashtable]$extraEnv, [strin
     if (Test-Path $d) { Remove-Item $d -Recurse -Force }
     New-Item -ItemType Directory -Force $d | Out-Null
     $cfg = Join-Path $d 'config.ini'
-    "apps = $apps`nb = shift+f`nlog_inputs = 1`n$cfgExtra" | Set-Content -Encoding ASCII $cfg
+    "apps = $apps`nb = shift+f`nlog = 1`nlog_inputs = 1`n$cfgExtra" | Set-Content -Encoding ASCII $cfg
     $env:VRC_CONFIG = $cfg
     $env:VRC_LOG_DIR = Join-Path $d 'logs'
     $env:VRC_TEST_EVENTS = Join-Path $d 'events.txt'
@@ -263,7 +263,7 @@ if (-not $Only -or $Only -eq 'menusmall') {
     $r = RunCase 'menusmall' 'fake_game.exe' @('--d3d11') 3.5 @{ VRC_MOCK_INPUT = $s; VRC_MOCK_DUMP = $d } "menu_place = 0, -0.104, -0.743, 0, -8, 0.3`n"
     Check 'menusmall' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
     Check 'menusmall' ($r.log -match 'menu shown at 683 x 546 \(68 % of its 1000 x 800 picture') 'log: the menu shrunk to its size in the headset'
-    Check 'menusmall' ($r.mock -match 'swapchain 683x546 mips 6') 'the swapchain has the shrunk size (+ mips)'
+    Check 'menusmall' ($r.mock -match 'swapchain 683x546 mips 1') 'the swapchain has the shrunk size (one level)'
     Check 'menusmall' (Test-Path (Join-Path $d 'quad_683x546.bmp')) 'the shrunk picture reached the swapchain'
     Check 'menusmall' ($r.mock -notmatch 'endframe REFUSED|REFUSED \(quad') 'every frame accepted'
 }

@@ -2,9 +2,15 @@
 #include "vr_menu.h"
 #include <windows.h>
 #include <cctype>
+#include <cmath>
+#include <condition_variable>
 #include <cstdio>
 #include <cstring>
+#include <deque>
 #include <initializer_list>
+#include <atomic>
+#include <thread>
+#include <utility>
 #include "log.h"
 
 namespace ck {
@@ -210,6 +216,251 @@ const char* const kThemeLabel[kThemeCount] = { "Dark", "Blue", "Grey", "Light", 
 
 }  // namespace
 
+// ------------------------------------------------------------------------------------------------ the painter
+
+namespace {
+// sRGB <-> linear for the shrink filter (8-bit in; a 4096-step table back)
+const float* ToLin() {
+    static const float* t = [] {
+        static float a[256];
+        for (int i = 0; i < 256; ++i) { const double c = i / 255.0; a[i] = (float)(c <= 0.04045 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4)); }
+        return a;
+    }();
+    return t;
+}
+const uint8_t* ToSrgb() {
+    static const uint8_t* t = [] {
+        static uint8_t a[4096];
+        for (int i = 0; i < 4096; ++i) {
+            const double l = i / 4095.0, c = l <= 0.0031308 ? l * 12.92 : 1.055 * std::pow(l, 1 / 2.4) - 0.055;
+            a[i] = (uint8_t)(c * 255.0 + 0.5);
+        }
+        return a;
+    }();
+    return t;
+}
+// The area filter: each target pixel = the average of the source pixels it covers (colour in linear light). One axis' weights.
+struct Axis { std::vector<int> first, count, off; std::vector<float> w; int src = 0, dst = 0; };
+void MakeAxis(int src, int dst, Axis& a) {
+    a.src = src; a.dst = dst;
+    a.first.assign((size_t)dst, 0); a.count.assign((size_t)dst, 0); a.off.assign((size_t)dst, 0); a.w.clear();
+    const double k = (double)src / dst;               // source pixels per target pixel (>= 1)
+    for (int j = 0; j < dst; ++j) {
+        const double s0 = j * k, s1 = (j + 1) * k;
+        int i0 = (int)s0, i1 = (int)std::ceil(s1) - 1;
+        if (i1 >= src) i1 = src - 1;
+        if (i1 < i0) i1 = i0;
+        a.first[(size_t)j] = i0;
+        a.count[(size_t)j] = i1 - i0 + 1;
+        a.off[(size_t)j] = (int)a.w.size();
+        for (int i = i0; i <= i1; ++i) {
+            const double lo = i > s0 ? i : s0, hi = i + 1 < s1 ? i + 1 : s1;
+            a.w.push_back((float)((hi - lo) / k));
+        }
+    }
+}
+// target pixels [x0, x1) x [y0, y1) of `dst` (dw x dh) from `src` (sw x sh); ax / ay: the weights (made when their sizes differ)
+void Shrink(const uint32_t* src, int sw, int sh, uint32_t* dst, int dw, int dh, int x0, int y0, int x1, int y1, Axis& ax, Axis& ay) {
+    if (ax.src != sw || ax.dst != dw) MakeAxis(sw, dw, ax);
+    if (ay.src != sh || ay.dst != dh) MakeAxis(sh, dh, ay);
+    const float* lin = ToLin();
+    const uint8_t* srgb = ToSrgb();
+    std::vector<float> acc((size_t)(x1 - x0) * 4);
+    for (int y = y0; y < y1; ++y) {
+        std::fill(acc.begin(), acc.end(), 0.0f);
+        for (int r = 0; r < ay.count[(size_t)y]; ++r) {
+            const float wy = ay.w[(size_t)(ay.off[(size_t)y] + r)];
+            const uint32_t* sr = src + (size_t)(ay.first[(size_t)y] + r) * sw;
+            for (int x = x0; x < x1; ++x) {
+                float c0 = 0, c1 = 0, c2 = 0, ca = 0;
+                const int f = ax.first[(size_t)x], n = ax.count[(size_t)x];
+                const float* wx = &ax.w[(size_t)ax.off[(size_t)x]];
+                for (int i = 0; i < n; ++i) {
+                    const uint32_t q = sr[f + i];
+                    c0 += wx[i] * lin[q & 0xFF]; c1 += wx[i] * lin[(q >> 8) & 0xFF]; c2 += wx[i] * lin[(q >> 16) & 0xFF];
+                    ca += wx[i] * (float)(q >> 24);
+                }
+                float* o = &acc[(size_t)(x - x0) * 4];
+                o[0] += wy * c0; o[1] += wy * c1; o[2] += wy * c2; o[3] += wy * ca;
+            }
+        }
+        uint32_t* dr = dst + (size_t)y * dw;
+        for (int x = x0; x < x1; ++x) {
+            const float* o = &acc[(size_t)(x - x0) * 4];
+            auto enc = [&](float v) { const int i = (int)(v * 4095.0f + 0.5f); return (uint32_t)srgb[i < 0 ? 0 : i > 4095 ? 4095 : i]; };
+            const int a = (int)(o[3] + 0.5f);
+            dr[x] = ((uint32_t)(a < 0 ? 0 : a > 255 ? 255 : a) << 24) | (enc(o[2]) << 16) | (enc(o[1]) << 8) | enc(o[0]);
+        }
+    }
+}
+void Unite(int d[4], int x0, int y0, int x1, int y1) {
+    if (d[2] <= d[0] || d[3] <= d[1]) { d[0] = x0; d[1] = y0; d[2] = x1; d[3] = y1; return; }
+    d[0] = d[0] < x0 ? d[0] : x0; d[1] = d[1] < y0 ? d[1] : y0; d[2] = d[2] > x1 ? d[2] : x1; d[3] = d[3] > y1 ? d[3] : y1;
+}
+}  // namespace
+
+// One background thread at below-normal priority: paint jobs (a whole panel, or only some elements) and config.ini writes, in
+// order; the output size / channel order of each panel (Output) -- a change re-shrinks the whole picture. Its result per
+// panel: `src` (full size, BGRA, the tests' picture) and the published Picture (pub, under pubM).
+class Painter {
+public:
+    struct Job {
+        int p = 0;
+        bool full = false, frame = false, save = false;
+        int w = 0, h = 0, theme = 0, alpha = 255;
+        std::vector<VrMenu::Elem> el;
+        std::vector<uint8_t> st;
+        std::wstring path;                                     // save: config.ini
+        std::vector<std::pair<std::string, std::string>> kv;
+    };
+    Painter() { th_ = std::thread([this] { Run(); }); }
+    ~Painter() {
+        { std::lock_guard<std::mutex> lk(m_); stop_ = true; }
+        cv_.notify_all();
+        if (th_.joinable()) th_.join();
+    }
+    void Post(Job&& j) {
+        { std::lock_guard<std::mutex> lk(m_); q_.push_back(std::move(j)); }
+        cv_.notify_one();
+    }
+    void SetOut(int p, int w, int h, bool rgba) {
+        {
+            std::lock_guard<std::mutex> lk(m_);
+            if (out_[p].w == w && out_[p].h == h && out_[p].rgba == rgba) return;
+            out_[p] = { w, h, rgba };
+            outChanged_[p] = true;
+        }
+        cv_.notify_one();
+    }
+    bool OutReady(int p) {                                    // the published picture has the size asked for
+        std::lock_guard<std::mutex> lk(pubM);
+        return pub[p].w == pubWant_[p][0] && pub[p].h == pubWant_[p][1] && pub[p].w > 0;
+    }
+    void Flush() {
+        std::unique_lock<std::mutex> lk(m_);
+        idle_.wait(lk, [this] { return q_.empty() && !busy_ && !outChanged_[0] && !outChanged_[1]; });
+    }
+    bool TakeSaveFailed() { return saveFailed_.exchange(false); }
+    const std::vector<uint32_t>& Src(int p) const { return src_[p]; }
+    std::mutex pubM;
+    VrMenu::Picture pub[VrMenu::kPanCount];
+
+private:
+    struct Out { int w = 0, h = 0; bool rgba = false; };
+    void Run() {
+        SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);   // never ahead of the game's threads
+        for (;;) {
+            Job j;
+            bool has = false, re[VrMenu::kPanCount] = {};
+            Out out[VrMenu::kPanCount];
+            {
+                std::unique_lock<std::mutex> lk(m_);
+                cv_.wait(lk, [this] { return stop_ || !q_.empty() || outChanged_[0] || outChanged_[1]; });
+                if (stop_) return;
+                if (!q_.empty()) { j = std::move(q_.front()); q_.pop_front(); has = true; }
+                for (int p = 0; p < VrMenu::kPanCount; ++p) { re[p] = outChanged_[p]; outChanged_[p] = false; out[p] = out_[p]; }
+                busy_ = true;
+            }
+            try {
+                if (has && j.save) Save(j);
+                else if (has) Paint(j, out[j.p]);
+                for (int p = 0; p < VrMenu::kPanCount; ++p)
+                    if (re[p] && srcW_[p] > 0) { int all[4] = { 0, 0, srcW_[p], srcH_[p] }; Publish(p, all, out[p], true); }
+            } catch (...) {
+                LOGE("VR menu: the painter failed (exception) -- skipped");
+            }
+            { std::lock_guard<std::mutex> lk(m_); busy_ = false; }
+            idle_.notify_all();
+        }
+    }
+    void Save(const Job& j) {
+        if (SaveConfigValues(j.path, j.kv)) LOGI("VR menu: settings saved to %ls", j.path.c_str());
+        else if (!j.path.empty()) {
+            LOGW("VR menu: could not write %ls -- the change works until the game ends", j.path.c_str());
+            saveFailed_ = true;
+        }
+    }
+    void Paint(const Job& j, const Out& out) {
+        std::unique_ptr<MenuCanvas>& cvp = canvas_[j.p];
+        bool full = j.full;
+        if (!cvp || cvp->W() != j.w || cvp->H() != j.h) { cvp = std::make_unique<MenuCanvas>(j.w, j.h); full = true; }
+        MenuCanvas& c = *cvp;
+        if (!c.Ok()) return;
+        if (full && !j.full) return;                          // a partial job for a canvas never drawn whole: wait for a full one
+        const Theme& T = kThemes[j.theme];
+        int d[4] = { 0, 0, 0, 0 };
+        if (full) {
+            c.Round(0, 0, j.w, j.h, 0, j.frame ? T.accent : T.bg);   // (picking a key: an accent frame)
+            if (j.frame) c.Round(5, 5, j.w - 11, j.h - 11, 0, T.bg);
+            for (size_t i = 0; i < j.el.size(); ++i) VrMenu::DrawElem(c, j.theme, j.el[i], j.st[i]);
+            d[2] = j.w; d[3] = j.h;
+        } else {
+            for (size_t i = 0; i < j.el.size(); ++i) {
+                const VrMenu::Elem& e = j.el[i];
+                c.Round(e.x, e.y, e.w, e.h, 0, j.p == VrMenu::kPanMenu && e.y < 72 ? T.bar : T.bg);
+                VrMenu::DrawElem(c, j.theme, e, j.st[i]);
+                Unite(d, e.x - 1, e.y - 1, e.x + e.w + 2, e.y + e.h + 2);
+            }
+        }
+        if (d[2] <= d[0]) return;
+        c.CopyTo(src_[j.p], j.alpha, d[0], d[1], d[2], d[3]);
+        if (srcW_[j.p] != j.w || srcH_[j.p] != j.h) { srcW_[j.p] = j.w; srcH_[j.p] = j.h; d[0] = d[1] = 0; d[2] = j.w; d[3] = j.h; }
+        Publish(j.p, d, out, false);
+    }
+    // the changed area d of src -> the output picture (shrunk or copied, channel order), then published
+    void Publish(int p, const int d[4], const Out& out, bool all) {
+        const int sw = srcW_[p], sh = srcH_[p];
+        const int ow = out.w > 0 ? out.w : sw, oh = out.h > 0 ? out.h : sh;
+        std::vector<uint32_t>& ob = outBuf_[p];
+        int r[4] = { d[0], d[1], d[2], d[3] };
+        if (ob.size() != (size_t)ow * oh || all || outW_[p] != ow || outH_[p] != oh || outRgba_[p] != out.rgba) {
+            ob.assign((size_t)ow * oh, 0);
+            outW_[p] = ow; outH_[p] = oh; outRgba_[p] = out.rgba;
+            r[0] = r[1] = 0; r[2] = ow; r[3] = oh;
+        } else if (ow != sw || oh != sh) {                 // the changed area in the output (+ 1 px: the filter's reach)
+            const double kx = (double)ow / sw, ky = (double)oh / sh;
+            r[0] = (int)(d[0] * kx) - 1; r[1] = (int)(d[1] * ky) - 1; r[2] = (int)std::ceil(d[2] * kx) + 1; r[3] = (int)std::ceil(d[3] * ky) + 1;
+            r[0] = r[0] < 0 ? 0 : r[0]; r[1] = r[1] < 0 ? 0 : r[1]; r[2] = r[2] > ow ? ow : r[2]; r[3] = r[3] > oh ? oh : r[3];
+        }
+        if (r[2] <= r[0] || r[3] <= r[1]) return;
+        if (ow != sw || oh != sh) Shrink(src_[p].data(), sw, sh, ob.data(), ow, oh, r[0], r[1], r[2], r[3], ax_[p], ay_[p]);
+        else for (int y = r[1]; y < r[3]; ++y) memcpy(ob.data() + (size_t)y * ow + r[0], src_[p].data() + (size_t)y * sw + r[0], (size_t)(r[2] - r[0]) * 4);
+        if (out.rgba)                                       // ours are BGRA
+            for (int y = r[1]; y < r[3]; ++y)
+                for (uint32_t* q = ob.data() + (size_t)y * ow + r[0], *e = ob.data() + (size_t)y * ow + r[2]; q < e; ++q)
+                    *q = (*q & 0xFF00FF00u) | ((*q >> 16) & 0xFFu) | ((*q & 0xFFu) << 16);
+        std::lock_guard<std::mutex> lk(pubM);
+        VrMenu::Picture& pb = pub[p];
+        if (pb.w != ow || pb.h != oh || pb.px.size() != ob.size()) {
+            pb.px = ob;
+            pb.w = ow; pb.h = oh;
+            pb.dirty[0] = pb.dirty[1] = 0; pb.dirty[2] = ow; pb.dirty[3] = oh;
+        } else {
+            for (int y = r[1]; y < r[3]; ++y) memcpy(pb.px.data() + (size_t)y * ow + r[0], ob.data() + (size_t)y * ow + r[0], (size_t)(r[2] - r[0]) * 4);
+            Unite(pb.dirty, r[0], r[1], r[2], r[3]);
+        }
+        ++pb.version;
+    }
+public:
+    void WantOut(int p, int w, int h) { std::lock_guard<std::mutex> lk(pubM); pubWant_[p][0] = w; pubWant_[p][1] = h; }
+private:
+    std::thread th_;
+    std::mutex m_;
+    std::condition_variable cv_, idle_;
+    std::deque<Job> q_;
+    bool stop_ = false, busy_ = false;
+    Out out_[VrMenu::kPanCount];
+    bool outChanged_[VrMenu::kPanCount] = {};
+    std::atomic<bool> saveFailed_{ false };
+    std::unique_ptr<MenuCanvas> canvas_[VrMenu::kPanCount];
+    std::vector<uint32_t> src_[VrMenu::kPanCount], outBuf_[VrMenu::kPanCount];
+    int srcW_[VrMenu::kPanCount] = {}, srcH_[VrMenu::kPanCount] = {}, outW_[VrMenu::kPanCount] = {}, outH_[VrMenu::kPanCount] = {};
+    bool outRgba_[VrMenu::kPanCount] = {};
+    int pubWant_[VrMenu::kPanCount][2] = {};
+    Axis ax_[VrMenu::kPanCount], ay_[VrMenu::kPanCount];
+};
+
+
 // ------------------------------------------------------------------------------------------------ the combo gate
 
 bool BtnDown(const VrPad::Frame& f, int b) {
@@ -264,7 +515,7 @@ bool ComboGate::Step(VrPad::Frame& f, double now) {
 
 VrMenu::~VrMenu() = default;
 
-VrMenu::VrMenu(const Config& cfg, const std::wstring& path) : pad_(cfg.pad), path_(path) {
+VrMenu::VrMenu(const Config& cfg, const std::wstring& path) : pad_(cfg.pad), path_(path), painter_(std::make_unique<Painter>()) {
     gate_.btns = cfg.menuCombo;
     gate_.hold = cfg.menuHold;
     place_[kPanMenu] = cfg.menuPlace;
@@ -280,7 +531,7 @@ VrMenu::VrMenu(const Config& cfg, const std::wstring& path) : pad_(cfg.pad), pat
         if (place_[kPanKb].set) pan_[kPanKb].show = true;   //   the head at the first frame that has the head)
         else kbPending_ = true;
     }
-    // both panels drawn now, while the game loads: opening the menu then only shows them (no 3-5 ms of GDI in a VR frame)
+    // both panels drawn now (on the painter's thread, while the game loads): opening the menu then only shows them
     RedrawAll();
     // the pointer dot: white with a dark ring, soft edge, premultiplied alpha
     cursorPx_.resize((size_t)kCursorPx * kCursorPx);
@@ -552,28 +803,52 @@ void VrMenu::LayoutKb() {
     }
 }
 
-void VrMenu::Draw(int p) {
-    const Theme& T = kThemes[look_.theme];
+void VrMenu::Draw(int p) {                              // the whole panel: a job for the painter
     Panel& pn = pan_[p];
-    if (!cv_[p] || cv_[p]->W() != pn.pw || cv_[p]->H() != pn.ph) cv_[p] = std::make_unique<MenuCanvas>(pn.pw, pn.ph);
-    MenuCanvas& c = *cv_[p];
-    if (!c.Ok()) return;
-    c.Round(0, 0, pn.pw, pn.ph, 0, p == kPanKb && pickBtn_ >= 0 ? T.accent : T.bg);   // (picking: an accent frame)
-    if (p == kPanKb && pickBtn_ >= 0) c.Round(5, 5, pn.pw - 11, pn.ph - 11, 0, T.bg);
+    Painter::Job j;
+    j.p = p; j.full = true; j.w = pn.pw; j.h = pn.ph; j.theme = look_.theme;
+    j.alpha = (int)((p == kPanMenu ? look_.menuOpacity : look_.kbOpacity) * 255.0f + 0.5f);
+    j.frame = p == kPanKb && pickBtn_ >= 0;
+    j.el = pn.el;
     elState_[p].assign(pn.el.size(), 0);
-    for (size_t i = 0; i < pn.el.size(); ++i) {
-        elState_[p][i] = (uint8_t)ElemState(p, pn.el[i]);
-        DrawElem(c, pn.el[i], elState_[p][i]);
-    }
-    pn.dirty[0] = pn.dirty[1] = 0;
-    pn.dirty[2] = pn.pw;
-    pn.dirty[3] = pn.ph;
-    Publish(p);
+    for (size_t i = 0; i < pn.el.size(); ++i) elState_[p][i] = (uint8_t)ElemState(p, pn.el[i]);
+    j.st = elState_[p];
+    painter_->Post(std::move(j));
 }
 
-void VrMenu::TakeDirty(int p, int out[4]) {
-    for (int i = 0; i < 4; ++i) { out[i] = pan_[p].dirty[i]; pan_[p].dirty[i] = 0; }
+bool VrMenu::Output(int p, double wantPx, bool rgba) {
+    // the size it is shown at: shrunk to its width in the headset in 10 % steps (each step a new swapchain), none at 80 % or
+    // more (no visible gain), changed only when the wanted size leaves -20 % .. +15 % of the current one
+    const Panel& pn = pan_[p];
+    double scale = 1.0;
+    if (wantPx > 0) {
+        double want = wantPx / pn.pw;
+        want = want < 0.2 ? 0.2 : want > 1.0 ? 1.0 : want;
+        scale = scaleOf_[p] == pn.pw ? scale_[p] : 0.0;
+        if (scale <= 0 || want > scale * 1.15 || want < scale / 1.25) {
+            scale = 1.0;
+            if (want < 0.8) while (scale / 1.1 >= want) scale /= 1.1;   // the smallest step still at least as big as wanted
+        }
+    } else if (scaleOf_[p] == pn.pw && scale_[p] > 0) {
+        scale = scale_[p];
+    }
+    int ow = (int)(pn.pw * scale + 0.5), oh = (int)(pn.ph * scale + 0.5);
+    ow = ow < 16 ? 16 : ow; oh = oh < 16 ? 16 : oh;
+    if (scale != scale_[p] || scaleOf_[p] != pn.pw) {
+        if (scale < 1.0) LOGI("VR menu: %s shown at %d x %d (%.0f %% of its %d x %d picture: its size in the headset)",
+                              p == kPanMenu ? "menu" : "keyboard", ow, oh, scale * 100.0, pn.pw, pn.ph);
+        scale_[p] = scale;
+        scaleOf_[p] = pn.pw;
+    }
+    painter_->WantOut(p, ow, oh);
+    painter_->SetOut(p, ow, oh, rgba);
+    return painter_->OutReady(p);
 }
+
+std::unique_lock<std::mutex> VrMenu::LockPictures() { return std::unique_lock<std::mutex>(painter_->pubM); }
+VrMenu::Picture& VrMenu::PictureLocked(int p) { return painter_->pub[p]; }
+void VrMenu::Flush() { painter_->Flush(); }
+const std::vector<uint32_t>& VrMenu::FullPicture(int p) { painter_->Flush(); return painter_->Src(p); }
 
 int VrMenu::ElemState(int p, const Elem& e) const {
     int st = 0;
@@ -585,36 +860,25 @@ int VrMenu::ElemState(int p, const Elem& e) const {
     return st;
 }
 
-// A pointer moving over the keys changes two elements: only those are drawn again (a full panel is ~2 ms of GDI).
+// A pointer moving over the keys changes two elements: only those go to the painter (a whole panel is ~2 ms of GDI).
 bool VrMenu::DrawChanged(int p) {
-    const Theme& T = kThemes[look_.theme];
     Panel& pn = pan_[p];
-    if (!cv_[p] || elState_[p].size() != pn.el.size()) return false;
-    MenuCanvas& c = *cv_[p];
-    bool any = false;
+    if (elState_[p].size() != pn.el.size()) return false;
+    Painter::Job j;
     for (size_t i = 0; i < pn.el.size(); ++i) {
         const Elem& e = pn.el[i];
         const int st = ElemState(p, e);
         if (st == elState_[p][i]) continue;
         if (e.kind == eBar) return false;            // the bar lies under its buttons: all again
         elState_[p][i] = (uint8_t)st;
-        c.Round(e.x, e.y, e.w, e.h, 0, p == kPanMenu && e.y < 72 ? T.bar : T.bg);
-        DrawElem(c, e, st);
-        int* d = pn.dirty;                             // the changed area grows by this element (+1 px for its edge)
-        const int x0 = e.x - 1, y0 = e.y - 1, x1 = e.x + e.w + 2, y1 = e.y + e.h + 2;
-        if (d[2] <= d[0]) { d[0] = x0; d[1] = y0; d[2] = x1; d[3] = y1; }
-        else { d[0] = d[0] < x0 ? d[0] : x0; d[1] = d[1] < y0 ? d[1] : y0; d[2] = d[2] > x1 ? d[2] : x1; d[3] = d[3] > y1 ? d[3] : y1; }
-        any = true;
+        j.el.push_back(e);
+        j.st.push_back((uint8_t)st);
     }
-    if (any) Publish(p);
+    if (j.el.empty()) return true;
+    j.p = p; j.w = pn.pw; j.h = pn.ph; j.theme = look_.theme;
+    j.alpha = (int)((p == kPanMenu ? look_.menuOpacity : look_.kbOpacity) * 255.0f + 0.5f);
+    painter_->Post(std::move(j));
     return true;
-}
-
-void VrMenu::Publish(int p) {
-    const float op = p == kPanMenu ? look_.menuOpacity : look_.kbOpacity;
-    const int* d = pan_[p].dirty;                       // (only the changed area; a full draw marks all of it)
-    cv_[p]->CopyTo(pan_[p].px, (int)(op * 255.0f + 0.5f), d[0], d[1], d[2], d[3]);
-    ++pan_[p].version;
 }
 
 void VrMenu::Redraw(int p) {
@@ -623,8 +887,8 @@ void VrMenu::Redraw(int p) {
     content_[p] = ContentKey(p);
 }
 
-void VrMenu::DrawElem(MenuCanvas& c, const Elem& e, int st) {
-    const Theme& T = kThemes[look_.theme];
+void VrMenu::DrawElem(MenuCanvas& c, int theme, const Elem& e, int st) {
+    const Theme& T = kThemes[theme];
     const bool hov = (st & 1) != 0, prs = (st & 2) != 0;
     switch (e.kind) {
     case eBar:
@@ -724,7 +988,7 @@ std::string VrMenu::Describe() const {
     return b;
 }
 
-void VrMenu::Save() { saveAt_ = 0; }   // written at the end of this Update (see Update)
+void VrMenu::Save() { saveDue_ = true; }   // written by the painter at the end of this Update (see Update)
 
 void VrMenu::SavePlaces() {
     for (int p = 0; p < kPanCount; ++p) {
@@ -898,6 +1162,7 @@ void VrMenu::Update(VrPad::Frame& f, bool live, bool headOk, const Pose& head, d
         ReleaseAll(sink);
         hov_[0] = hov_[1] = Ref();
         trigDown_[0] = trigDown_[1] = false;
+        own_[0] = own_[1] = false;
     } else {
         if (gate_.Step(f, now)) {
             if (pan_[kPanMenu].show) Close();
@@ -950,25 +1215,26 @@ void VrMenu::Update(VrPad::Frame& f, bool live, bool headOk, const Pose& head, d
             if (r.pan >= 0 || g.pan >= 0) f.grip[h] = 0.0f;                         // pointing at / holding a panel: no air mouse
             if (g.pan >= 0) { f.sx[h] = f.sy[h] = 0.0f; }                            // holding: the stick moves the panel
             const bool down = trigDown_[h] ? f.trig[h] > VrPad::kReleaseAt : f.trig[h] > VrPad::kPressAt;
-            if (down && !trigDown_[h] && r.pan >= 0) Activate(h, r, f, sink);
+            if (down && !trigDown_[h] && r.pan >= 0) { own_[h] = true; Activate(h, r, f, sink); }
+            if (!down) own_[h] = false;
             if (!down && press_[h].pan >= 0) Release(h, sink);
             if (press_[h].pan >= 0 && !pan_[press_[h].pan].show) Release(h, sink);   // (its panel was closed by that press)
             trigDown_[h] = down;
-            if (hov_[h].pan >= 0 || press_[h].pan >= 0) f.trig[h] = 0.0f;           // this trigger belongs to the menu now
+            if (hov_[h].pan >= 0 || press_[h].pan >= 0 || own_[h]) f.trig[h] = 0.0f;   // this trigger belongs to the menu now
         }
     }
     for (int p = 0; p < kPanCount; ++p)                 // (closed: nothing drawn)
         if (pan_[p].show && (needRedraw_ || ContentKey(p) != content_[p] || !DrawChanged(p))) Redraw(p);
     needRedraw_ = false;
-    if (saveAt_ >= 0) {
-        saveAt_ = -1;
-        if (SaveConfigValues(path_, MenuValues(pad_, place_[kPanMenu], place_[kPanKb], look_)))
-            LOGI("VR menu: settings saved to %ls", path_.c_str());
-        else if (!path_.empty()) {
-            LOGW("VR menu: could not write %ls -- the change works until the game ends", path_.c_str());
-            status_ = "Could not save config.ini (the change works until the game ends).";   // (a new status: redrawn)
-        }
+    if (saveDue_) {                                     // config.ini: written on the painter's thread (no file I/O in a frame)
+        saveDue_ = false;
+        Painter::Job j;
+        j.save = true;
+        j.path = path_;
+        j.kv = MenuValues(pad_, place_[kPanMenu], place_[kPanKb], look_);
+        painter_->Post(std::move(j));
     }
+    if (painter_->TakeSaveFailed()) status_ = "Could not save config.ini (the change works until the game ends).";
 }
 
 std::string VrMenu::ContentKey(int p) const {
