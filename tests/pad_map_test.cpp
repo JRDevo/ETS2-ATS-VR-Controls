@@ -41,7 +41,7 @@ static VrPad::Config OldDefaults() {
     VrPad::ParseOut("enter", &c.map[VrPad::kA]);
     c.mouseStick = 1;
     c.mouseSpeed = 900.0f;
-    c.modMap[VrPad::kB] = VrPad::Out();
+    c.modMap[VrPad::kA] = c.modMap[VrPad::kB] = VrPad::Out();
     VrPad::ParseOut("mouse_right", &c.modMap[VrPad::kRTrig]);
     return c;
 }
@@ -108,7 +108,7 @@ int main() {
         m.Step(f, true, 0.011, c, r);
         CHECK(r.Take() == "m0v m0^", "modifier off: the trigger is the left click");
     }
-    {   // the defaults since 2026-10-23: A = left click, B = Esc, right grip (air mouse, the modifier) + B = right click
+    {   // the defaults since 2026-10-23: A = left click, B = Esc, right grip (air mouse, the modifier) + A / B = left / right click
         Config c = DefaultConfig();
         Mapper m; Rec r; Frame f;
         f.hand[0] = f.hand[1] = true;
@@ -124,10 +124,10 @@ int main() {
         f.sec[1] = false; m.Step(f, true, 0.011, c, r);
         f.prim[1] = true; m.Step(f, true, 0.011, c, r);
         f.prim[1] = false; f.grip[1] = 0.0f; m.Step(f, true, 0.011, c, r);
-        CHECK(r.Take() == "m1^ m0v m0^", "... up; right grip + A = left click as normal");
+        CHECK(r.Take() == "m1^ m0v m0^", "... up; right grip + A = left click");
         f.trig[1] = 1.0f; m.Step(f, true, 0.011, c, r);
         f.trig[1] = 0.0f; m.Step(f, true, 0.011, c, r);
-        CHECK(r.Take() == "m1v m1^", "right trigger = right click");
+        CHECK(r.Take().empty(), "right trigger = none (free)");
     }
     {   // edges, hysteresis, the hold button, combos
         Config c = OldDefaults();

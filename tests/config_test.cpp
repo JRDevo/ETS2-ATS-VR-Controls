@@ -71,12 +71,12 @@ int main(int argc, char** argv) {
     CHECK(md.menuCombo == d.menuCombo && md.notes.size() == 3, "bad combos / air_mode noted");
     const Config me = ParseConfig("menu_combo = lgrip+rgrip+x+y\nmenu_combo = a+b+x+y+lstick\n");
     CHECK(me.menuCombo.size() == 4 && me.notes.size() == 1, "4 buttons ok, 5 noted");
-    // the modifier: shipped = the defaults (right grip; rtrigger:mouse_right), parsing, the menu's write read back
+    // the modifier: shipped = the defaults (right grip; a:mouse_left | b:mouse_right), parsing, the menu's write read back
     CHECK(c.pad.modBtn == d.pad.modBtn && d.pad.modBtn == VrPad::kRGrip, "shipped modifier = rgrip");
     for (int b = 0; b < VrPad::kBtnCount; ++b) CHECK(SameOut(c.pad.modMap[b], d.pad.modMap[b]), "modifier key %s differs", VrPad::BtnNames()[b]);
-    CHECK(d.pad.modMap[VrPad::kB].kind == VrPad::kMouseR && d.pad.map[VrPad::kA].kind == VrPad::kMouseL &&
-          d.pad.map[VrPad::kRTrig].kind == VrPad::kMouseR && d.pad.mouseStick == 2,
-          "defaults: A = left click, right trigger = right click, modifier + B = right click, right stick = mouse");
+    CHECK(d.pad.modMap[VrPad::kB].kind == VrPad::kMouseR && d.pad.modMap[VrPad::kA].kind == VrPad::kMouseL &&
+          d.pad.map[VrPad::kA].kind == VrPad::kMouseL && d.pad.map[VrPad::kRTrig].kind == VrPad::kNone && d.pad.mouseStick == 2,
+          "defaults: A = left click, right trigger = none, modifier + A = left click, + B = right click, right stick = mouse");
     const Config mo = ParseConfig("modifier = lgrip\nmodifier_keys = a:shift+f | ltrigger:mouse_right | x:,\n");
     CHECK(mo.pad.modBtn == VrPad::kLGrip && mo.pad.modMap[VrPad::kA].n == 2 && mo.pad.modMap[VrPad::kLTrig].kind == VrPad::kMouseR &&
           mo.pad.modMap[VrPad::kX].kind == VrPad::kKeys && mo.pad.modMap[VrPad::kRTrig].kind == VrPad::kNone && mo.notes.empty(),

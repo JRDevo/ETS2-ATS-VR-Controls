@@ -43,8 +43,8 @@ Only one OpenXR runtime is active at a time; the last one you set wins.
 - **Air mouse**: hold the right grip and turn the controller. The pointer follows, like a laser pointer. (Or set it to
   toggle: one press on, the next press off.)
 - **Modifier**: while you hold the modifier button (right grip), buttons can send something else. Default: **right grip +
-  B = right click** -- so one controller does everything: hold the grip (the pointer follows), hold B to right-click (drag
-  the map); A is the left click. Set any button's modified key in the VR menu.
+  A = left click, right grip + B = right click** -- so one controller does everything: hold the grip (the pointer follows),
+  press A to click, hold B to right-click (drag the map). Set any button's modified key in the VR menu.
 - **VR menu + keyboard**: hold both grips + the left stick click for 1 second. A menu opens in front of you. See [The VR menu](#the-vr-menu).
 - The game's own VR controls (the trigger and the left menu button) still work.
 - It only works in the games named in `config.ini`. In every other VR program it does nothing.
@@ -56,15 +56,16 @@ works next to the ETS2 / ATS DLAA mod, VR EyeCapture, Virtual Desktop, OpenXR To
 ## Default buttons
 
 Made so that **one controller (the right one) does the whole mouse**: point with the right stick or the air mouse, A =
-left click, the right trigger or right grip + B = right click.
+left click, right grip + B = right click. The right trigger is free (none).
 
 | Controller | Sends | In ETS2 / ATS (default keys) |
 |---|---|---|
 | Right stick | moves the mouse pointer | |
 | Right grip (hold) | air mouse (the pointer follows the controller), and the **modifier** | |
 | A | left mouse click | click |
-| Right trigger | right mouse click | |
+| Right grip + A | left mouse click | click while the air mouse aims |
 | Right grip + B | right mouse click | drag the map: hold the grip, aim, hold B |
+| Right trigger | nothing (free) | |
 | B | Esc | menu / back |
 | Left trigger | mouse wheel up | zoom |
 | X | `[` | left indicator |
@@ -101,7 +102,7 @@ There are **two** pointers, and only one of them works on the menu and the keybo
 | What it is | Windows' mouse arrow, inside the game's own screens | A white dot that this mod draws on its own panels |
 | How it moves | The right stick, or the **air mouse**: hold the **right grip** and turn the controller | Just **point** a controller at the menu or the keyboard. No button needed. |
 | Where it works | Only inside the game's picture (game menus, map, ...). It can **not** reach the VR menu or keyboard. | Only on the VR menu and the keyboard |
-| How it clicks | A = left click, right trigger (or right grip + B) = right click | **Trigger** while the dot is on a key / button |
+| How it clicks | A = left click, right grip + B = right click | **Trigger** while the dot is on a key / button |
 
 So for the menu and the keyboard: **do not use the air mouse** (do not hold the grip). Aim the controller at the panel like
 a laser pointer. A **white dot** appears where you point, and the key under it lights up. Then pull the trigger.

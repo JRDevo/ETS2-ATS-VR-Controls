@@ -161,8 +161,8 @@ struct Config {
 inline Config DefaultConfig() {
     Config c;
     // (the user's own mapping, made the default 2026-10-23: one controller does the mouse -- right stick or air mouse to point,
-    //  A = left click, right trigger = right click, right grip + B = right click as well, to drag the map with the grip held)
-    ParseOut("mouse_right", &c.map[kRTrig]);
+    //  A = left click; right grip (the air mouse) + A = left click, + B = right click, to drag the map with the grip held. The
+    //  right trigger is free: none.)
     ParseOut("wheel_up", &c.map[kLTrig]);
     ParseOut("mouse_left", &c.map[kA]);
     ParseOut("esc", &c.map[kB]);
@@ -175,6 +175,7 @@ inline Config DefaultConfig() {
     ParseOut("down", &c.map[kRDown]);
     ParseOut("left", &c.map[kRLeft]);
     ParseOut("right", &c.map[kRRight]);
+    ParseOut("mouse_left", &c.modMap[kA]);             // right grip (air mouse) + A = left click
     ParseOut("mouse_right", &c.modMap[kB]);            // right grip (air mouse) + B = right click: drag the map
     return c;
 }
