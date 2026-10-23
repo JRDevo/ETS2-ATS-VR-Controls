@@ -58,8 +58,8 @@ works next to the ETS2 / ATS DLAA mod, VR EyeCapture, Virtual Desktop, OpenXR To
 ## Default buttons
 
 Made so that **one controller (the right one) does the whole mouse**: point with the right stick or the air mouse, A =
-left click, right grip + B = right click. The right trigger is free (none). **The left controller drives**: left stick =
-steering, left trigger = gas.
+left click (or the right trigger), right grip + B = right click. **The left controller drives**: left stick = steering,
+left trigger = gas, left grip = brake.
 
 | Controller | Sends | In ETS2 / ATS (default keys) |
 |---|---|---|
@@ -68,10 +68,11 @@ steering, left trigger = gas.
 | A | left mouse click | click |
 | Right grip + A | left mouse click | click while the air mouse aims |
 | Right grip + B | right mouse click | drag the map: hold the grip, aim, hold B |
-| Right trigger | nothing (free) | |
+| Right trigger | left mouse click | click |
 | B | Esc | menu / back |
 | Left stick left / right | **steering** (let go = straight) | see [Driving](#driving-with-one-controller) |
 | Left trigger | **gas pedal** (press harder = more gas, let go = roll) | |
+| Left grip | **brake** (press harder = more brake) | |
 | X | `[` | left indicator |
 | Y | `]` | right indicator |
 | Right stick click | H | horn |
@@ -99,6 +100,7 @@ By default the **left controller drives** the truck:
 |---|---|
 | Stick left / right | steering wheel. Let go: the wheel goes straight again. |
 | Trigger | gas pedal. Press a little = a little gas. Let go = the truck rolls (no gas). |
+| Grip | brake. Press a little = a little brake. |
 
 **You choose what drives.** Gas and brake are normal button choices, like a key:
 
@@ -126,8 +128,11 @@ SDK). This mod is also such an add-on, so the game gets the stick and the trigge
 no file in the game folder, and **nothing to set in the game's options** (it works next to your wheel, keyboard or gamepad
 settings). `install.ps1` tells the game where the mod is (see [What install.ps1 does](#what-installps1-does-and-why-there-is-one)).
 
-- **The game shows a note at every start** that SDK add-ons are in use. That is this mod. Click OK. (It shows on the flat
-  monitor, not in the headset.) SCS shows it for every add-on that uses their SDK; as far as we know, a mod cannot hide it.
+- **The game shows a note at every start**: "Request to use advanced SDK features detected". That is this mod. Point at
+  **OK** and click (A or the right trigger). SCS shows it for every add-on that uses their SDK; as far as we know, a mod
+  cannot hide it.
+
+  ![The game's note at start: Request to use advanced SDK features detected](docs/images/sdk-popup.png)
 - `steer = off` and no gas / brake buttons: nothing drives, but the game still loads the add-on (so the VR menu can change
   it at once). To remove it completely, run `uninstall.ps1`.
 - It works in every OpenXR mode and headset (Virtual Desktop, Link, SteamVR, Windows MR): the driving part does not depend

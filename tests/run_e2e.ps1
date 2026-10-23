@@ -82,7 +82,7 @@ function RunCase($name, $apps, $gameArgs, $seconds, [hashtable]$extraEnv, [strin
     New-Item -ItemType Directory -Force $d | Out-Null
     $cfg = Join-Path $d 'config.ini'
     # (the mapping these checks were written for: the defaults before 2026-10-23)
-    $old = "rtrigger = mouse_left`nltrigger = mouse_right`na = enter`nmouse_stick = left`nmouse_speed = 900`nmodifier_keys = rtrigger:mouse_right`nsteer = off`n"
+    $old = "rtrigger = mouse_left`nltrigger = mouse_right`na = enter`nmouse_stick = left`nmouse_speed = 900`nmodifier_keys = rtrigger:mouse_right`nsteer = off`nlgrip = none`n"
     "apps = $apps`nb = shift+f`nlog = 1`nlog_inputs = 1`n$old$cfgExtra" | Set-Content -Encoding ASCII $cfg
     $env:VRC_CONFIG = $cfg
     $env:VRC_LOG_DIR = Join-Path $d 'logs'

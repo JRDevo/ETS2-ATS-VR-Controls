@@ -133,7 +133,7 @@ int main() {
         CHECK(r.Take() == "m1^ m0v m0^", "... up; right grip + A = left click");
         f.trig[1] = 1.0f; m.Step(f, true, 0.011, c, r);
         f.trig[1] = 0.0f; m.Step(f, true, 0.011, c, r);
-        CHECK(r.Take().empty(), "right trigger = none (free)");
+        CHECK(r.Take() == "m0v m0^", "right trigger = left click");
     }
     {   // edges, hysteresis, the hold button, combos
         Config c = OldDefaults();
@@ -248,8 +248,9 @@ int main() {
     {
         Config c = DefaultConfig();                    // left stick x = steering, left trigger = gas
         c.steerSpeed = 0.0f;                           // (at once: the values below are exact)
-        CHECK(DefaultConfig().steerStick == 1 && DefaultConfig().map[kLTrig].kind == kGas && DefaultConfig().map[kRTrig].kind == kNone &&
-              DefaultConfig().steerSpeed == 2.0f && DefaultConfig().steerCurve == 2.0f, "defaults: left stick steers, left trigger = gas, no brake");
+        CHECK(DefaultConfig().steerStick == 1 && DefaultConfig().map[kLTrig].kind == kGas && DefaultConfig().map[kRTrig].kind == kMouseL &&
+              DefaultConfig().map[kLGrip].kind == kBrake &&
+              DefaultConfig().steerSpeed == 2.0f && DefaultConfig().steerCurve == 2.0f, "defaults: left stick steers, left trigger = gas, left grip = brake");
         Out po;
         CHECK(ParseOut("gas", &po) && po.kind == kGas && ParseOut("Throttle", &po) && po.kind == kGas && ParseOut("brake", &po) && po.kind == kBrake,
               "gas / throttle / brake parse");

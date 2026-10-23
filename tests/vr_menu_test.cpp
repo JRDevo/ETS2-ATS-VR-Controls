@@ -357,13 +357,13 @@ int main(int argc, char** argv) {
               click(1, VrMenu::kPanMenu, VrMenu::ePickOut, VrPad::kNone) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kNone,
               "left grip = none again");
         // Reset tab: the first press only arms it (another press elsewhere disarms), the second resets that tab only
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kLGrip) && click(1, VrMenu::kPanMenu, VrMenu::ePickOut, VrPad::kBrake),
-              "left grip = Brake again");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kBrake,
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kLGrip) && click(1, VrMenu::kPanMenu, VrMenu::ePickOut, VrPad::kMouseR),
+              "left grip = Mouse R");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kMouseR,
               "Reset pressed once: nothing reset yet");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 120) && click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) &&
-              m.Pad().map[VrPad::kLGrip].kind == VrPad::kBrake, "another press in between: Reset armed again only");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kNone &&
+              m.Pad().map[VrPad::kLGrip].kind == VrPad::kMouseR, "another press in between: Reset armed again only");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kBrake &&
               m.Pad().map[VrPad::kLTrig].kind == VrPad::kGas && m.Pad().modMap[VrPad::kB].kind == VrPad::kMouseR,
               "Buttons tab reset: the default buttons");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kA) && click(1, VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("shift")) &&
