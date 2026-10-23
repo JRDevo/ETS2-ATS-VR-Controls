@@ -2,6 +2,9 @@
 // the physical key, whatever the keyboard layout), mouse buttons, wheel and relative moves. Only while the GAME's window is in
 // front (GameInFront): the layer never types into another program. Key / button RELEASES are always sent, so nothing stays
 // held when the game loses focus.
+// The game's thread only queues an event (microseconds); one sender thread hands them to Windows in order (SendInput can
+// block for milliseconds -- the user's log showed every 4-12 ms frame was SendInput). Flush (the session / instance ends)
+// waits until all are sent, so no key stays held when the game closes.
 // Test mode (environment VRC_TEST_EVENTS = a file path): every event is written to that file as one line instead
 // ("key 023 down", "mouse 0 up", "wheel +1", "move 12 -3"), and GameInFront is always true.
 #pragma once
@@ -23,10 +26,12 @@ public:
     bool TestMode() const { return test_ != nullptr; }
     void SetLogEvents(bool on) { logEvents_ = on; }
     void SetMeasure(bool on) { measure_ = on; }
-    double TakeSendTime();            // seconds spent in SendInput (or the test file) since the last call (measure on)
+    double TakeSendTime();            // seconds the game's thread spent queueing input since the last call (measure on)
+    double TakeSenderMax();           // the longest SendInput of the sender thread since the last call (seconds)
+    void   Flush();                   // wait (up to 0.2 s) until every queued event is sent
 private:
     void Emit(const char* line);
-    void Timed(const INPUT& in);
+    void Queue(const INPUT& in);
     void* test_ = nullptr;   // FILE*
     bool  logEvents_ = false;
     bool  measure_ = false;

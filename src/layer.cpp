@@ -27,6 +27,7 @@
 #include <openxr/openxr_loader_negotiation.h>
 #include "config.h"
 #include "log.h"
+#include "output.h"
 #include "pad_input.h"
 
 namespace ck {
@@ -104,10 +105,11 @@ void CostEnd(double s, bool menu) {
         const double n = (double)g_cost.frames;
         LOGI("performance: the layer's own work took %.3f ms per frame on average (most %.2f ms) over %llu frames in %.0f s "
              "[controllers + menu %.3f ms avg / %.2f most, pictures to the headset %.3f / %.2f]; VR menu / keyboard shown in "
-             "%llu of them; most in one frame: VR system %.2f, menu %.2f, sending keys %.2f, waiting %.2f ms", 1000.0 * g_cost.sum / n,
+             "%llu of them; most in one frame: VR system %.2f, menu %.2f, sending keys %.2f, waiting %.2f ms; the input thread's "
+             "longest hand-over to Windows %.2f ms (not in a frame)", 1000.0 * g_cost.sum / n,
              1000.0 * g_cost.max, (unsigned long long)g_cost.frames, now - g_cost.t0, 1000.0 * g_cost.bSum / n, 1000.0 * g_cost.bMax,
              1000.0 * g_cost.eSum / n, 1000.0 * g_cost.eMax, (unsigned long long)g_cost.menuFrames, 1000.0 * g_cost.partMax[0],
-             1000.0 * g_cost.partMax[1], 1000.0 * g_cost.partMax[2], 1000.0 * g_cost.partMax[3]);
+             1000.0 * g_cost.partMax[1], 1000.0 * g_cost.partMax[2], 1000.0 * g_cost.partMax[3], 1000.0 * Sink().TakeSenderMax());
         for (double& x : g_cost.partMax) x = 0;
         g_cost.t0 = now;
         g_cost.sum = g_cost.max = g_cost.bSum = g_cost.bMax = g_cost.eSum = g_cost.eMax = 0;
@@ -175,6 +177,7 @@ XrResult XRAPI_CALL Hook_DestroyInstance(XrInstance instance) {
     }
     if (!next) return XR_ERROR_HANDLE_INVALID;
     if (dead && dead->pad) dead->pad->ReleaseAll();   // a game that skips xrDestroySession: nothing stays held
+    Sink().Flush();                                    // (the releases are sent before the game goes)
     LOGI("instance %p destroyed", (void*)instance);
     LogFlush();
     return next(instance);   // (dead is freed after the call returns)
@@ -202,6 +205,7 @@ XrResult XRAPI_CALL Hook_DestroySession(XrSession session) {
     InstanceData* id = FindSession(session);
     if (!id || !id->DestroySession) return XR_ERROR_HANDLE_INVALID;
     if (id->pad) id->pad->SessionDestroyed(session);
+    Sink().Flush();
     LogFlush();
     {
         std::lock_guard<std::mutex> lk(g_lock);
