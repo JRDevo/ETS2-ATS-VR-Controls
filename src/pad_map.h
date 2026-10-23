@@ -35,7 +35,9 @@ constexpr float kPressAt = 0.75f, kReleaseAt = 0.55f;   // trigger / grip / stic
 
 // what one button does. Keys = up to 3 scan codes (set 1; + kExt for an E0 key) pressed in order, released in reverse.
 constexpr uint16_t kExt = 0x100;
-enum OutKind : uint8_t { kNone, kKeys, kMouseL, kMouseR, kMouseM, kWheelUp, kWheelDown };
+// kGas / kBrake: driving pedals -- not a key: how far the button is pressed (a trigger / grip / stick direction: analog, any
+// other button: full) goes to the game as the gas / brake pedal (Sink::Drive, scs_input.h)
+enum OutKind : uint8_t { kNone, kKeys, kMouseL, kMouseR, kMouseM, kWheelUp, kWheelDown, kGas, kBrake };
 struct Out { uint8_t kind = kNone; uint8_t n = 0; uint16_t code[3] = {}; };
 
 // scan code of one key name (case-insensitive); 0 = unknown
@@ -94,6 +96,8 @@ inline bool ParseOut(const char* in, Out* o) {
     if (!_stricmp(buf, "mouse_middle") || !_stricmp(buf, "mouse3")) { o->kind = kMouseM; return true; }
     if (!_stricmp(buf, "wheel_up"))   { o->kind = kWheelUp; return true; }
     if (!_stricmp(buf, "wheel_down")) { o->kind = kWheelDown; return true; }
+    if (!_stricmp(buf, "gas") || !_stricmp(buf, "throttle") || !_stricmp(buf, "accelerate")) { o->kind = kGas; return true; }
+    if (!_stricmp(buf, "brake")) { o->kind = kBrake; return true; }
     Out r;
     r.kind = kKeys;
     char* part = buf;
@@ -133,6 +137,8 @@ inline void OutToString(const Out& o, char* buf, size_t cap) {
     case kMouseM: strncpy_s(buf, cap, "mouse_middle", _TRUNCATE); return;
     case kWheelUp: strncpy_s(buf, cap, "wheel_up", _TRUNCATE); return;
     case kWheelDown: strncpy_s(buf, cap, "wheel_down", _TRUNCATE); return;
+    case kGas: strncpy_s(buf, cap, "gas", _TRUNCATE); return;
+    case kBrake: strncpy_s(buf, cap, "brake", _TRUNCATE); return;
     case kKeys: break;
     default: strncpy_s(buf, cap, "none", _TRUNCATE); return;
     }
@@ -157,21 +163,22 @@ struct Config {
     // job (the air mouse on the right grip). What a press sends is decided when it goes down (and released the same way).
     int   modBtn = kRGrip;
     Out   modMap[kBtnCount];
-    // one-controller driving (drive = 1): the left stick's x steers, the left trigger is the throttle -- analog values for the
-    // game's own input plugin door (scs_input.h), not keys. The left trigger's mapping and the left stick's directions are then
-    // not used (and a left stick mouse is off). driveBrake: the right trigger is the brake (its mapping not used).
-    bool  drive = true;
+    // driving -- analog values for the game's own input plugin door (scs_input.h), not keys. Steering: steerStick's x (its
+    // left / right directions are then not buttons, and a mouse on that stick is off); the wheel follows the stick at most
+    // steerSpeed full turns (centre -> full lock) per second, so a flick does not throw the wheel. Gas / brake: any button
+    // mapped to "gas" / "brake" (map or modMap), see kGas.
+    int   steerStick = 1;                              // 0 off, 1 left stick, 2 right stick
     float steerDeadzone = 0.10f;                       // stick, before steering starts
-    float steerCurve = 1.5f;                           // 1 = straight; more = finer near the centre
+    float steerCurve = 2.0f;                           // 1 = straight; more = finer near the centre
     float steerMax = 1.0f;                             // full stick = this much of the wheel (0.2 .. 1)
-    bool  driveBrake = false;
+    float steerSpeed = 2.0f;                           // centre -> full lock per second at most (0 = at once)
 };
 inline Config DefaultConfig() {
     Config c;
     // (the user's own mapping, made the default 2026-10-23: one controller does the mouse -- right stick or air mouse to point,
     //  A = left click; right grip (the air mouse) + A = left click, + B = right click, to drag the map with the grip held. The
     //  right trigger is free: none.)
-    ParseOut("wheel_up", &c.map[kLTrig]);
+    ParseOut("gas", &c.map[kLTrig]);                   // driving: left trigger = gas, left stick = steering (steerStick)
     ParseOut("mouse_left", &c.map[kA]);
     ParseOut("esc", &c.map[kB]);
     ParseOut("[", &c.map[kX]);                         // ETS2 / ATS default: left indicator
@@ -216,7 +223,8 @@ struct Sink {
     virtual ~Sink() {}
 };
 
-// driving: the stick's x (-1 left .. +1 right) as steering after the dead zone and curve; a trigger as a pedal (0 .. 1)
+// driving: the stick's x (-1 left .. +1 right) as the wanted steering after the dead zone and curve; a trigger as a pedal
+// (0 .. 1)
 inline float SteerOf(float x, const Config& c) {
     const float a = x < 0 ? -x : x;
     if (a <= c.steerDeadzone || c.steerDeadzone >= 1.0f) return 0.0f;
@@ -282,7 +290,7 @@ public:
             airOn_ = false;
         }
         // stick mouse
-        const int ms = c.drive && c.mouseStick == 1 ? 0 : c.mouseStick;   // (driving owns the left stick)
+        const int ms = c.steerStick == c.mouseStick ? 0 : c.mouseStick;   // (steering owns that stick)
         if (active && (ms == 1 || ms == 2) && f.hand[ms - 1] && dt > 0.0 && dt < 0.25) {
             const int h = ms - 1;
             const double x = f.sx[h], y = f.sy[h];
@@ -295,10 +303,26 @@ public:
                 accY_ -= y * sp;
             }
         }
-        // driving: sent only when a value changed (inactive = all 0)
+        // driving: sent only when a value changed (inactive = all 0, at once)
         float dv[3] = {};
-        if (active && c.drive && f.hand[0]) { dv[0] = SteerOf(f.sx[0], c); dv[1] = PedalOf(f.trig[0]); }
-        if (active && c.drive && c.driveBrake && f.hand[1]) dv[2] = PedalOf(f.trig[1]);
+        if (active) {
+            const int sh = c.steerStick - 1;
+            float st = sh == 0 || sh == 1 ? (f.hand[sh] ? SteerOf(f.sx[sh], c) : 0.0f) : 0.0f;
+            if (c.steerSpeed > 0.0f) {                 // the wheel turns toward the stick, not at once
+                const float step = c.steerSpeed * (float)(dt > 0.0 && dt < 0.25 ? dt : 0.011);
+                const float cur = drive_[0];
+                st = st > cur + step ? cur + step : st < cur - step ? cur - step : st;
+            }
+            dv[0] = st;
+            for (int b = 0; b < kBtnCount; ++b) {      // gas / brake: the most pressed button mapped to each
+                if (b == c.airBtn) continue;
+                const Out& o = modOn && b != c.modBtn && c.modMap[b].kind != kNone ? c.modMap[b] : c.map[b];
+                if (o.kind != kGas && o.kind != kBrake) continue;
+                const float v = Pressed(f, c, b);
+                float& d = dv[o.kind == kGas ? 1 : 2];
+                if (v > d) d = v;
+            }
+        }
         if (dv[0] != drive_[0] || dv[1] != drive_[1] || dv[2] != drive_[2]) {
             for (int i = 0; i < 3; ++i) drive_[i] = dv[i];
             s.Drive(dv[0], dv[1], dv[2]);
@@ -309,27 +333,50 @@ public:
     }
     bool Down(int b) const { return b >= 0 && b < kBtnCount && down_[b]; }
     bool AirOn() const { return airOn_; }
-    float Driving(int i) const { return i >= 0 && i < 3 ? drive_[i] : 0.0f; }   // the last steer / throttle / brake sent
+    float Driving(int i) const { return i >= 0 && i < 3 ? drive_[i] : 0.0f; }   // the last steer / gas / brake sent
 
 private:
     void Want(const Frame& f, const Config& c, bool* w) const {
         auto ana = [&](int b, float v) { w[b] = down_[b] ? v > kReleaseAt : v > kPressAt; };
         for (int h = 0; h < 2; ++h) {
             if (!f.hand[h]) continue;
-            if (!(c.drive && (h == 0 || c.driveBrake))) ana(h ? kRTrig : kLTrig, f.trig[h]);   // (driving: a pedal)
+            ana(h ? kRTrig : kLTrig, f.trig[h]);
             ana(h ? kRGrip : kLGrip, f.grip[h]);
             w[h ? kA : kX] = f.prim[h];
             w[h ? kB : kY] = f.sec[h];
             w[h ? kRStick : kLStick] = f.click[h];
             if (!h) w[kMenu] = f.menu[0];
-            if (c.mouseStick != h + 1 && !(h == 0 && c.drive)) {   // that stick is not the mouse (or steering): 4 buttons
+            if (c.mouseStick != h + 1) {               // that stick is not the mouse: its directions are buttons
                 const int u = h ? kRUp : kLUp;
                 ana(u + 0, f.sy[h]);
                 ana(u + 1, -f.sy[h]);
-                ana(u + 2, -f.sx[h]);
-                ana(u + 3, f.sx[h]);
+                if (c.steerStick != h + 1) {           // (left / right: not while that stick steers)
+                    ana(u + 2, -f.sx[h]);
+                    ana(u + 3, f.sx[h]);
+                }
             }
         }
+    }
+    // how far button b is pressed, 0 .. 1 (gas / brake): a trigger / grip as a pedal, a stick direction after the dead zone,
+    // any other button full; 0 for a stick direction that is not a button now (the mouse / the steering)
+    static float Pressed(const Frame& f, const Config& c, int b) {
+        const int h = HandOfBtn(b);
+        if (!f.hand[h]) return 0.0f;
+        switch (b) {
+        case kLTrig: case kRTrig: return PedalOf(f.trig[h]);
+        case kLGrip: case kRGrip: return PedalOf(f.grip[h]);
+        case kX: case kA: return f.prim[h] ? 1.0f : 0.0f;
+        case kY: case kB: return f.sec[h] ? 1.0f : 0.0f;
+        case kLStick: case kRStick: return f.click[h] ? 1.0f : 0.0f;
+        case kMenu: return f.menu[0] ? 1.0f : 0.0f;
+        default: break;
+        }
+        const int d = (b - kLUp) % 4;                  // up, down, left, right
+        if (c.mouseStick == h + 1 || (d >= 2 && c.steerStick == h + 1)) return 0.0f;
+        const float v = d == 0 ? f.sy[h] : d == 1 ? -f.sy[h] : d == 2 ? -f.sx[h] : f.sx[h];
+        if (v <= c.deadzone || c.deadzone >= 1.0f) return 0.0f;
+        const float k = ((v > 1.0f ? 1.0f : v) - c.deadzone) / (1.0f - c.deadzone);
+        return k > 1.0f ? 1.0f : k;
     }
     static void Send(const Out& o, bool down, Sink& s) {
         switch (o.kind) {

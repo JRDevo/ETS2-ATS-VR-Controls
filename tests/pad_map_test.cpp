@@ -6,6 +6,7 @@
 // Exit code 0 = every check passed.
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <vector>
 #include "pad_map.h"
@@ -45,7 +46,7 @@ static VrPad::Config OldDefaults() {
     VrPad::ParseOut("enter", &c.map[VrPad::kA]);
     c.mouseStick = 1;
     c.mouseSpeed = 900.0f;
-    c.drive = false;
+    c.steerStick = 0;
     c.modMap[VrPad::kA] = c.modMap[VrPad::kB] = VrPad::Out();
     VrPad::ParseOut("mouse_right", &c.modMap[VrPad::kRTrig]);
     return c;
@@ -245,11 +246,19 @@ int main() {
     }
     printf("(3) driving\n");
     {
-        Config c = DefaultConfig();                    // drive = 1: left stick x = steering, left trigger = throttle
-        CHECK(c.drive && !c.driveBrake, "driving on by default, no brake");
+        Config c = DefaultConfig();                    // left stick x = steering, left trigger = gas
+        c.steerSpeed = 0.0f;                           // (at once: the values below are exact)
+        CHECK(DefaultConfig().steerStick == 1 && DefaultConfig().map[kLTrig].kind == kGas && DefaultConfig().map[kRTrig].kind == kNone &&
+              DefaultConfig().steerSpeed == 2.0f && DefaultConfig().steerCurve == 2.0f, "defaults: left stick steers, left trigger = gas, no brake");
+        Out po;
+        CHECK(ParseOut("gas", &po) && po.kind == kGas && ParseOut("Throttle", &po) && po.kind == kGas && ParseOut("brake", &po) && po.kind == kBrake,
+              "gas / throttle / brake parse");
+        char ob[32];
+        OutToString(po, ob, sizeof(ob));
+        CHECK(!strcmp(ob, "brake"), "brake written back (%s)", ob);
         CHECK(SteerOf(0.05f, c) == 0.0f && SteerOf(-0.1f, c) == 0.0f, "steering dead zone");
         CHECK(std::fabs(SteerOf(1.0f, c) - 1.0f) < 1e-5f && std::fabs(SteerOf(-1.0f, c) + 1.0f) < 1e-5f, "full stick = full wheel");
-        CHECK(std::fabs(SteerOf(0.55f, c) - std::pow(0.5f, 1.5f)) < 1e-4f, "half way after the dead zone: 0.5^1.5 (%.4f)", (double)SteerOf(0.55f, c));
+        CHECK(std::fabs(SteerOf(0.55f, c) - 0.25f) < 1e-4f, "half way after the dead zone: 0.5^2 (%.4f)", (double)SteerOf(0.55f, c));
         CHECK(SteerOf(1.4f, c) == 1.0f, "a diagonal over 1 is capped");
         Config m = c; m.steerMax = 0.5f; m.steerCurve = 1.0f;
         CHECK(std::fabs(SteerOf(-1.0f, m) + 0.5f) < 1e-5f && std::fabs(SteerOf(0.55f, m) - 0.25f) < 1e-4f, "steer_max / curve 1");
@@ -258,40 +267,80 @@ int main() {
         f.hand[0] = f.hand[1] = true;
         mp.Step(f, true, 0.011, c, r);
         CHECK(r.drives == 0, "nothing sent while nothing moves");
-        f.sx[0] = 1.0f; f.sy[0] = 1.0f; f.trig[0] = 1.0f;
+        f.sx[0] = 1.0f; f.trig[0] = 1.0f;
         mp.Step(f, true, 0.011, c, r);
-        CHECK(r.drives == 1 && r.drv[0] == 1.0f && r.drv[1] == 1.0f && r.drv[2] == 0.0f, "full right + full throttle");
-        CHECK(r.Take().empty() && r.mx == 0 && r.my == 0, "no wheel_up from the left trigger, no up key, no mouse from the left stick");
+        CHECK(r.drives == 1 && r.drv[0] == 1.0f && r.drv[1] == 1.0f && r.drv[2] == 0.0f, "full right + full gas");
+        CHECK(r.Take().empty() && r.mx == 0 && r.my == 0, "no key from the gas trigger or the steering stick, no mouse");
         mp.Step(f, true, 0.011, c, r);
         CHECK(r.drives == 1, "the same values are not sent again");
         f.sx[0] = 0.0f; f.trig[0] = 0.0f;
         mp.Step(f, true, 0.011, c, r);
-        CHECK(r.drives == 2 && r.drv[0] == 0.0f && r.drv[1] == 0.0f, "stick let go = straight, trigger let go = coast");
-        f.trig[1] = 1.0f;
+        CHECK(r.drives == 2 && r.drv[0] == 0.0f && r.drv[1] == 0.0f, "stick let go = straight, trigger let go = roll");
+        f.sy[0] = 1.0f;                                // the steering stick's up / down are still buttons
+        ParseOut("x", &c.map[kLUp]);
         mp.Step(f, true, 0.011, c, r);
-        CHECK(r.drives == 2 && r.Take().empty(), "right trigger: no brake (drive_brake = 0), its mapping (none)");
-        f.trig[1] = 0.0f; mp.Step(f, true, 0.011, c, r);
-        Config b = c; b.driveBrake = true;
-        ParseOut("mouse_left", &b.map[kRTrig]);
-        f.trig[1] = 1.0f;
+        f.sy[0] = 0.0f; mp.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "k02dv k02d^", "steering stick up = its key (X)");
+        Config b = c;                                  // brake on the left grip, gas also on the left stick up (analog)
+        ParseOut("brake", &b.map[kLGrip]);
+        ParseOut("gas", &b.map[kLUp]);
+        f.grip[0] = 0.525f;
         mp.Step(f, true, 0.011, b, r);
-        CHECK(r.drives == 3 && r.drv[2] == 1.0f && r.Take().empty(), "drive_brake: right trigger = brake, its mapping not sent");
+        CHECK(std::fabs(r.drv[2] - 0.5f) < 1e-4f && r.Take().empty(), "left grip = brake, half pressed: 0.5, no key");
+        f.grip[0] = 0.0f; f.sy[0] = 0.575f;            // (stick dead zone 0.15: (0.575 - 0.15) / 0.85 = 0.5)
+        mp.Step(f, true, 0.011, b, r);
+        CHECK(std::fabs(r.drv[1] - 0.5f) < 1e-4f && r.drv[2] == 0.0f, "left stick up = gas, analog (%.3f)", (double)r.drv[1]);
+        f.sy[0] = 0.0f; f.trig[0] = 0.3f; f.prim[0] = true;
+        ParseOut("gas", &b.map[kX]);
+        mp.Step(f, true, 0.011, b, r);
+        CHECK(r.drv[1] == 1.0f && r.Take().empty(), "two gas buttons: the most pressed one (X = full)");
+        f.prim[0] = false; f.trig[0] = 0.0f; mp.Step(f, true, 0.011, b, r);
+        Config md = c;                                 // with the modifier: right grip + right trigger = brake
+        ParseOut("brake", &md.modMap[kRTrig]);
+        ParseOut("mouse_left", &md.map[kRTrig]);
+        f.trig[1] = 0.4f;                              // (not pressed as a button yet: the modifier decides already)
+        mp.Step(f, true, 0.011, md, r);
+        CHECK(r.drv[2] == 0.0f && r.Take().empty(), "without the modifier the trigger is a click (not pressed yet)");
+        f.grip[1] = 1.0f;
+        mp.Step(f, true, 0.011, md, r);
+        CHECK(r.drv[2] > 0.3f && r.Take().empty(), "right grip + right trigger = brake (%.3f)", (double)r.drv[2]);
+        f.grip[1] = 0.0f; f.trig[1] = 0.0f;
         f.sx[0] = -0.7f; f.trig[0] = 0.6f;
-        mp.Step(f, true, 0.011, b, r);
-        mp.Step(f, false, 0.011, b, r);
+        mp.Step(f, true, 0.011, c, r);
+        mp.Step(f, false, 0.011, c, r);
         CHECK(r.drv[0] == 0.0f && r.drv[1] == 0.0f && r.drv[2] == 0.0f, "inactive (game not in front): all 0");
-        Config off = c; off.drive = false;             // off: the left trigger is a button again, nothing driven
+        Config off = c; off.steerStick = 0; ParseOut("wheel_up", &off.map[kLTrig]);
         Mapper mo; Rec ro; Frame g;
         g.hand[0] = g.hand[1] = true;
         g.trig[0] = 1.0f; g.sx[0] = 1.0f;
         mo.Step(g, true, 0.011, off, ro);
-        CHECK(ro.drives == 0 && ro.Take() == "w+1", "drive = 0: left trigger = wheel up again, no driving");
-        Config ml = c; ml.mouseStick = 1;              // a left stick mouse: driving owns the stick
+        CHECK(ro.drives == 0 && ro.Take() == "w+1", "steer = off, left trigger = wheel up: no driving at all");
+        Config ml = c; ml.mouseStick = 1;              // the mouse on the steering stick: steering wins
         Mapper mm; Rec rm; Frame h;
         h.hand[0] = true; h.sx[0] = 1.0f;
         mm.Step(h, true, 0.011, ml, rm);
         mm.Step(h, true, 0.011, ml, rm);
-        CHECK(rm.mx == 0 && rm.drv[0] == 1.0f, "mouse_stick = left + drive: the stick steers, no mouse");
+        CHECK(rm.mx == 0 && rm.drv[0] == 1.0f, "mouse_stick = steer stick: it steers, no mouse");
+        Config rs = c; rs.steerStick = 2;              // the right stick steers (the mouse moves to nothing on it)
+        Mapper mr; Rec rr; Frame k;
+        k.hand[0] = k.hand[1] = true; k.sx[1] = -1.0f;
+        mr.Step(k, true, 0.011, rs, rr);
+        CHECK(rr.drv[0] == -1.0f && rr.mx == 0 && rr.Take().empty(), "steer = right: the right stick steers");
+    }
+    {   // steering speed: the wheel follows the stick at most steerSpeed full turns per second
+        Config c = DefaultConfig();
+        c.steerSpeed = 2.0f; c.steerCurve = 1.0f; c.steerDeadzone = 0.0f;
+        Mapper mp; Rec r; Frame f;
+        f.hand[0] = true; f.sx[0] = 1.0f;
+        mp.Step(f, true, 0.1, c, r);
+        CHECK(std::fabs(r.drv[0] - 0.2f) < 1e-4f, "0.1 s after a flick: 0.2 of the wheel (%.3f)", (double)r.drv[0]);
+        for (int i = 0; i < 4; ++i) mp.Step(f, true, 0.1, c, r);
+        CHECK(r.drv[0] == 1.0f, "0.5 s: full");
+        f.sx[0] = 0.0f;
+        mp.Step(f, true, 0.1, c, r);
+        CHECK(std::fabs(r.drv[0] - 0.8f) < 1e-4f, "let go: back toward the middle at the same speed (%.3f)", (double)r.drv[0]);
+        mp.Step(f, false, 0.1, c, r);
+        CHECK(r.drv[0] == 0.0f, "inactive: 0 at once");
     }
     printf("%d checks, %d failed\n", g_checks, g_fails);
     return g_fails ? 1 : 0;

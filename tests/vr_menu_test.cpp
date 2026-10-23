@@ -333,20 +333,29 @@ int main(int argc, char** argv) {
         const uint32_t px0 = m.FullPicture(VrMenu::kPanMenu)[(size_t)400 * 1000 + 10];
         CHECK((px0 >> 24) == 179, "the picture is 70 %% solid (alpha %u)", px0 >> 24);
     }
-    // Driving tab: off / on, the curve one step up, full stick 90 %, the right trigger as the brake (and back)
+    // Driving tab: the steering stick right / off / left, the curve one step up, full stick 90 %, the speed one step slower
     {
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 4), "Driving tab");
-        CHECK(m.Pad().drive, "driving on by default");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 131) && !m.Pad().drive, "driving off");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 130) && m.Pad().drive, "driving on again");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 135) && std::fabs(m.Pad().steerCurve - 1.75f) < 0.01f, "curve 1.5 -> 1.75");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 136) && std::fabs(m.Pad().steerMax - 0.9f) < 0.01f, "full stick 100 -> 90 %%");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 138) && m.Pad().driveBrake, "right trigger = brake");
-        click(1, VrMenu::kPanMenu, VrMenu::eSet, 139);
-        click(1, VrMenu::kPanMenu, VrMenu::eSet, 134);
-        click(1, VrMenu::kPanMenu, VrMenu::eSet, 137);
-        CHECK(!m.Pad().driveBrake && std::fabs(m.Pad().steerCurve - 1.5f) < 0.01f && std::fabs(m.Pad().steerMax - 1.0f) < 0.01f,
-              "driving settings back");
+        CHECK(m.Pad().steerStick == 1, "the left stick steers by default");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 131) && m.Pad().steerStick == 2, "steer: right");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 132) && m.Pad().steerStick == 0, "steer: off");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 130) && m.Pad().steerStick == 1, "steer: left again");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 136) && std::fabs(m.Pad().steerCurve - 2.25f) < 0.01f, "curve 2 -> 2.25");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 137) && std::fabs(m.Pad().steerMax - 0.9f) < 0.01f, "full stick 100 -> 90 %%");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 139) && m.Pad().steerSpeed == 1.5f, "speed 2 -> 1.5 (slower)");
+        for (int i = 0; i < 4; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 140);
+        CHECK(m.Pad().steerSpeed == 0.0f, "fastest step: at once (%.2f)", (double)m.Pad().steerSpeed);
+        for (int i = 0; i < 3; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 139);
+        click(1, VrMenu::kPanMenu, VrMenu::eSet, 135);
+        click(1, VrMenu::kPanMenu, VrMenu::eSet, 138);
+        CHECK(m.Pad().steerSpeed == 2.0f && std::fabs(m.Pad().steerCurve - 2.0f) < 0.01f && std::fabs(m.Pad().steerMax - 1.0f) < 0.01f,
+              "driving settings back (speed %.2f)", (double)m.Pad().steerSpeed);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 0) && click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kLGrip) &&
+              click(1, VrMenu::kPanMenu, VrMenu::ePickOut, VrPad::kBrake) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kBrake,
+              "Buttons tab: left grip = Brake (picked from the bar)");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kLGrip) &&
+              click(1, VrMenu::kPanMenu, VrMenu::ePickOut, VrPad::kNone) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kNone,
+              "left grip = none again");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 3), "Look tab again");
     }
     WriteBmp(dir + L"\\menu.bmp", m, VrMenu::kPanMenu);

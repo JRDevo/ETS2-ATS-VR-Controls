@@ -16,7 +16,7 @@
       vive       Vive wands: the game's right menu = our B, left to the game with a warning
       unfocus    the session leaves FOCUSED while the trigger is held: released at once, pressed again after
       restore    the runtime refuses our bindings merged into the game's Touch suggestion: the game's own is put back
-      drive      one-controller driving: the fake game first loads the layer's DLL as the game's input plugin (--scs, like
+      drive      driving: the fake game first loads the layer's DLL as the game's input plugin (--scs, like
                  ETS2 / ATS), the left stick steers and the left trigger is the throttle -- the game gets the analog values from
                  the plugin device (one module for both sides), the left trigger / stick send no keys or mouse
       menu       a D3D11 game with VR EyeCapture's set (both stick clicks, shared): both grips + the left stick click held 1 s open the VR menu (quad layers on D3D11 swapchains), the right hand
@@ -82,7 +82,7 @@ function RunCase($name, $apps, $gameArgs, $seconds, [hashtable]$extraEnv, [strin
     New-Item -ItemType Directory -Force $d | Out-Null
     $cfg = Join-Path $d 'config.ini'
     # (the mapping these checks were written for: the defaults before 2026-10-23)
-    $old = "rtrigger = mouse_left`nltrigger = mouse_right`na = enter`nmouse_stick = left`nmouse_speed = 900`nmodifier_keys = rtrigger:mouse_right`ndrive = 0`n"
+    $old = "rtrigger = mouse_left`nltrigger = mouse_right`na = enter`nmouse_stick = left`nmouse_speed = 900`nmodifier_keys = rtrigger:mouse_right`nsteer = off`n"
     "apps = $apps`nb = shift+f`nlog = 1`nlog_inputs = 1`n$old$cfgExtra" | Set-Content -Encoding ASCII $cfg
     $env:VRC_CONFIG = $cfg
     $env:VRC_LOG_DIR = Join-Path $d 'logs'
@@ -302,16 +302,19 @@ if (-not $Only -or $Only -eq 'noinput') {
 }
 # ---- drive
 if (-not $Only -or $Only -eq 'drive') {
-    # left stick 0.55 right 1.0-1.5 (0.5 after the dead zone: 0.5^1.5 = 0.354), full left 1.6-2.0; left trigger 0.525 (half)
-    # 2.2-2.6; right trigger 2.8-3.0 (drive_brake = 0: its own mapping, a left click)
+    # left stick 0.55 right 1.0-1.5 (0.5 after the dead zone: 0.5^2 = 0.25), full left 1.6-2.0; left trigger (gas) 0.525 (half)
+    # 2.2-2.6; right trigger 2.8-3.0 (its own mapping, a left click); left grip (brake) 0.62 3.0-3.2 (0.6). steer_speed = 0:
+    # exact values (the speed: pad_map_test)
     $s = '1.0-1.5:/user/hand/left/input/thumbstick=0.55,0;1.6-2.0:/user/hand/left/input/thumbstick=-1,0;' +
-         '2.2-2.6:/user/hand/left/input/trigger/value=0.525;2.8-3.0:/user/hand/right/input/trigger/value=0.9'
+         '2.2-2.6:/user/hand/left/input/trigger/value=0.525;2.8-3.0:/user/hand/right/input/trigger/value=0.9;' +
+         '3.0-3.2:/user/hand/left/input/squeeze/value=0.62'
     $dll = Join-Path $layerDir 'ets2_ats_vr_controls.dll'
-    $r = RunCase 'drive' 'fake_game.exe' @('--scs', "`"$dll`"") 3.5 @{ VRC_MOCK_INPUT = $s } "drive = 1`nmouse_stick = right`n"
+    $r = RunCase 'drive' 'fake_game.exe' @('--scs', "`"$dll`"") 3.5 @{ VRC_MOCK_INPUT = $s } "steer = left`nsteer_speed = 0`nmouse_stick = right`nltrigger = gas`nlgrip = brake`n"
     $b = Buttons @($r.events | Where-Object { $_ -notmatch '^drive ' })
     Write-Host "  events: $b"
-    Check 'drive' ((@($r.events | Where-Object { $_ -match '^drive ' }) -join ' | ') -eq ('drive 0.354 0.000 0.000 | drive 0.000 0.000 0.000 | ' +
-          'drive -1.000 0.000 0.000 | drive 0.000 0.000 0.000 | drive 0.000 0.500 0.000 | drive 0.000 0.000 0.000')) 'the layer sent each change once'
+    Check 'drive' ((@($r.events | Where-Object { $_ -match '^drive ' }) -join ' | ') -eq ('drive 0.250 0.000 0.000 | drive 0.000 0.000 0.000 | ' +
+          'drive -1.000 0.000 0.000 | drive 0.000 0.000 0.000 | drive 0.000 0.500 0.000 | drive 0.000 0.000 0.000 | ' +
+          'drive 0.000 0.000 0.600 | drive 0.000 0.000 0.000')) 'the layer sent each change once'
     $scs =@($r.game -split "`r?`n" | Where-Object { $_ -match '^scs (steering|aforward|abackward) ' } | ForEach-Object { ($_ -replace ' at .*$', '') })
     Write-Host "  game got: $($scs -join ' | ')"
     Check 'drive' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
@@ -320,11 +323,11 @@ if (-not $Only -or $Only -eq 'drive') {
     Check 'drive' ($r.game -match 'scs same module: yes') 'the OpenXR loader got the same module (shared values)'
     $j = $scs -join ' | '
     Check 'drive' ($j -match '^scs steering 0\.000 \| scs aforward 0\.000 \| scs abackward 0\.000') 'all three told at the first frame'
-    Check 'drive' ($j -match 'scs steering 0\.354 \| scs steering 0\.000 \| scs steering -1\.000 \| scs steering 0\.000') 'steering: 0.354, straight, full left, straight'
-    Check 'drive' ($j -match 'scs aforward 0\.500 \| scs aforward 0\.000') 'throttle half, then 0 (coast)'
-    Check 'drive' ($j -notmatch 'abackward [^0]') 'no brake (drive_brake = 0)'
+    Check 'drive' ($j -match 'scs steering 0\.250 \| scs steering 0\.000 \| scs steering -1\.000 \| scs steering 0\.000') 'steering: 0.25, straight, full left, straight'
+    Check 'drive' ($j -match 'scs aforward 0\.500 \| scs aforward 0\.000') 'gas (left trigger) half, then 0 (roll)'
+    Check 'drive' ($j -match 'scs abackward 0\.600 \| scs abackward 0\.000') 'brake (left grip) 0.6, then 0'
     Check 'drive' (@($r.events | Where-Object { $_ -match '^move ' }).Count -eq 0) 'the left stick moved no mouse'
-    Check 'drive' ($b -eq 'mouse 0 down | mouse 0 up') "only the right trigger's click; no key / button from the left trigger or stick ($b)"
+    Check 'drive' ($b -eq 'mouse 0 down | mouse 0 up') "only the right trigger's click; no key / button from the gas trigger, brake grip or stick ($b)"
     Check 'drive' ($r.log -match 'driving: input device registered in Fake Truck Simulator') 'log: device registered'
     Check 'drive' ($r.log -match 'mapping: .*driving: left stick steers') 'log: driving in the mapping line'
     Check 'drive' ($r.log -notmatch '\] E ') 'log: no errors'

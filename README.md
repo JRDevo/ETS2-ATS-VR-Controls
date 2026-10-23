@@ -45,8 +45,8 @@ Only one OpenXR runtime is active at a time; the last one you set wins.
 - **Modifier**: while you hold the modifier button (right grip), buttons can send something else. Default: **right grip +
   A = left click, right grip + B = right click** -- so one controller does everything: hold the grip (the pointer follows),
   press A to click, hold B to right-click (drag the map). Set any button's modified key in the VR menu.
-- **Driving with one controller** (the left one): the left stick steers, the left trigger is the gas pedal. Smooth, like a
-  gamepad, not on / off keys. See [Driving](#driving-with-one-controller).
+- **Driving with one controller** (the left one by default): the left stick steers, the left trigger is the gas pedal.
+  Smooth, like a gamepad, not on / off keys. Gas and brake can go on any button. See [Driving](#driving-with-one-controller).
 - **VR menu + keyboard**: hold both grips + the left stick click for 1 second. A menu opens in front of you. See [The VR menu](#the-vr-menu).
 - The game's own VR controls (the trigger and the left menu button) still work.
 - It only works in the games named in `config.ini`. In every other VR program it does nothing.
@@ -93,27 +93,43 @@ function to a controller button instead (for example `y = l` for the lights).
 
 ## Driving with one controller
 
-The **left controller drives** the truck:
+By default the **left controller drives** the truck:
 
 | Left controller | Does |
 |---|---|
 | Stick left / right | steering wheel. Let go: the wheel goes straight again. |
 | Trigger | gas pedal. Press a little = a little gas. Let go = the truck rolls (no gas). |
-| Right trigger (off by default) | brake, if you switch it on (`drive_brake = 1`, or the Driving tab). |
+
+**You choose what drives.** Gas and brake are normal button choices, like a key:
+
+- In the VR menu: Buttons tab, point at a button, then pick **Gas** or **Brake** in the bar at the bottom. Also with the
+  modifier ("With modifier": for example right grip + right trigger = brake).
+- In `config.ini`: `rtrigger = brake`, `lgrip = brake`, `lup = gas` (stick forward), `modifier_keys = rtrigger:brake` ...
+- Triggers and grips are analog (press harder = more). A stick direction too. Any other button (A, B, X, Y, stick click)
+  is full gas / full brake.
+- The steering stick: left, right or off (Driving tab, or `steer = left / right / off`). That stick's left / right then
+  steer; its up / down are still free buttons (for example gas and brake).
+
+**Steering feel** (Driving tab, or `config.ini`):
+
+| Setting | What it does | Default |
+|---|---|---|
+| Steering dead zone (`steer_deadzone`) | how far the stick must move before the wheel turns | 0.10 |
+| Steering curve (`steer_curve`) | 1 = straight. More = small stick moves turn the wheel only a little; full lock only at the end | 2.00 |
+| Full stick turns the wheel (`steer_max`) | how much of the wheel full stick turns | 100 % |
+| Steering speed (`steer_speed`) | how fast the wheel follows the stick. 2 = half a second from the middle to full lock. Less = calmer. 0 = at once (twitchy) | 2.00 |
+
+Too twitchy? Make the curve bigger, or the steering speed slower.
 
 It is smooth, like a gamepad: not on / off keys. How: ETS2 and ATS have their own door for input add-ons (the SCS input
-SDK). This mod is also such an add-on, so the game gets the stick and the trigger directly. **No driver**, no fake gamepad,
+SDK). This mod is also such an add-on, so the game gets the stick and the triggers directly. **No driver**, no fake gamepad,
 no file in the game folder, and **nothing to set in the game's options** (it works next to your wheel, keyboard or gamepad
 settings). `install.ps1` tells the game where the mod is (see [What install.ps1 does](#what-installps1-does-and-why-there-is-one)).
 
-- Settings (Driving tab in the VR menu, or `config.ini`): on / off (`drive`), the stick's dead zone (`steer_deadzone`),
-  the **curve** (`steer_curve`: more = finer steering near the middle), how far full stick turns the wheel (`steer_max`),
-  right trigger = brake (`drive_brake`).
-- While driving is on, the left trigger and the left stick send no keys (their key settings wait until you switch it off).
-- The game may show a short note at start that an SDK add-on is in use. That is this mod. Click OK. (It may show on the
-  flat monitor, not in the headset.)
-- `drive = 0` switches driving off, but the game still loads the add-on (so the VR menu can switch it on again at once).
-  To remove it completely, run `uninstall.ps1`.
+- **The game shows a note at every start** that SDK add-ons are in use. That is this mod. Click OK. (It shows on the flat
+  monitor, not in the headset.) SCS shows it for every add-on that uses their SDK; as far as we know, a mod cannot hide it.
+- `steer = off` and no gas / brake buttons: nothing drives, but the game still loads the add-on (so the VR menu can change
+  it at once). To remove it completely, run `uninstall.ps1`.
 - It works in every OpenXR mode and headset (Virtual Desktop, Link, SteamVR, Windows MR): the driving part does not depend
   on the headset at all.
 
@@ -150,8 +166,8 @@ a laser pointer. A **white dot** appears where you point, and the key under it l
 - **Mouse** tab: which stick moves the mouse, its speed and dead zone, the air mouse button, hold or toggle, its speed.
 - **Panels** tab: menu size, keyboard size, show / hide the keyboard, bring both in front of you.
 - **Panels** tab also: the distance of each panel (Closer / Farther).
-- **Driving** tab: driving with the left controller on / off, the steering dead zone, curve and how far full stick turns
-  the wheel, right trigger = brake. See [Driving](#driving-with-one-controller).
+- **Driving** tab: the stick that steers (left / right / off), the steering dead zone, curve, how far full stick turns
+  the wheel and the steering speed. Gas and brake: any button, Buttons tab. See [Driving](#driving-with-one-controller).
 - **Look** tab: colours (Dark, Blue, Grey, Light, Black, Green), how see-through the menu and the keyboard are, and
   **pointer smoothing** (Off / Low / Medium / High): calms a shaky hand, for the menu pointer and the air mouse.
 - **Keyboard** (button at the top of the menu): a full keyboard with F-keys, arrows and number pad. A key goes down when
@@ -250,7 +266,7 @@ in Notepad (the VR menu's changes work at once).
 
 Button names: `ltrigger rtrigger lgrip rgrip x y a b lstick rstick menu lup ldown lleft lright rup rdown rleft rright`.
 Values: a key (`h`, `f1`, `space`, `[`), up to 3 keys with `+` (`shift+f`), `mouse_left`, `mouse_right`, `mouse_middle`,
-`wheel_up`, `wheel_down` or `none`.
+`wheel_up`, `wheel_down`, `gas`, `brake` (driving) or `none`.
 
 ## Problems
 

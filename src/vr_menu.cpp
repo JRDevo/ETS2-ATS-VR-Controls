@@ -631,10 +631,9 @@ void VrMenu::Close() {
     LOGI("VR menu closed");
 }
 
-// driving (pad_map.h Config::drive) takes these buttons: the left trigger, the left stick's directions, the right trigger
-// as the brake
+// steering (pad_map.h Config::steerStick) takes that stick's left / right directions
 static bool DrivingUses(const VrPad::Config& p, int btn) {
-    return p.drive && (btn == VrPad::kLTrig || (btn >= VrPad::kLUp && btn <= VrPad::kLRight) || (btn == VrPad::kRTrig && p.driveBrake));
+    return btn >= VrPad::kLUp && (btn - VrPad::kLUp) % 4 >= 2 && p.steerStick == (btn >= VrPad::kRUp ? 2 : 1);
 }
 
 void VrMenu::Layout(int p) { if (p == kPanMenu) LayoutMenu(); else LayoutKb(); }
@@ -675,9 +674,8 @@ void VrMenu::LayoutMenu() {
                 bool dim = false;
                 if (layer_ && btn == pad_.modBtn) { val = "the modifier"; dim = true; }
                 else if (btn == pad_.airBtn) { val = "air mouse"; dim = true; }
-                else if (DrivingUses(pad_, btn)) { val = btn == VrPad::kLTrig ? "gas (driving)" : btn == VrPad::kRTrig ? "brake (driving)"
-                                                                                                    : "steers (driving)"; dim = true; }
                 else if (btn >= VrPad::kLUp && pad_.mouseStick == (btn >= VrPad::kRUp ? 2 : 1)) { val = "moves the mouse"; dim = true; }
+                else if (DrivingUses(pad_, btn)) { val = "steers"; dim = true; }
                 else if (layer_ && (pad_.modBtn < 0 || pad_.modMap[btn].kind == VrPad::kNone)) { val = "as normal"; dim = true; }
                 bool combo = false;
                 for (int cb : gate_.btns) combo = combo || cb == btn;
@@ -685,9 +683,10 @@ void VrMenu::LayoutMenu() {
                     combo && !layer_ ? val + "  (+menu)" : val);
             }
         if (picking) {
-            static const int kOuts[6] = { VrPad::kMouseL, VrPad::kMouseR, VrPad::kMouseM, VrPad::kWheelUp, VrPad::kWheelDown, VrPad::kNone };
-            static const char* const kOutNames[6] = { "Mouse L", "Mouse R", "Mouse M", "Wheel up", "Wheel dn", "None" };
-            for (int i = 0; i < 6; ++i) add(ePickOut, kOuts[i], 24 + i * 138, 716, 130, 64, kOutNames[i]);
+            static const int kOuts[8] = { VrPad::kMouseL, VrPad::kMouseR, VrPad::kMouseM, VrPad::kWheelUp, VrPad::kWheelDown,
+                                          VrPad::kGas, VrPad::kBrake, VrPad::kNone };
+            static const char* const kOutNames[8] = { "Mouse L", "Mouse R", "Mouse M", "Wheel up", "Wheel dn", "Gas", "Brake", "None" };
+            for (int i = 0; i < 8; ++i) add(ePickOut, kOuts[i], 24 + i * 103, 716, 97, 64, kOutNames[i]);
             add(ePickCancel, 0, 852, 716, 124, 64, "Cancel");
         } else {
             add(eInfo, 0, 24, 716, 952, 64, !status_.empty() ? status_
@@ -775,32 +774,35 @@ void VrMenu::LayoutMenu() {
         for (int i = 0; i < 4; ++i) add(eSet, 110 + i, 470 + i * 129, 514, 119, 70, kSm[i], look_.smoothing == i);
         add(eInfo, 302, 24, 596, 952, 56, "Smoothing calms a shaky hand (menu pointer and air mouse).");
         add(eInfo, 0, 24, 716, 952, 64, status_.empty() ? "- = more see-through, + = more solid." : status_);
-    } else {                                            // Driving: the left controller drives (scs_input.h)
+    } else {                                            // Driving (scs_input.h): steering here, gas / brake on any button
         auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 162 + r * 88, 440, 70, label); };
-        auto onOff = [&](int r, int base, bool on) {
-            add(eSet, base, 470, 162 + r * 88, 248, 70, "On", on);
-            add(eSet, base + 1, 728, 162 + r * 88, 248, 70, "Off", !on);
+        auto opts = [&](int r, int base, std::initializer_list<const char*> names, int cur) {
+            const int n = (int)names.size(), w = (506 - (n - 1) * 10) / n;
+            int i = 0;
+            for (const char* nm : names) { add(eSet, base + i, 470 + i * (w + 10), 162 + r * 88, w, 70, nm, i == cur); ++i; }
         };
         auto plusMinus = [&](int r, int base, const std::string& value) {
             add(eSet, base, 470, 162 + r * 88, 90, 70, "\xE2\x88\x92");
             add(eInfo, 200 + r, 570, 162 + r * 88, 306, 70, value);
             add(eSet, base + 1, 886, 162 + r * 88, 90, 70, "+");
         };
-        row(0, "Drive with the left controller");
-        onOff(0, 130, pad_.drive);
+        row(0, "Stick that steers");
+        opts(0, 130, { "Left", "Right", "Off" }, pad_.steerStick == 1 ? 0 : pad_.steerStick == 2 ? 1 : 2);
         row(1, "Steering dead zone");
         snprintf(b, sizeof(b), "%.2f", (double)pad_.steerDeadzone);
-        plusMinus(1, 132, b);
+        plusMinus(1, 133, b);
         row(2, "Steering curve");
         snprintf(b, sizeof(b), pad_.steerCurve < 1.01f ? "%.2f (straight)" : "%.2f", (double)pad_.steerCurve);
-        plusMinus(2, 134, b);
+        plusMinus(2, 135, b);
         row(3, "Full stick turns the wheel");
         snprintf(b, sizeof(b), "%d %%", (int)(pad_.steerMax * 100.0f + 0.5f));
-        plusMinus(3, 136, b);
-        row(4, "Right trigger = brake");
-        onOff(4, 138, pad_.driveBrake);
-        add(eInfo, 303, 24, 600, 952, 46, "Left stick left / right = steering. Left trigger = gas (let go = roll).");
-        add(eInfo, 304, 24, 646, 952, 46, "Curve: more = finer steering near the middle.");
+        plusMinus(3, 137, b);
+        row(4, "Steering speed");
+        if (pad_.steerSpeed <= 0.0f) snprintf(b, sizeof(b), "at once");
+        else snprintf(b, sizeof(b), "%.2g s to full", 1.0 / (double)pad_.steerSpeed);
+        plusMinus(4, 139, b);
+        add(eInfo, 303, 24, 600, 952, 46, "Gas / brake: any button, Buttons tab (pick Gas or Brake).");
+        add(eInfo, 304, 24, 646, 952, 46, "Curve: more = finer near the middle. Speed: slower = calmer wheel.");
         add(eInfo, 0, 24, 716, 952, 64, status_.empty() ? "Changes work at once and are saved." : status_);
     }
 }
@@ -1083,23 +1085,31 @@ void VrMenu::SetValue(int arg) {
         if (pad_.airBtn >= 0) pad_.airHand = VrPad::HandOfBtn(pad_.airBtn);
         break;
     case 40: case 41: pad_.airToggle = arg == 41; break;
-    case 130: case 131: pad_.drive = arg == 130; break;
-    case 132: case 133: {
-        const float d = pad_.steerDeadzone + (arg == 133 ? 0.05f : -0.05f);
+    case 130: case 131: case 132: pad_.steerStick = arg == 130 ? 1 : arg == 131 ? 2 : 0; break;
+    case 133: case 134: {
+        const float d = pad_.steerDeadzone + (arg == 134 ? 0.05f : -0.05f);
         pad_.steerDeadzone = d < 0.0f ? 0.0f : d > 0.5f ? 0.5f : (float)(int)(d * 20.0f + 0.5f) / 20.0f;
         break;
     }
-    case 134: case 135: {
-        const float k = pad_.steerCurve + (arg == 135 ? 0.25f : -0.25f);
+    case 135: case 136: {
+        const float k = pad_.steerCurve + (arg == 136 ? 0.25f : -0.25f);
         pad_.steerCurve = k < 1.0f ? 1.0f : k > 3.0f ? 3.0f : k;
         break;
     }
-    case 136: case 137: {
-        const float m = pad_.steerMax + (arg == 137 ? 0.1f : -0.1f);
+    case 137: case 138: {
+        const float m = pad_.steerMax + (arg == 138 ? 0.1f : -0.1f);
         pad_.steerMax = m < 0.2f ? 0.2f : m > 1.0f ? 1.0f : (float)(int)(m * 10.0f + 0.5f) / 10.0f;
         break;
     }
-    case 138: case 139: pad_.driveBrake = arg == 138; break;
+    case 139: case 140: {                              // speed: seconds centre -> full lock in steps (0 = at once at the top)
+        static const float kSpeeds[8] = { 0.5f, 0.75f, 1.0f, 1.5f, 2.0f, 3.0f, 5.0f, 0.0f };
+        int i = 0;
+        while (i < 7 && kSpeeds[i] != pad_.steerSpeed && !(pad_.steerSpeed > 0.0f && kSpeeds[i] > pad_.steerSpeed)) ++i;
+        if (pad_.steerSpeed <= 0.0f) i = 7;
+        i += arg == 140 ? 1 : -1;
+        pad_.steerSpeed = kSpeeds[i < 0 ? 0 : i > 7 ? 7 : i];
+        break;
+    }
     case 50: case 51: mul(pad_.airGain, arg == 51, 1.0f, 500.0f); break;
     case 62: case 63: Push(kPanMenu, arg == 63 ? 0.05 : -0.05); return;
     case 72: case 73: if (pan_[kPanKb].show) Push(kPanKb, arg == 73 ? 0.05 : -0.05); return;
@@ -1171,11 +1181,11 @@ void VrMenu::Activate(int h, const Ref& r, const VrPad::Frame&, VrPad::Sink& sin
         if (layer_ && pad_.modBtn < 0) { status_ = "Choose a modifier button first (the button above)."; break; }
         if (layer_ && r.arg == pad_.modBtn) { status_ = std::string(BtnLabel(r.arg)) + " is the modifier."; break; }
         if (r.arg == pad_.airBtn) { status_ = std::string(BtnLabel(r.arg)) + " is the air mouse button (Mouse tab)."; break; }
-        if (DrivingUses(pad_, r.arg)) { status_ = "Driving uses it (Driving tab)."; break; }
         if (r.arg >= VrPad::kLUp && pad_.mouseStick == (r.arg >= VrPad::kRUp ? 2 : 1)) {
             status_ = "That stick moves the mouse (Mouse tab).";
             break;
         }
+        if (DrivingUses(pad_, r.arg)) { status_ = "That stick steers (Driving tab)."; break; }
         pickBtn_ = pickBtn_ == r.arg && pickMod_ == (layer_ == 1) ? -1 : r.arg;
         pickMod_ = layer_ == 1;
         for (bool& l : latch_) l = false;

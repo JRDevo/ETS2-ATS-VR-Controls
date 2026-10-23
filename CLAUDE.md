@@ -31,7 +31,7 @@ Read `README.md` and the header comments of `src/pad_input.h`, `src/layer.cpp`, 
   profiles (Touch, Index, Vive, WMR, HP) + ours, so the runtime picks the real controller.
 - Only the game's MENU button is left to the game; every other button is shared. Other API layers above ours (VR
   EyeCapture ...) reach our hooks like the game, so never key a rule on "the game binds it" (that dropped the stick clicks once).
-- Driving (2026-10-23, config drive): the same DLL is also an SCS SDK input plugin (scs_input_init: a SEMANTICAL device,
+- Driving (2026-10-23; steer = stick, gas / brake = button outputs): the same DLL is also an SCS SDK input plugin (scs_input_init: a SEMANTICAL device,
   floats steering / aforward / abackward; no binding in the game needed). The game loads it from
   HKLM\SOFTWARE\SCS Software\<game>\Plugins (install.ps1); the OpenXR loader then gets the same module (same path), so the
   values are shared directly. e2e case `drive`: fake_game --scs plays the game's plugin loader.

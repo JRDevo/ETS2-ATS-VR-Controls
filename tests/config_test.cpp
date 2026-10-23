@@ -89,17 +89,22 @@ int main(int argc, char** argv) {
     CHECK(mr.pad.modBtn == VrPad::kLGrip && SameOut(mr.pad.modMap[VrPad::kA], mo.pad.modMap[VrPad::kA]) &&
           SameOut(mr.pad.modMap[VrPad::kX], mo.pad.modMap[VrPad::kX]) && mr.notes.empty(), "the menu's modifier lines read back the same");
     // driving: shipped = defaults; parsing; the menu's lines read back
-    CHECK(c.pad.drive == d.pad.drive && d.pad.drive && c.pad.driveBrake == d.pad.driveBrake && c.pad.steerDeadzone == d.pad.steerDeadzone &&
-          c.pad.steerCurve == d.pad.steerCurve && c.pad.steerMax == d.pad.steerMax, "shipped driving = the defaults (on)");
-    const Config dr = ParseConfig("drive = 0\ndrive_brake = 1\nsteer_deadzone = 0.2\nsteer_curve = 2\nsteer_max = 0.6\n");
-    CHECK(!dr.pad.drive && dr.pad.driveBrake && dr.pad.steerDeadzone == 0.2f && dr.pad.steerCurve == 2.0f && dr.pad.steerMax == 0.6f &&
-          dr.notes.empty(), "driving keys (%zu notes)", dr.notes.size());
-    const Config dc = ParseConfig("steer_max = 5\nsteer_curve = x\n");
-    CHECK(dc.pad.steerMax == 1.0f && dc.pad.steerCurve == 1.5f && dc.notes.size() == 1, "steer_max clamped, a bad curve noted (%zu notes)", dc.notes.size());
+    CHECK(c.pad.steerStick == d.pad.steerStick && d.pad.steerStick == 1 && c.pad.steerDeadzone == d.pad.steerDeadzone &&
+          c.pad.steerCurve == d.pad.steerCurve && c.pad.steerMax == d.pad.steerMax && c.pad.steerSpeed == d.pad.steerSpeed &&
+          c.pad.map[VrPad::kLTrig].kind == VrPad::kGas, "shipped driving = the defaults (left stick steers, left trigger = gas)");
+    const Config dr = ParseConfig("steer = right\nsteer_deadzone = 0.2\nsteer_curve = 2.5\nsteer_max = 0.6\nsteer_speed = 0.75\n"
+                                  "lgrip = brake\nmodifier_keys = rtrigger:brake | a:gas\n");
+    CHECK(dr.pad.steerStick == 2 && dr.pad.steerDeadzone == 0.2f && dr.pad.steerCurve == 2.5f && dr.pad.steerMax == 0.6f &&
+          dr.pad.steerSpeed == 0.75f && dr.pad.map[VrPad::kLGrip].kind == VrPad::kBrake && dr.pad.modMap[VrPad::kRTrig].kind == VrPad::kBrake &&
+          dr.pad.modMap[VrPad::kA].kind == VrPad::kGas && dr.notes.empty(), "driving keys, gas / brake on buttons (%zu notes)", dr.notes.size());
+    const Config dc = ParseConfig("steer_max = 5\nsteer_curve = x\nsteer = up\n");
+    CHECK(dc.pad.steerMax == 1.0f && dc.pad.steerCurve == 2.0f && dc.pad.steerStick == 1 && dc.notes.size() == 2,
+          "steer_max clamped, a bad curve and stick noted (%zu notes)", dc.notes.size());
     std::string wd;
     for (const auto& kv : MenuValues(dr.pad, PanelPlace(), PanelPlace(), MenuLook())) wd += kv.first + " = " + kv.second + "\n";
     const Config drr = ParseConfig(wd);
-    CHECK(!drr.pad.drive && drr.pad.driveBrake && drr.pad.steerCurve == 2.0f && drr.pad.steerMax == 0.6f && drr.notes.empty(),
+    CHECK(drr.pad.steerStick == 2 && drr.pad.steerCurve == 2.5f && drr.pad.steerMax == 0.6f && drr.pad.steerSpeed == 0.75f &&
+          drr.pad.map[VrPad::kLGrip].kind == VrPad::kBrake && drr.pad.modMap[VrPad::kRTrig].kind == VrPad::kBrake && drr.notes.empty(),
           "the menu's driving lines read back the same");
     // OutToString is the inverse of ParseOut (the menu writes what it read)
     for (const char* t : { "shift+f", "mouse_left", "wheel_down", "none", "num7", "f12", "[", "\\", "ctrl+alt+delete", "rctrl" }) {

@@ -9,7 +9,7 @@
 //     on change). The game's main thread asks once per frame (event callback, first_in_frame) and gets only what changed since
 //     it was last told (all three after an activation), one event per call, then "not found".
 //   * Only for a game in config.ini 'apps' with enabled = 1 (anything else: unsupported, nothing registered). The device is
-//     registered whatever drive says, so the VR menu can switch driving on and off at once (off = all 0).
+//     registered whatever the settings say, so the VR menu can change steering / gas / brake at once (unused = 0).
 #pragma once
 
 namespace ck {

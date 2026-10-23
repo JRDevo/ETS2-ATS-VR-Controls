@@ -40,7 +40,7 @@ struct ScsInitV100 {                                        // scs_input_init_pa
 static_assert(sizeof(ScsEvent) == 28 && sizeof(ScsDeviceInput) == 24 && sizeof(ScsDevice) == 56 && sizeof(ScsInitV100) == 40,
               "SCS SDK layouts (x64)");
 
-std::atomic<float> g_val[3];                                // steer, throttle, brake
+std::atomic<float> g_val[3];                                // steer, gas, brake
 const ScsDeviceInput kInputs[3] = {
     { "steering", "Steering", kValueFloat, 0 },
     { "aforward", "Throttle", kValueFloat, 0 },
@@ -106,8 +106,8 @@ extern "C" __declspec(dllexport) ck::scs_result_t __stdcall scs_input_init(const
         LOGE("driving: the game refused our input device (%d) -- no steering / throttle from the controller", (int)r);
         return kGenericError;
     }
-    LOGI("driving: input device registered in %s (input API 1.0, game input version %u.%u); drive = %d", p->game_name ? p->game_name : "?",
-         p->game_version >> 16, p->game_version & 0xFFFF, c->pad.drive ? 1 : 0);
+    LOGI("driving: input device registered in %s (input API 1.0, game input version %u.%u)", p->game_name ? p->game_name : "?",
+         p->game_version >> 16, p->game_version & 0xFFFF);
     return kOk;
 }
 
