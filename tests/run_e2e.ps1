@@ -41,8 +41,8 @@ New-Item -ItemType Directory -Force $layerDir | Out-Null
 Copy-Item (Join-Path $rel 'ets2_ats_vr_controls.dll'), (Join-Path $rel 'XR_APILAYER_JRDEVO_ets2_ats_vr_controls.json') $layerDir -Force
 $env:XR_API_LAYER_PATH = $layerDir
 if ($Register) {
-    $k = 'HKLM:\SOFTWARE\Khronos\OpenXR'
-    New-Item -Force "$k\ApiLayers\Explicit" | Out-Null
+    $k = 'HKLM:\SOFTWARE\Khronos\OpenXR\1'
+    if (-not (Test-Path "$k\ApiLayers\Explicit")) { New-Item -Force "$k\ApiLayers\Explicit" | Out-Null }
     Set-ItemProperty $k -Name ActiveRuntime -Value $env:XR_RUNTIME_JSON
     New-ItemProperty "$k\ApiLayers\Explicit" -Name (Join-Path $layerDir 'XR_APILAYER_JRDEVO_ets2_ats_vr_controls.json') -Value 0 -PropertyType DWord -Force | Out-Null
     Write-Host "registered (elevated CI): active runtime = mock, explicit layer = $layerDir"
