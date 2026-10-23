@@ -17,6 +17,7 @@ constexpr scs_result_t kOk = 0, kUnsupported = -1, kNotFound = -4, kGenericError
 constexpr uint32_t kInputVersion100 = (1u << 16) | 0u;     // SCS_INPUT_VERSION_1_00
 constexpr uint32_t kTypeSemantical = 2;                     // SCS_INPUT_DEVICE_TYPE_semantical
 constexpr uint32_t kValueFloat = 5;                         // SCS_VALUE_TYPE_float
+constexpr uint32_t kValueFPlacement = 10, kValueDPlacement = 11;
 constexpr uint32_t kFirstInFrame = 1, kFirstAfterActivation = 2;
 constexpr int32_t  kLogError = 2;                           // SCS_LOG_TYPE_error
 
@@ -37,7 +38,12 @@ struct ScsInitV100 {                                        // scs_input_init_pa
     const char* game_name; const char* game_id; uint32_t game_version; uint32_t padding; ScsLog log;
     ScsRegister register_device;
 };
-struct ScsValue { uint32_t type; uint32_t padding; union { float value_float; double sizing[7]; }; };   // scs_value_t
+struct ScsFPlacement { float x, y, z, heading, pitch, roll; };                 // scs_value_fplacement_t
+struct ScsDPlacement { double x, y, z; float heading, pitch, roll; uint32_t padding; };   // scs_value_dplacement_t
+struct ScsValue {                                                                 // scs_value_t
+    uint32_t type; uint32_t padding;
+    union { float value_float; ScsFPlacement value_fplacement; ScsDPlacement value_dplacement; double sizing[7]; };
+};
 typedef void (__stdcall* ScsChannelCb)(const char* name, uint32_t index, const ScsValue* value, void* context);
 typedef scs_result_t (__stdcall* ScsRegisterChannel)(const char* name, uint32_t index, uint32_t type, uint32_t flags,
                                                      ScsChannelCb callback, void* context);
@@ -62,9 +68,12 @@ int   g_activeLogs = 0;
 // telemetry (log = 1: what the game made of our steering; the game's main thread too)
 std::atomic<float> g_tm[3];                                 // truck.input.steering, truck.effective.steering, truck.speed
 std::atomic<bool> g_tmOn{false};                            // (main thread writes, the VR thread reads)
+// log = 1 only (data for pinning panels to the cab): the cabin's and the head's offsets (fplacement: x y z metres, heading
+// pitch roll in turns), the truck's heading / pitch / roll, and our VR head pose (LOCAL) at the same moment
+std::atomic<float> g_cab[6], g_headOff[6], g_truck[3], g_vrHead[7];   // vrHead: x y z, then the orientation's x y z w
 bool   g_logDrive = false;
 double g_lastDriveLog = 0;
-float  g_lastLogged[3] = { NAN, NAN, NAN };
+float  g_lastLogged[3] = { NAN, NAN, NAN }, g_lastCab = NAN;
 int    g_driveLogs = 0;
 
 double NowSec() {
@@ -81,7 +90,9 @@ void LogDrive() {
     const double now = NowSec();
     if (now - g_lastDriveLog < 0.1) return;
     const float in = g_tm[0].load(std::memory_order_relaxed), eff = g_tm[1].load(std::memory_order_relaxed);
-    if (g_now[0] == g_lastLogged[0] && in == g_lastLogged[1] && eff == g_lastLogged[2]) return;
+    const float cabP = g_cab[4].load(std::memory_order_relaxed);
+    if (g_now[0] == g_lastLogged[0] && in == g_lastLogged[1] && eff == g_lastLogged[2] && cabP == g_lastCab) return;
+    g_lastCab = cabP;
     g_lastDriveLog = now;
     g_lastLogged[0] = g_now[0]; g_lastLogged[1] = in; g_lastLogged[2] = eff;
     ++g_driveLogs;
@@ -90,6 +101,15 @@ void LogDrive() {
              g_now[2], -in, -eff, g_tm[2].load(std::memory_order_relaxed) * 3.6f, g_driveLogs == 3000 ? " (no more of these lines)" : "");
     else
         LOGI("drive: sent steer %+.3f gas %.2f brake %.2f%s", g_now[0], g_now[1], g_now[2], g_driveLogs == 3000 ? " (no more of these lines)" : "");
+    if (g_tmOn) {                                       // the cab line (same moment)
+        float c[6], h[6], t[3], v[7];
+        for (int i = 0; i < 6; ++i) { c[i] = g_cab[i].load(std::memory_order_relaxed); h[i] = g_headOff[i].load(std::memory_order_relaxed); }
+        for (int i = 0; i < 3; ++i) t[i] = g_truck[i].load(std::memory_order_relaxed);
+        for (int i = 0; i < 7; ++i) v[i] = g_vrHead[i].load(std::memory_order_relaxed);
+        LOGI("cab: offset %+.3f %+.3f %+.3f m, h/p/r %+.4f %+.4f %+.4f | head offset %+.3f %+.3f %+.3f, %+.4f %+.4f %+.4f | truck "
+             "h/p/r %.4f %+.4f %+.4f | vr head %+.3f %+.3f %+.3f q %+.3f %+.3f %+.3f %+.3f", c[0], c[1], c[2], c[3], c[4], c[5], h[0],
+             h[1], h[2], h[3], h[4], h[5], t[0], t[1], t[2], v[0], v[1], v[2], v[3], v[4], v[5], v[6]);
+    }
 }
 
 // All three values every frame: a semantical input the game is not told in a frame may count as released (steering that
@@ -116,11 +136,30 @@ void __stdcall OnActive(uint8_t active, void*) {
 void __stdcall OnChannel(const char*, uint32_t, const ScsValue* v, void* context) {
     if (v && v->type == kValueFloat) g_tm[(int)(intptr_t)context].store(v->value_float, std::memory_order_relaxed);
 }
+void __stdcall OnPlacement(const char*, uint32_t, const ScsValue* v, void* context) {   // context 0 cabin, 1 head, 2 truck
+    if (!v) return;
+    const int w = (int)(intptr_t)context;
+    if (w < 2 && v->type == kValueFPlacement) {
+        const ScsFPlacement& p = v->value_fplacement;
+        std::atomic<float>* d = w ? g_headOff : g_cab;
+        const float a[6] = { p.x, p.y, p.z, p.heading, p.pitch, p.roll };
+        for (int i = 0; i < 6; ++i) d[i].store(a[i], std::memory_order_relaxed);
+    } else if (w == 2 && v->type == kValueDPlacement) {
+        g_truck[0].store(v->value_dplacement.heading, std::memory_order_relaxed);
+        g_truck[1].store(v->value_dplacement.pitch, std::memory_order_relaxed);
+        g_truck[2].store(v->value_dplacement.roll, std::memory_order_relaxed);
+    }
+}
 
 void DriveSet(float steer, float throttle, float brake) {
     g_val[0].store(steer, std::memory_order_relaxed);
     g_val[1].store(throttle, std::memory_order_relaxed);
     g_val[2].store(brake, std::memory_order_relaxed);
+}
+void VrHeadSet(const double p[3], const double q[4]) {
+    if (!g_logDrive) return;                            // (log = 1 only: the cab line)
+    for (int i = 0; i < 3; ++i) g_vrHead[i].store((float)p[i], std::memory_order_relaxed);
+    for (int i = 0; i < 4; ++i) g_vrHead[3 + i].store((float)q[i], std::memory_order_relaxed);
 }
 float DriveSpeedKmh() {
     return g_tmOn ? std::fabs(g_tm[2].load(std::memory_order_relaxed)) * 3.6f : -1.0f;
@@ -172,6 +211,13 @@ extern "C" __declspec(dllexport) ck::scs_result_t __stdcall scs_telemetry_init(c
     for (int i = 0; i < 3; ++i) ok += p->register_for_channel(kCh[i], 0xFFFFFFFFu, kValueFloat, 0, OnChannel, (void*)(intptr_t)i) == kOk;
     g_tm[2].store(0.0f, std::memory_order_relaxed);
     g_tmOn = ok == 3;
+    if (c->log) {                                       // the cab data for the log (pinning panels to the cab, coming)
+        int okc = 0;
+        okc += p->register_for_channel("truck.cabin.offset", 0xFFFFFFFFu, kValueFPlacement, 0, OnPlacement, (void*)(intptr_t)0) == kOk;
+        okc += p->register_for_channel("truck.head.offset", 0xFFFFFFFFu, kValueFPlacement, 0, OnPlacement, (void*)(intptr_t)1) == kOk;
+        okc += p->register_for_channel("truck.world.placement", 0xFFFFFFFFu, kValueDPlacement, 0, OnPlacement, (void*)(intptr_t)2) == kOk;
+        LOGI("driving: telemetry for the log: cab / head / truck placement %d of 3", okc);
+    }
     if (ok == 3) LOGI("driving: telemetry (truck speed, steering) %d of 3 channels", ok);
     else LOGW("driving: telemetry: only %d of 3 channels -- no speed-sensitive steering", ok);
     return kOk;

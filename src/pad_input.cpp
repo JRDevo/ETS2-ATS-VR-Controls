@@ -494,6 +494,8 @@ void PadInput::ReadLocked(XrSession s, SessionData& sd, VrPad::Frame& f) {
             sd.headOk = true;
             sd.head.q = Q4{ loc.pose.orientation.x, loc.pose.orientation.y, loc.pose.orientation.z, loc.pose.orientation.w };
             sd.head.p = V3{ loc.pose.position.x, loc.pose.position.y, loc.pose.position.z };
+            const double hp[3] = { sd.head.p.x, sd.head.p.y, sd.head.p.z }, hq[4] = { sd.head.q.x, sd.head.q.y, sd.head.q.z, sd.head.q.w };
+            VrHeadSet(hp, hq);                         // (log = 1 only: the log's cab line)
         }
     }
     if (fails) {
