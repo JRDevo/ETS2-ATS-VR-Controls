@@ -114,7 +114,8 @@ int main() {
         m.Step(f, true, 0.011, c, r);
         CHECK(r.Take() == "m0v m0^", "modifier off: the trigger is the left click");
     }
-    {   // the defaults since 2026-10-23: A = left click, B = Esc, right grip (air mouse, the modifier) + A / B = left / right click
+    {   // the defaults since 2026-10-23: A = left click, B = Esc, right grip (air mouse, the modifier) + A / B = left / right
+        // click, + right trigger = left click; the right trigger alone = gas, the left trigger = brake
         Config c = DefaultConfig();
         Mapper m; Rec r; Frame f;
         f.hand[0] = f.hand[1] = true;
@@ -132,8 +133,15 @@ int main() {
         f.prim[1] = false; f.grip[1] = 0.0f; m.Step(f, true, 0.011, c, r);
         CHECK(r.Take() == "m1^ m0v m0^", "... up; right grip + A = left click");
         f.trig[1] = 1.0f; m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take().empty() && r.drv[1] == 1.0f, "right trigger alone = gas (no click)");
         f.trig[1] = 0.0f; m.Step(f, true, 0.011, c, r);
-        CHECK(r.Take() == "m0v m0^", "right trigger = left click");
+        f.grip[1] = 1.0f; m.Step(f, true, 0.011, c, r);
+        f.trig[1] = 1.0f; m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "m0v" && r.drv[1] == 0.0f, "right grip + right trigger = left click, no gas");
+        f.trig[1] = 0.0f; f.grip[1] = 0.0f; m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "m0^", "... released");
+        f.trig[0] = 1.0f; m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take().empty() && r.drv[2] == 1.0f, "left trigger = brake");
     }
     {   // edges, hysteresis, the hold button, combos
         Config c = OldDefaults();
@@ -246,11 +254,16 @@ int main() {
     }
     printf("(3) driving\n");
     {
-        Config c = DefaultConfig();                    // left stick x = steering, left trigger = gas
+        Config c = DefaultConfig();                    // left stick x = steering; here: left trigger = gas, curve 2, no modifier keys
         c.steerSpeed = 0.0f;                           // (at once: the values below are exact)
-        CHECK(DefaultConfig().steerStick == 1 && DefaultConfig().map[kLTrig].kind == kGas && DefaultConfig().map[kRTrig].kind == kMouseL &&
-              DefaultConfig().map[kLGrip].kind == kBrake &&
-              DefaultConfig().steerSpeed == 2.0f && DefaultConfig().steerCurve == 2.0f, "defaults: left stick steers, left trigger = gas, left grip = brake");
+        c.steerCurve = 2.0f;
+        ParseOut("gas", &c.map[kLTrig]);
+        c.map[kRTrig] = Out();
+        for (Out& mo : c.modMap) mo = Out();
+        const Config dc = DefaultConfig();
+        CHECK(dc.steerStick == 1 && dc.map[kRTrig].kind == kGas && dc.map[kLTrig].kind == kBrake && dc.map[kLGrip].kind == kNone &&
+              dc.modMap[kRTrig].kind == kMouseL && dc.steerSpeed == 0.5f && dc.steerCurve == 1.0f,
+              "defaults: left stick steers, right trigger = gas (+ right grip: left click), left trigger = brake, curve 1, speed 0.5");
         Out po;
         CHECK(ParseOut("gas", &po) && po.kind == kGas && ParseOut("Throttle", &po) && po.kind == kGas && ParseOut("brake", &po) && po.kind == kBrake,
               "gas / throttle / brake parse");

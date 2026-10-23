@@ -340,15 +340,17 @@ int main(int argc, char** argv) {
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 131) && m.Pad().steerStick == 2, "steer: right");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 132) && m.Pad().steerStick == 0, "steer: off");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 130) && m.Pad().steerStick == 1, "steer: left again");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 136) && std::fabs(m.Pad().steerCurve - 2.25f) < 0.01f, "curve 2 -> 2.25");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 136) && std::fabs(m.Pad().steerCurve - 1.25f) < 0.01f, "curve 1 -> 1.25");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 137) && std::fabs(m.Pad().steerMax - 0.9f) < 0.01f, "full stick 100 -> 90 %%");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 139) && m.Pad().steerSpeed == 1.5f, "speed 2 -> 1.5 (slower)");
-        for (int i = 0; i < 4; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 140);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 139) && m.Pad().steerSpeed == 0.35f, "speed 0.5 -> 0.35 (slower)");
+        click(1, VrMenu::kPanMenu, VrMenu::eSet, 139);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 139) && m.Pad().steerSpeed == 0.25f, "the slowest: 0.25");
+        for (int i = 0; i < 9; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 140);
         CHECK(m.Pad().steerSpeed == 0.0f, "fastest step: at once (%.2f)", (double)m.Pad().steerSpeed);
-        for (int i = 0; i < 3; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 139);
+        for (int i = 0; i < 7; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 139);
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 135);
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 138);
-        CHECK(m.Pad().steerSpeed == 2.0f && std::fabs(m.Pad().steerCurve - 2.0f) < 0.01f && std::fabs(m.Pad().steerMax - 1.0f) < 0.01f,
+        CHECK(m.Pad().steerSpeed == 0.5f && std::fabs(m.Pad().steerCurve - 1.0f) < 0.01f && std::fabs(m.Pad().steerMax - 1.0f) < 0.01f,
               "driving settings back (speed %.2f)", (double)m.Pad().steerSpeed);
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 0) && click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kLGrip) &&
               click(1, VrMenu::kPanMenu, VrMenu::ePickOut, VrPad::kBrake) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kBrake,
@@ -363,17 +365,17 @@ int main(int argc, char** argv) {
               "Reset pressed once: nothing reset yet");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 120) && click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) &&
               m.Pad().map[VrPad::kLGrip].kind == VrPad::kMouseR, "another press in between: Reset armed again only");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kBrake &&
-              m.Pad().map[VrPad::kLTrig].kind == VrPad::kGas && m.Pad().modMap[VrPad::kB].kind == VrPad::kMouseR,
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) && m.Pad().map[VrPad::kLGrip].kind == VrPad::kNone &&
+              m.Pad().map[VrPad::kLTrig].kind == VrPad::kBrake && m.Pad().modMap[VrPad::kRTrig].kind == VrPad::kMouseL,
               "Buttons tab reset: the default buttons");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kA) && click(1, VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("shift")) &&
               click(1, VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("f")) && m.Pad().map[VrPad::kA].n == 2,
               "A = Shift + F again (as the config.ini checks below expect)");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 4) && click(1, VrMenu::kPanMenu, VrMenu::eSet, 139) &&
-              click(1, VrMenu::kPanMenu, VrMenu::eSet, 131) && m.Pad().steerSpeed == 1.5f && m.Pad().steerStick == 2, "Driving changed");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 4) && click(1, VrMenu::kPanMenu, VrMenu::eSet, 140) &&
+              click(1, VrMenu::kPanMenu, VrMenu::eSet, 131) && m.Pad().steerSpeed == 0.75f && m.Pad().steerStick == 2, "Driving changed");
         const float mouseSpeed = m.Pad().mouseSpeed;
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) && click(1, VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg) &&
-              m.Pad().steerSpeed == 2.0f && m.Pad().steerStick == 1 && m.Pad().mouseSpeed == mouseSpeed,
+              m.Pad().steerSpeed == 0.5f && m.Pad().steerStick == 1 && m.Pad().mouseSpeed == mouseSpeed,
               "Driving tab reset (the Mouse tab untouched)");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eTab, 3), "Look tab again");
     }

@@ -75,8 +75,9 @@ int main(int argc, char** argv) {
     CHECK(c.pad.modBtn == d.pad.modBtn && d.pad.modBtn == VrPad::kRGrip, "shipped modifier = rgrip");
     for (int b = 0; b < VrPad::kBtnCount; ++b) CHECK(SameOut(c.pad.modMap[b], d.pad.modMap[b]), "modifier key %s differs", VrPad::BtnNames()[b]);
     CHECK(d.pad.modMap[VrPad::kB].kind == VrPad::kMouseR && d.pad.modMap[VrPad::kA].kind == VrPad::kMouseL &&
-          d.pad.map[VrPad::kA].kind == VrPad::kMouseL && d.pad.map[VrPad::kRTrig].kind == VrPad::kMouseL && d.pad.map[VrPad::kLGrip].kind == VrPad::kBrake && d.pad.mouseStick == 2,
-          "defaults: A / right trigger = left click, left grip = brake, modifier + A = left click, + B = right click, right stick = mouse");
+          d.pad.map[VrPad::kA].kind == VrPad::kMouseL && d.pad.map[VrPad::kRTrig].kind == VrPad::kGas && d.pad.map[VrPad::kLTrig].kind == VrPad::kBrake &&
+          d.pad.modMap[VrPad::kRTrig].kind == VrPad::kMouseL && d.pad.mouseStick == 2,
+          "defaults: A = left click, right trigger = gas, left trigger = brake, modifier + A / right trigger = left click, + B = right click");
     const Config mo = ParseConfig("modifier = lgrip\nmodifier_keys = a:shift+f | ltrigger:mouse_right | x:,\n");
     CHECK(mo.pad.modBtn == VrPad::kLGrip && mo.pad.modMap[VrPad::kA].n == 2 && mo.pad.modMap[VrPad::kLTrig].kind == VrPad::kMouseR &&
           mo.pad.modMap[VrPad::kX].kind == VrPad::kKeys && mo.pad.modMap[VrPad::kRTrig].kind == VrPad::kNone && mo.notes.empty(),
@@ -91,14 +92,14 @@ int main(int argc, char** argv) {
     // driving: shipped = defaults; parsing; the menu's lines read back
     CHECK(c.pad.steerStick == d.pad.steerStick && d.pad.steerStick == 1 && c.pad.steerDeadzone == d.pad.steerDeadzone &&
           c.pad.steerCurve == d.pad.steerCurve && c.pad.steerMax == d.pad.steerMax && c.pad.steerSpeed == d.pad.steerSpeed &&
-          c.pad.map[VrPad::kLTrig].kind == VrPad::kGas, "shipped driving = the defaults (left stick steers, left trigger = gas)");
+          c.pad.map[VrPad::kRTrig].kind == VrPad::kGas, "shipped driving = the defaults (left stick steers, right trigger = gas)");
     const Config dr = ParseConfig("steer = right\nsteer_deadzone = 0.2\nsteer_curve = 2.5\nsteer_max = 0.6\nsteer_speed = 0.75\n"
                                   "lgrip = brake\nmodifier_keys = rtrigger:brake | a:gas\n");
     CHECK(dr.pad.steerStick == 2 && dr.pad.steerDeadzone == 0.2f && dr.pad.steerCurve == 2.5f && dr.pad.steerMax == 0.6f &&
           dr.pad.steerSpeed == 0.75f && dr.pad.map[VrPad::kLGrip].kind == VrPad::kBrake && dr.pad.modMap[VrPad::kRTrig].kind == VrPad::kBrake &&
           dr.pad.modMap[VrPad::kA].kind == VrPad::kGas && dr.notes.empty(), "driving keys, gas / brake on buttons (%zu notes)", dr.notes.size());
     const Config dc = ParseConfig("steer_max = 5\nsteer_curve = x\nsteer = up\n");
-    CHECK(dc.pad.steerMax == 1.0f && dc.pad.steerCurve == 2.0f && dc.pad.steerStick == 1 && dc.notes.size() == 2,
+    CHECK(dc.pad.steerMax == 1.0f && dc.pad.steerCurve == 1.0f && dc.pad.steerStick == 1 && dc.notes.size() == 2,
           "steer_max clamped, a bad curve and stick noted (%zu notes)", dc.notes.size());
     std::string wd;
     for (const auto& kv : MenuValues(dr.pad, PanelPlace(), PanelPlace(), MenuLook())) wd += kv.first + " = " + kv.second + "\n";

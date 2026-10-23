@@ -309,7 +309,7 @@ if (-not $Only -or $Only -eq 'drive') {
          '2.2-2.6:/user/hand/left/input/trigger/value=0.525;2.8-3.0:/user/hand/right/input/trigger/value=0.9;' +
          '3.0-3.2:/user/hand/left/input/squeeze/value=0.62'
     $dll = Join-Path $layerDir 'ets2_ats_vr_controls.dll'
-    $r = RunCase 'drive' 'fake_game.exe' @('--scs', "`"$dll`"") 3.5 @{ VRC_MOCK_INPUT = $s } "steer = left`nsteer_speed = 0`nmouse_stick = right`nltrigger = gas`nlgrip = brake`n"
+    $r = RunCase 'drive' 'fake_game.exe' @('--scs', "`"$dll`"") 3.5 @{ VRC_MOCK_INPUT = $s } "steer = left`nsteer_speed = 0`nsteer_curve = 2`nmouse_stick = right`nltrigger = gas`nlgrip = brake`n"
     $b = Buttons @($r.events | Where-Object { $_ -notmatch '^drive ' })
     Write-Host "  events: $b"
     Check 'drive' ((@($r.events | Where-Object { $_ -match '^drive ' }) -join ' | ') -eq ('drive 0.250 0.000 0.000 | drive 0.000 0.000 0.000 | ' +

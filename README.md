@@ -43,10 +43,10 @@ Only one OpenXR runtime is active at a time; the last one you set wins.
 - **Air mouse**: hold the right grip and turn the controller. The pointer follows, like a laser pointer. (Or set it to
   toggle: one press on, the next press off.)
 - **Modifier**: while you hold the modifier button (right grip), buttons can send something else. Default: **right grip +
-  A = left click, right grip + B = right click** -- so one controller does everything: hold the grip (the pointer follows),
-  press A to click, hold B to right-click (drag the map). Set any button's modified key in the VR menu.
-- **Driving with one controller** (the left one by default): the left stick steers, the left trigger is the gas pedal.
-  Smooth, like a gamepad, not on / off keys. Gas and brake can go on any button. See [Driving](#driving-with-one-controller).
+  A or right trigger = left click, right grip + B = right click** -- so one controller does everything: hold the grip (the
+  pointer follows), press A or the trigger to click, hold B to right-click (drag the map). Set any button's modified key in the VR menu.
+- **Driving**: the left stick steers, the right trigger is the gas pedal, the left trigger the brake. Smooth, like a
+  gamepad, not on / off keys. Gas and brake can go on any button. See [Driving](#driving-with-one-controller).
 - **VR menu + keyboard**: hold both grips + the left stick click for 1 second. A menu opens in front of you. See [The VR menu](#the-vr-menu).
 - The game's own VR controls (the trigger and the left menu button) still work.
 - It only works in the games named in `config.ini`. In every other VR program it does nothing.
@@ -58,8 +58,8 @@ works next to the ETS2 / ATS DLAA mod, VR EyeCapture, Virtual Desktop, OpenXR To
 ## Default buttons
 
 Made so that **one controller (the right one) does the whole mouse**: point with the right stick or the air mouse, A =
-left click (or the right trigger), right grip + B = right click. **The left controller drives**: left stick = steering,
-left trigger = gas, left grip = brake.
+left click, right grip + right trigger = left click too, right grip + B = right click. **Driving**: left stick =
+steering, right trigger = gas, left trigger = brake.
 
 | Controller | Sends | In ETS2 / ATS (default keys) |
 |---|---|---|
@@ -68,11 +68,11 @@ left trigger = gas, left grip = brake.
 | A | left mouse click | click |
 | Right grip + A | left mouse click | click while the air mouse aims |
 | Right grip + B | right mouse click | drag the map: hold the grip, aim, hold B |
-| Right trigger | left mouse click | click |
+| Right grip + right trigger | left mouse click | click while the air mouse aims |
+| Right trigger | **gas pedal** (press harder = more gas, let go = roll) | |
 | B | Esc | menu / back |
 | Left stick left / right | **steering** (let go = straight) | see [Driving](#driving-with-one-controller) |
-| Left trigger | **gas pedal** (press harder = more gas, let go = roll) | |
-| Left grip | **brake** (press harder = more brake) | |
+| Left trigger | **brake** (press harder = more brake) | |
 | X | `[` | left indicator |
 | Y | `]` | right indicator |
 | Right stick click | H | horn |
@@ -94,13 +94,14 @@ function to a controller button instead (for example `y = l` for the lights).
 
 ## Driving with one controller
 
-By default the **left controller drives** the truck:
+By default:
 
-| Left controller | Does |
+| Controller | Does |
 |---|---|
-| Stick left / right | steering wheel. Let go: the wheel goes straight again. |
-| Trigger | gas pedal. Press a little = a little gas. Let go = the truck rolls (no gas). |
-| Grip | brake. Press a little = a little brake. |
+| Left stick left / right | steering wheel. Let go: the wheel goes straight again. |
+| Right trigger | gas pedal. Press a little = a little gas. Let go = the truck rolls (no gas). |
+| Left trigger | brake. Press a little = a little brake. |
+| Right grip + right trigger | left mouse click (not gas): hold the grip to aim with the air mouse, pull the trigger to click |
 
 **You choose what drives.** Gas and brake are normal button choices, like a key:
 
@@ -117,9 +118,9 @@ By default the **left controller drives** the truck:
 | Setting | What it does | Default |
 |---|---|---|
 | Steering dead zone (`steer_deadzone`) | how far the stick must move before the wheel turns | 0.10 |
-| Steering curve (`steer_curve`) | 1 = straight. More = small stick moves turn the wheel only a little; full lock only at the end | 2.00 |
+| Steering curve (`steer_curve`) | 1 = straight. More = small stick moves turn the wheel only a little; full lock only at the end | 1.00 |
 | Full stick turns the wheel (`steer_max`) | how much of the wheel full stick turns | 100 % |
-| Steering speed (`steer_speed`) | how fast the wheel follows the stick. 2 = half a second from the middle to full lock. Less = calmer. 0 = at once (twitchy) | 2.00 |
+| Steering speed (`steer_speed`) | how fast the wheel follows the stick, in full turns per second. 0.5 = 2 seconds from the middle to full lock. Less = calmer, more = quicker. 0 = at once (twitchy) | 0.50 |
 
 Too twitchy? Make the curve bigger, or the steering speed slower.
 

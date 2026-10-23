@@ -169,18 +169,17 @@ struct Config {
     // mapped to "gas" / "brake" (map or modMap), see kGas.
     int   steerStick = 1;                              // 0 off, 1 left stick, 2 right stick
     float steerDeadzone = 0.10f;                       // stick, before steering starts
-    float steerCurve = 2.0f;                           // 1 = straight; more = finer near the centre
+    float steerCurve = 1.0f;                           // 1 = straight; more = finer near the centre
     float steerMax = 1.0f;                             // full stick = this much of the wheel (0.2 .. 1)
-    float steerSpeed = 2.0f;                           // centre -> full lock per second at most (0 = at once)
+    float steerSpeed = 0.5f;                           // centre -> full lock per second at most (0 = at once)
 };
 inline Config DefaultConfig() {
     Config c;
-    // (the user's own mapping, made the default 2026-10-23: one controller does the mouse -- right stick or air mouse to point,
-    //  A or the right trigger = left click; right grip (the air mouse) + A = left click, + B = right click, to drag the map
-    //  with the grip held. The left controller drives: left stick = steering, left trigger = gas, left grip = brake.)
-    ParseOut("mouse_left", &c.map[kRTrig]);
-    ParseOut("brake", &c.map[kLGrip]);
-    ParseOut("gas", &c.map[kLTrig]);                   // driving: left trigger = gas, left stick = steering (steerStick)
+    // (the user's own mapping, made the default 2026-10-23. Driving: left stick = steering, right trigger = gas, left trigger
+    //  = brake. The mouse with the right hand: right stick or air mouse (hold the right grip) to point, A = left click; right
+    //  grip + A or + right trigger = left click, + B = right click (drag the map with the grip held).)
+    ParseOut("gas", &c.map[kRTrig]);
+    ParseOut("brake", &c.map[kLTrig]);
     ParseOut("mouse_left", &c.map[kA]);
     ParseOut("esc", &c.map[kB]);
     ParseOut("[", &c.map[kX]);                         // ETS2 / ATS default: left indicator
@@ -193,6 +192,7 @@ inline Config DefaultConfig() {
     ParseOut("left", &c.map[kRLeft]);
     ParseOut("right", &c.map[kRRight]);
     ParseOut("mouse_left", &c.modMap[kA]);             // right grip (air mouse) + A = left click
+    ParseOut("mouse_left", &c.modMap[kRTrig]);         // ... + right trigger = left click (the trigger alone is the gas)
     ParseOut("mouse_right", &c.modMap[kB]);            // right grip (air mouse) + B = right click: drag the map
     return c;
 }

@@ -1111,12 +1111,13 @@ void VrMenu::SetValue(int arg) {
         break;
     }
     case 139: case 140: {                              // speed: seconds centre -> full lock in steps (0 = at once at the top)
-        static const float kSpeeds[8] = { 0.5f, 0.75f, 1.0f, 1.5f, 2.0f, 3.0f, 5.0f, 0.0f };
+        static const float kSpeeds[] = { 0.25f, 0.35f, 0.5f, 0.75f, 1.0f, 1.5f, 2.0f, 3.0f, 5.0f, 0.0f };
+        constexpr int kLast = (int)(sizeof(kSpeeds) / sizeof(kSpeeds[0])) - 1;
         int i = 0;
-        while (i < 7 && kSpeeds[i] != pad_.steerSpeed && !(pad_.steerSpeed > 0.0f && kSpeeds[i] > pad_.steerSpeed)) ++i;
-        if (pad_.steerSpeed <= 0.0f) i = 7;
+        while (i < kLast && kSpeeds[i] < pad_.steerSpeed) ++i;   // (the first step at or above the current speed)
+        if (pad_.steerSpeed <= 0.0f) i = kLast;
         i += arg == 140 ? 1 : -1;
-        pad_.steerSpeed = kSpeeds[i < 0 ? 0 : i > 7 ? 7 : i];
+        pad_.steerSpeed = kSpeeds[i < 0 ? 0 : i > kLast ? kLast : i];
         break;
     }
     case 50: case 51: mul(pad_.airGain, arg == 51, 1.0f, 500.0f); break;
