@@ -8,8 +8,9 @@
 //   * The controllers' side (pad_map.h Mapper, the game's VR thread) only stores the values (DriveSet: three atomic floats,
 //     on change). The game's main thread asks once per frame (event callback, first_in_frame) and gets ALL THREE every frame,
 //     one event per call, then "not found" (a value not told in a frame may count as released: steering snapped back).
-//   * log = 1 only: also a telemetry plugin (scs_telemetry_init: truck.input / effective.steering, truck.speed) so the log
-//     shows what the game made of our steering ("drive: sent ... | game input ..., used ..."), 10 lines a second at most.
+//   * Also a telemetry plugin (scs_telemetry_init: truck.speed, truck.input / effective.steering): the speed for
+//     speed-sensitive steering (DriveSpeedKmh -> Mapper::SetSpeed); with log = 1 the log shows what the game made of our
+//     steering ("drive: sent ... | game input ..., used ... | km/h"), 10 lines a second at most.
 //   * Only for a game in config.ini 'apps' with enabled = 1 (anything else: unsupported, nothing registered). The device is
 //     registered whatever the settings say, so the VR menu can change steering / gas / brake at once (unused = 0).
 #pragma once
@@ -21,5 +22,6 @@ const Config* GameConfig();   // layer.cpp: config.ini of this program (read onc
 
 void DriveSet(float steer, float throttle, float brake);   // any thread
 void DriveGet(float out[3]);                               // the values the game gets next (tests)
+float DriveSpeedKmh();                                     // the truck's speed from the game's telemetry; -1 = not known
 
 }  // namespace ck

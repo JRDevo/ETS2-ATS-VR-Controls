@@ -128,9 +128,10 @@ By default:
 | Wheel turns at most (`steer_max`) | how far the wheel can turn | 100 % |
 | Full stick: full turn in (`steer_turn_time`, turn speed) | seconds from the middle to full lock with the stick all the way. More = calmer | 5 s |
 | Let go: straight again in (`steer_return_time`, turn speed) | seconds from full lock back to straight after you let go | 3 s |
+| At 90 km/h (`steer_speed_sens`, `steer_at_speed`) | **speed-sensitive steering**, On / Off: up to 10 km/h the stick steers fully; at 90 km/h and faster only this much -- the wheel turns less, and turns and goes back more slowly | On, 30 % |
 | Steering speed (`steer_speed`, wheel) | how fast the wheel follows the stick, in full turns per second. 0.5 = 2 seconds to full lock. 0 = at once (twitchy) | 0.50 |
 
-Too twitchy? Make the curve bigger, or the full turn slower.
+Too twitchy at speed? Lower "At 90 km/h". Too twitchy everywhere? Make the curve bigger, or the full turn slower.
 
 **Switch driving off:** Driving tab > Driving: **Off** (or `drive = 0`). Then nothing steers, the gas / brake buttons do
 nothing, and the steering stick's left / right send their keys again. **On** brings it all back.

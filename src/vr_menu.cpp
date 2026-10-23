@@ -777,16 +777,16 @@ void VrMenu::LayoutMenu() {
         add(eInfo, 302, 24, 596, 952, 56, "Smoothing calms a shaky hand (menu pointer and air mouse).");
         add(eInfo, 0, 24, 704, 742, 54, status_.empty() ? "- = more see-through, + = more solid." : status_);
     } else {                                            // Driving (scs_input.h): steering here, gas / brake on any button
-        auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 156 + r * 68, 440, 60, label); };
+        auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 150 + r * 61, 440, 54, label); };
         auto opts = [&](int r, int base, std::initializer_list<const char*> names, int cur) {
             const int n = (int)names.size(), w = (506 - (n - 1) * 10) / n;
             int i = 0;
-            for (const char* nm : names) { add(eSet, base + i, 470 + i * (w + 10), 156 + r * 68, w, 60, nm, i == cur); ++i; }
+            for (const char* nm : names) { add(eSet, base + i, 470 + i * (w + 10), 150 + r * 61, w, 54, nm, i == cur); ++i; }
         };
         auto plusMinus = [&](int r, int base, const std::string& value) {
-            add(eSet, base, 470, 156 + r * 68, 90, 60, "\xE2\x88\x92");
-            add(eInfo, 200 + r, 570, 156 + r * 68, 306, 60, value);
-            add(eSet, base + 1, 886, 156 + r * 68, 90, 60, "+");
+            add(eSet, base, 470, 150 + r * 61, 90, 54, "\xE2\x88\x92");
+            add(eInfo, 200 + r, 570, 150 + r * 61, 306, 54, value);
+            add(eSet, base + 1, 886, 150 + r * 61, 90, 54, "+");
         };
         const bool rate = pad_.steerMode == 1;
         row(0, "Driving");
@@ -816,6 +816,15 @@ void VrMenu::LayoutMenu() {
             if (pad_.steerSpeed <= 0.0f) snprintf(b, sizeof(b), "at once");
             else snprintf(b, sizeof(b), "%.2g s to full", 1.0 / (double)pad_.steerSpeed);
             plusMinus(6, 139, b);
+        }
+        {                                               // speed-sensitive: [On / Off] [-] value [+]
+            const int r = rate ? 8 : 7, y = 150 + r * 61;
+            row(r, "At 90 km/h: steering");
+            add(eSet, 154, 470, y, 110, 54, pad_.steerSpeedSens ? "On" : "Off", pad_.steerSpeedSens);
+            snprintf(b, sizeof(b), "%d %%", (int)(pad_.steerAtSpeed * 100.0f + 0.5f));
+            add(eSet, 152, 590, y, 80, 54, "\xE2\x88\x92");
+            add(eInfo, 200 + r, 680, y, 196, 54, pad_.steerSpeedSens ? b : "(off)");
+            add(eSet, 153, 886, y, 90, 54, "+");
         }
         add(eInfo, 0, 24, 704, 742, 54, !status_.empty() ? status_ : !pad_.drive ? "Driving off: no steering, gas or brake."
                                         : rate ? "Push a little = turn slowly, all the way = fast." : "The stick's place = the wheel's place.");
@@ -1131,6 +1140,12 @@ void VrMenu::SetValue(int arg) {
     }
     case 141: case 142: pad_.steerMode = arg == 141 ? 1 : 0; break;
     case 147: case 148: pad_.drive = arg == 147; break;
+    case 154: pad_.steerSpeedSens = !pad_.steerSpeedSens; break;
+    case 152: case 153: {                              // at 90 km/h: 10 .. 100 % in 5 % steps
+        const float v = pad_.steerAtSpeed + (arg == 153 ? 0.05f : -0.05f);
+        pad_.steerAtSpeed = v < 0.1f ? 0.1f : v > 1.0f ? 1.0f : (float)(int)(v * 20.0f + 0.5f) / 20.0f;
+        break;
+    }
     case 143: case 144: case 145: case 146: {          // rate: full-turn time / back-to-the-middle time, in steps (seconds)
         static const float kTimes[] = { 0.5f, 1.0f, 1.5f, 2.0f, 3.0f, 4.0f, 5.0f, 7.0f, 10.0f, 15.0f, 20.0f };
         constexpr int kLast = (int)(sizeof(kTimes) / sizeof(kTimes[0])) - 1;
@@ -1225,6 +1240,7 @@ void VrMenu::ResetTab() {
         pad_.steerStick = d.steerStick; pad_.steerDeadzone = d.steerDeadzone; pad_.steerCurve = d.steerCurve;
         pad_.steerMax = d.steerMax; pad_.steerSpeed = d.steerSpeed;
         pad_.steerMode = d.steerMode; pad_.steerTurnTime = d.steerTurnTime; pad_.steerReturnTime = d.steerReturnTime;
+        pad_.steerAtSpeed = d.steerAtSpeed; pad_.steerSpeedSens = d.steerSpeedSens;
         break;
     }
     LOGI("VR menu: tab %d reset to the defaults", tab_);
@@ -1423,8 +1439,9 @@ std::string VrMenu::ContentKey(int p) const {
     snprintf(b, sizeof(b), "%d|%d|%d|%d%d|%.3f,%.3f|%d|%.2f|%.2f|%d|%d|", pan_[1].show, tab_, pickBtn_, pickMod_, layer_, pan_[0].width,
              pan_[1].width, look_.theme, look_.menuOpacity, look_.kbOpacity, look_.smoothing, look_.kbCompact);
     char dr[160];                                       // the Driving tab's values (DescribePad leaves them out while off)
-    snprintf(dr, sizeof(dr), "|%d%d%d|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|", pad_.drive ? 1 : 0, pad_.steerStick, pad_.steerMode,
-             pad_.steerDeadzone, pad_.steerCurve, pad_.steerMax, pad_.steerSpeed, pad_.steerTurnTime, pad_.steerReturnTime);
+    snprintf(dr, sizeof(dr), "|%d%d%d|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|", pad_.drive ? 1 : 0, pad_.steerStick, pad_.steerMode,
+             pad_.steerDeadzone, pad_.steerCurve, pad_.steerMax, pad_.steerSpeed, pad_.steerTurnTime, pad_.steerReturnTime,
+             pad_.steerSpeedSens ? pad_.steerAtSpeed : -pad_.steerAtSpeed);
     return std::string(b) + std::to_string(resetArm_) + "|" + status_ + dr + DescribePad(pad_);
 }
 

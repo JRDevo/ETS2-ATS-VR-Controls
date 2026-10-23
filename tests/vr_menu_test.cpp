@@ -352,6 +352,11 @@ int main(int argc, char** argv) {
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 145);
         CHECK(m.Pad().steerTurnTime == 5.0f && m.Pad().steerReturnTime == 3.0f, "times back");
         CHECK(!click(1, VrMenu::kPanMenu, VrMenu::eSet, 139), "turn speed style: no wheel speed row");
+        CHECK(m.Pad().steerAtSpeed == 0.3f && click(1, VrMenu::kPanMenu, VrMenu::eSet, 152) &&
+              std::fabs(m.Pad().steerAtSpeed - 0.25f) < 1e-4f, "at 90 km/h: 30 -> 25 %%");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 153) && std::fabs(m.Pad().steerAtSpeed - 0.3f) < 1e-4f, "... and back to 30 %%");
+        CHECK(m.Pad().steerSpeedSens && click(1, VrMenu::kPanMenu, VrMenu::eSet, 154) && !m.Pad().steerSpeedSens, "speed-sensitive: Off");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 154) && m.Pad().steerSpeedSens, "speed-sensitive: On again");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 142) && m.Pad().steerMode == 0, "style: wheel");
         CHECK(!click(1, VrMenu::kPanMenu, VrMenu::eSet, 143), "wheel style: no full-turn row");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 136) && std::fabs(m.Pad().steerCurve - 1.25f) < 0.01f, "curve 1 -> 1.25");

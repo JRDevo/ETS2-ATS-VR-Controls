@@ -1,5 +1,6 @@
 // pad_input -- see pad_input.h.
 #include "pad_input.h"
+#include "scs_input.h"
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
@@ -609,6 +610,7 @@ void PadInput::BeginFrame(XrSession s) {
     }
     {
         Part pm(meas, &split_[1]);
+        sd.mapper.SetSpeed(DriveSpeedKmh());             // (speed-sensitive steering; -1 = no telemetry)
         sd.mapper.Step(f, live, dt, cfg_.pad, Sink());   // (not live = everything held is released)
         const int kb = sd.mapper.TakeKeyboardToggles();  // a button set to "keyboard": show / hide the VR keyboard
         if (menu_ && (kb & 1)) menu_->ToggleKeyboard();

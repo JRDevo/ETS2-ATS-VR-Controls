@@ -121,6 +121,9 @@ void DriveSet(float steer, float throttle, float brake) {
     g_val[1].store(throttle, std::memory_order_relaxed);
     g_val[2].store(brake, std::memory_order_relaxed);
 }
+float DriveSpeedKmh() {
+    return g_tmOn ? std::fabs(g_tm[2].load(std::memory_order_relaxed)) * 3.6f : -1.0f;
+}
 void DriveGet(float out[3]) { for (int i = 0; i < 3; ++i) out[i] = g_val[i].load(std::memory_order_relaxed); }
 
 }  // namespace ck
@@ -154,19 +157,20 @@ extern "C" __declspec(dllexport) ck::scs_result_t __stdcall scs_input_init(const
     return kOk;
 }
 
-// The telemetry API: only with log = 1, to write what the game made of our steering (LogDrive). Nothing else uses it yet.
+// The telemetry API: the truck's speed (speed-sensitive steering: DriveSpeedKmh) and, with log = 1, what the game made of our
+// steering (LogDrive).
 extern "C" __declspec(dllexport) ck::scs_result_t __stdcall scs_telemetry_init(const uint32_t version, const void* params) {
     using namespace ck;
     if ((version >> 16) != 1 || !params) return kUnsupported;
     const Config* c = GameConfig();
-    if (!c || !c->log) return kUnsupported;
+    if (!c) return kUnsupported;
     const ScsTelemetryInitV100* p = static_cast<const ScsTelemetryInitV100*>(params);
     if (!p->register_for_channel) return kGenericError;
     static const char* const kCh[3] = { "truck.input.steering", "truck.effective.steering", "truck.speed" };
     int ok = 0;
     for (int i = 0; i < 3; ++i) ok += p->register_for_channel(kCh[i], 0xFFFFFFFFu, kValueFloat, 0, OnChannel, (void*)(intptr_t)i) == kOk;
     g_tmOn = ok == 3;
-    LOGI("driving: telemetry for the log (%d of 3 channels)", ok);
+    LOGI("driving: telemetry (truck speed, steering) %d of 3 channels", ok);
     return kOk;
 }
 

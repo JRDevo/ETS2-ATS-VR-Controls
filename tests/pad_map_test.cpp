@@ -402,7 +402,36 @@ int main() {
         CHECK(r.drv[0] == -1.0f, "held 8 s: full left, no further");
         Config m = c; m.steerMax = 0.5f;
         mp.Step(f, true, 0.1, m, r);
-        CHECK(r.drv[0] == -0.5f, "never past steer_max");
+        CHECK(r.drv[0] > -1.0f && r.drv[0] < -0.9f, "a lower limit: back inside at the return speed, not at once (%.3f)", (double)r.drv[0]);
+        for (int i = 0; i < 20; ++i) mp.Step(f, true, 0.1, m, r);
+        CHECK(r.drv[0] == -0.5f, "never past steer_max (held full left)");
+    }
+    {   // speed-sensitive steering: <= 10 km/h full, 90 km/h and up steerAtSpeed (0.3), between linear; unknown speed = full
+        Config c = DefaultConfig();
+        c.steerDeadzone = 0.0f;
+        CHECK(SpeedFactor(-1.0f, c) == 1.0f && SpeedFactor(5.0f, c) == 1.0f && std::fabs(SpeedFactor(50.0f, c) - 0.65f) < 1e-5f &&
+              std::fabs(SpeedFactor(90.0f, c) - 0.3f) < 1e-5f && std::fabs(SpeedFactor(130.0f, c) - 0.3f) < 1e-5f,
+              "speed factor: 1 / 0.65 at 50 / 0.3 from 90 km/h");
+        Config off = c; off.steerAtSpeed = 1.0f;
+        CHECK(SpeedFactor(120.0f, off) == 1.0f, "steer_at_speed = 1: off");
+        Config sw = c; sw.steerSpeedSens = false;
+        CHECK(SpeedFactor(120.0f, sw) == 1.0f, "steer_speed_sens = 0 (the switch): off");
+        Mapper mp; Rec r; Frame f;                      // rate: at 90 km/h full stick 1 s = 0.3 * 1/5, the wheel at most 0.3
+        f.hand[0] = true; f.sx[0] = 1.0f;
+        mp.SetSpeed(90.0f);
+        for (int i = 0; i < 10; ++i) mp.Step(f, true, 0.1, c, r);
+        CHECK(std::fabs(r.drv[0] - 0.06f) < 1e-4f, "90 km/h, full stick 1 s: 0.06 (%.3f)", (double)r.drv[0]);
+        for (int i = 0; i < 100; ++i) mp.Step(f, true, 0.1, c, r);
+        CHECK(std::fabs(r.drv[0] - 0.3f) < 1e-4f, "90 km/h: never past 0.3 (%.3f)", (double)r.drv[0]);
+        f.sx[0] = 0.0f;
+        for (int i = 0; i < 10; ++i) mp.Step(f, true, 0.1, c, r);
+        CHECK(std::fabs(r.drv[0] - 0.2f) < 1e-4f, "let go 1 s at 90 km/h: back by 0.3 / 3 (%.3f)", (double)r.drv[0]);
+        Config w = c; w.steerMode = 0; w.steerSpeed = 0.0f;   // wheel style: the place times the factor
+        Mapper mw; Rec rw; Frame gw;
+        gw.hand[0] = true; gw.sx[0] = 1.0f;
+        mw.SetSpeed(50.0f);
+        mw.Step(gw, true, 0.1, w, rw);
+        CHECK(std::fabs(rw.drv[0] - 0.65f) < 1e-4f, "wheel style at 50 km/h: full stick = 0.65 (%.3f)", (double)rw.drv[0]);
         Config cv = c; cv.steerCurve = 2.0f;           // the curve on the push: a small push turns much more slowly
         Mapper mc; Rec rc; Frame g;
         g.hand[0] = true; g.sx[0] = 0.5f;

@@ -20,6 +20,7 @@
                  ETS2 / ATS), the left stick steers and the left trigger is the throttle -- the game gets the analog values from
                  the plugin device (one module for both sides), the left trigger / stick send no keys or mouse
       kbkey      a button set to "keyboard" (Y): the first press shows the VR keyboard, the second hides it (no key sent)
+      drivespeed speed-sensitive steering: the fake game's telemetry says 90 km/h, full stick sends 0.3 of the wheel
       menu       a D3D11 game with VR EyeCapture's set (both stick clicks, shared): both grips + the left stick click held 1 s open the VR menu (quad layers on D3D11 swapchains), the right hand
                  points at the Mouse tab and at "air mouse: toggled on" (written to config.ini), the game never sees those
                  trigger pulls, a short stick click alone is still the horn (at once), the combo again closes it
@@ -311,6 +312,20 @@ if (-not $Only -or $Only -eq 'kbkey') {
     Check 'kbkey' ($r.mock -match 'endframe quads 0[\s\S]*endframe quads [1-3][\s\S]*endframe quads 0') 'the keyboard appears at the first Y, goes at the second'
     Check 'kbkey' ((Buttons $r.events) -eq '') "Y sends no key ($(Buttons $r.events))"
     Check 'kbkey' ($cfgText -match 'keyboard_show = 0') 'config.ini: keyboard_show = 0 again after the second Y'
+}
+
+# ---- drivespeed: speed-sensitive steering -- the fake game's telemetry says 90 km/h: full stick = 0.3 of the wheel
+if (-not $Only -or $Only -eq 'drivespeed') {
+    $s = '1.0-1.5:/user/hand/left/input/thumbstick=1,0'
+    $dll = Join-Path $layerDir 'ets2_ats_vr_controls.dll'
+    $r = RunCase 'drivespeed' 'fake_game.exe' @('--scs', "`"$dll`"", '--scs-speed', '90') 2.5 @{ VRC_MOCK_INPUT = $s } `
+        "steer = left`nsteer_mode = wheel`nsteer_speed = 0`nsteer_deadzone = 0`n"
+    $drv = @($r.events | Where-Object { $_ -match '^drive ' }) -join ' | '
+    Write-Host "  sent: $drv"
+    Check 'drivespeed' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
+    Check 'drivespeed' ($r.game -match 'scs channel truck\.speed type 5' -and $r.game -match 'scs telemetry init -> 0') 'the plugin asks the telemetry for truck.speed'
+    Check 'drivespeed' ($drv -eq 'drive 0.300 0.000 0.000 | drive 0.000 0.000 0.000') "90 km/h: full stick = 0.3 of the wheel, then straight ($drv)"
+    Check 'drivespeed' ($r.log -match 'driving: telemetry \(truck speed, steering\) 3 of 3 channels') 'log: telemetry'
 }
 
 # ---- drive

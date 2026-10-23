@@ -17,7 +17,8 @@
 //     --scs <dll>   what ETS2 / ATS's plugin loader does first: loads <dll> (the layer's file) and calls its scs_input_init with
 //                   a register_device of ours; each frame asks the device for its events (first_in_frame, first_after_activation
 //                   at the first) and prints "scs <input> <value> at <t>" when a value changed ("scs events per frame:
-//                   min .. max" at the end); "scs same module" = the OpenXR loader got the same module
+//                   min .. max" at the end); "scs same module" = the OpenXR loader got the same module. It also calls
+//                   scs_telemetry_init and feeds "truck.speed" every frame: --scs-speed <km/h> (default 0)
 // Exit code 0 = every OpenXR call the game made succeeded.
 #include <windows.h>
 #include <d3d11.h>
@@ -49,6 +50,21 @@ static int32_t __stdcall ScsRegister(const ScsDevice* d) {
     return 0;
 }
 
+// the telemetry API, the game's side: the channels the plugin asks for; "truck.speed" is fed each frame (--scs-speed)
+struct ScsValue { uint32_t type; uint32_t padding; union { float value_float; double sizing[7]; }; };
+typedef void (__stdcall* ScsChannelCb)(const char*, uint32_t, const ScsValue*, void*);
+struct ScsTelemetryInit { const char* game_name; const char* game_id; uint32_t game_version; uint32_t padding; void* log;
+                          void* reg_event; void* unreg_event;
+                          int32_t (__stdcall* reg_channel)(const char*, uint32_t, uint32_t, uint32_t, ScsChannelCb, void*);
+                          void* unreg_channel; };
+static ScsChannelCb g_speedCb = nullptr;
+static void* g_speedCtx = nullptr;
+static int32_t __stdcall ScsRegChannel(const char* name, uint32_t, uint32_t type, uint32_t, ScsChannelCb cb, void* ctx) {
+    printf("scs channel %s type %u\n", name, type);
+    if (!strcmp(name, "truck.speed")) { g_speedCb = cb; g_speedCtx = ctx; }
+    return 0;
+}
+
 static double Now() {
     static LARGE_INTEGER f = [] { LARGE_INTEGER x; QueryPerformanceFrequency(&x); return x; }();
     LARGE_INTEGER c;
@@ -62,6 +78,7 @@ int main(int argc, char** argv) {
     int syncEvery = 1;
     double stall0 = -1, stall1 = -1;
     const char* scsDll = nullptr;
+    float scsSpeed = 0.0f;                               // km/h the telemetry reports (--scs-speed)
     for (int i = 2; i < argc; ++i) {
         if (!strcmp(argv[i], "--no-input")) noInput = true;
         if (!strcmp(argv[i], "--no-sync")) noSync = true;
@@ -72,6 +89,7 @@ int main(int argc, char** argv) {
         if (!strcmp(argv[i], "--sync-every") && i + 1 < argc) syncEvery = atoi(argv[++i]) > 0 ? atoi(argv[i]) : 1;
         if (!strcmp(argv[i], "--stall") && i + 1 < argc) sscanf_s(argv[++i], "%lf-%lf", &stall0, &stall1);
         if (!strcmp(argv[i], "--scs") && i + 1 < argc) scsDll = argv[++i];
+        if (!strcmp(argv[i], "--scs-speed") && i + 1 < argc) scsSpeed = (float)atof(argv[++i]);
     }
     setvbuf(stdout, nullptr, _IONBF, 0);
     HMODULE scsMod = nullptr;
@@ -82,6 +100,11 @@ int main(int argc, char** argv) {
         ScsInit p = { "Fake Truck Simulator", "fake", (1u << 16), 0, nullptr, ScsRegister };
         const int32_t r = init ? init((1u << 16), &p) : -99;
         printf("scs init %s -> %d\n", scsDll, (int)r);
+        typedef int32_t (__stdcall* TInit)(uint32_t, const void*);
+        TInit tinit = scsMod ? reinterpret_cast<TInit>(GetProcAddress(scsMod, "scs_telemetry_init")) : nullptr;
+        ScsTelemetryInit tp = { "Fake Truck Simulator", "fake", (1u << 16), 0, nullptr, nullptr, nullptr, ScsRegChannel, nullptr };
+        const int32_t tr = tinit ? tinit((1u << 16) | 1u, &tp) : -99;
+        printf("scs telemetry init -> %d\n", (int)tr);
     }
     bool scsFirst = true;
     float scsLast[8] = { -9, -9, -9, -9, -9, -9, -9, -9 };   // the last value printed per input
@@ -230,6 +253,12 @@ int main(int argc, char** argv) {
                 if (down != prev[h]) printf("game select %s %s at %.2f\n", h ? "right" : "left", down ? "down" : "up", Now() - t0);
                 prev[h] = down;
             }
+        }
+        if (g_speedCb) {                                 // telemetry first (the game's physics step), in m/s
+            ScsValue v = {};
+            v.type = 5;
+            v.value_float = scsSpeed / 3.6f;
+            g_speedCb("truck.speed", 0xFFFFFFFFu, &v, g_speedCtx);
         }
         if (g_scsDev.event_cb) {                         // the game's main thread: the device's events of this frame
             uint32_t flags = 1u | (scsFirst ? 2u : 0u);

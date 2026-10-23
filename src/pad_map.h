@@ -185,6 +185,10 @@ struct Config {
     int   steerMode = 1;                               // 0 wheel, 1 rate
     float steerTurnTime = 5.0f;                        // rate: full stick turns centre -> full lock in this many seconds
     float steerReturnTime = 3.0f;                      // rate: let go, full lock -> straight in this many seconds
+    // speed-sensitive steering (the truck's speed from the game, SetSpeed): up to 10 km/h the stick steers fully; at 90 km/h
+    // and faster it steers steerAtSpeed of that -- how far the wheel turns AND how fast it turns / goes back. 1 = off.
+    float steerAtSpeed = 0.3f;
+    bool  steerSpeedSens = true;                       // the switch (the Driving tab's On / Off)
 };
 inline Config DefaultConfig() {
     Config c;
@@ -246,6 +250,11 @@ inline float StickShape(float x, const Config& c) {   // -1 .. 1 after the dead 
     const float k = ((a > 1.0f ? 1.0f : a) - c.steerDeadzone) / (1.0f - c.steerDeadzone);
     const float v = std::pow(k, c.steerCurve);
     return x < 0 ? -v : v;
+}
+inline float SpeedFactor(float kmh, const Config& c) {   // 1 slow .. steerAtSpeed fast; speed unknown (< 0) = 1
+    if (kmh < 0.0f || !c.steerSpeedSens || c.steerAtSpeed >= 1.0f) return 1.0f;
+    const float t = kmh <= 10.0f ? 0.0f : kmh >= 90.0f ? 1.0f : (kmh - 10.0f) / 80.0f;
+    return 1.0f + (c.steerAtSpeed - 1.0f) * t;
 }
 inline int SteerStickOf(const Config& c) { return c.drive ? c.steerStick : 0; }   // the stick that steers now (0 none)
 inline float SteerOf(float x, const Config& c) { return StickShape(x, c) * c.steerMax; }   // wheel style: the wheel position
@@ -329,20 +338,26 @@ public:
             const float x = (sh == 0 || sh == 1) && f.hand[sh] ? f.sx[sh] : 0.0f;
             const float t = (float)(dt > 0.0 && dt < 0.25 ? dt : 0.011);
             const float cur = drive_[0];
+            const float sf = SpeedFactor(speed_, c);   // faster = less wheel, turning and going back more slowly
+            const float most = c.steerMax * sf;
             float st;
             if (c.steerMode == 1) {                    // rate: the push turns the wheel; let go = back to the middle
                 const float r = StickShape(x, c);
                 if (r != 0.0f) {
-                    st = cur + r * t / (c.steerTurnTime > 0.1f ? c.steerTurnTime : 0.1f);
+                    st = cur + r * sf * t / (c.steerTurnTime > 0.1f ? c.steerTurnTime : 0.1f);
                 } else {
-                    const float step = t / (c.steerReturnTime > 0.1f ? c.steerReturnTime : 0.1f);
+                    const float step = sf * t / (c.steerReturnTime > 0.1f ? c.steerReturnTime : 0.1f);
                     st = cur > step ? cur - step : cur < -step ? cur + step : 0.0f;
                 }
-                st = st > c.steerMax ? c.steerMax : st < -c.steerMax ? -c.steerMax : st;
+                if (st > most || st < -most) {        // (faster than when it was turned: back inside, not at once)
+                    const float lim = (cur > 0 ? cur : -cur) - sf * t / (c.steerReturnTime > 0.1f ? c.steerReturnTime : 0.1f);
+                    const float m = lim > most ? lim : most;
+                    st = st > m ? m : st < -m ? -m : st;
+                }
             } else {                                   // wheel: the stick's position, reached at most steerSpeed / s
-                st = SteerOf(x, c);
+                st = SteerOf(x, c) * sf;
                 if (c.steerSpeed > 0.0f) {
-                    const float step = c.steerSpeed * t;
+                    const float step = c.steerSpeed * sf * t;
                     st = st > cur + step ? cur + step : st < cur - step ? cur - step : st;
                 }
             }
@@ -372,6 +387,7 @@ public:
     bool Down(int b) const { return b >= 0 && b < kBtnCount && down_[b]; }
     bool AirOn() const { return airOn_; }
     float Driving(int i) const { return i >= 0 && i < 3 ? drive_[i] : 0.0f; }   // the last steer / gas / brake sent
+    void SetSpeed(float kmh) { speed_ = kmh; }          // the truck's speed (km/h, < 0 = not known): speed-sensitive steering
     int TakeKeyboardToggles() { const int n = kbToggles_; kbToggles_ = 0; return n; }   // "keyboard" presses since the last call
 
 private:
@@ -433,7 +449,8 @@ private:
     }
     bool   down_[kBtnCount] = {};
     bool   notPedal_[kBtnCount] = {};
-    int    kbToggles_ = 0;                  // pressed as a key / click: not a pedal until fully let go
+    int    kbToggles_ = 0;
+    float  speed_ = -1.0f;                  // pressed as a key / click: not a pedal until fully let go
     Out    sent_[kBtnCount];                           // what each held button sent when it went down
     bool   airOn_ = false;
     bool   airLatch_ = false;                          // toggle mode: the air mouse is switched on
