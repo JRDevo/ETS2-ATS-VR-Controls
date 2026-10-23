@@ -200,6 +200,9 @@ struct Config {
     float steerFollowTime = 0.4f;                      // s, toward the stick while it is held (0 = at once)
     float steerCenterTime = 0.0f;                      // s, back to straight when let go (0 = at the speed limit)
     float steerRate = 0.5f;                            // full turns per second at most (0 = no limit)
+    // the limit while the wheel goes back toward straight (let go, or the stick on the other side): the user 2026-10-23
+    // 22:54 log, a swing from full lock to the other side took 4 s at steerRate -- "super slow". 0 = no limit.
+    float steerBackRate = 2.0f;                        // full turns per second
     // speed-sensitive steering (the truck's speed from the game, SetSpeed): up to 10 km/h the stick steers fully; at 90 km/h
     // and faster the wheel turns at most steerAtSpeed of that; the return and the rate limit go sqrt(steerAtSpeed) as fast.
     // 1 = off.
@@ -406,9 +409,12 @@ public:
             const float tau = other ? 0.0f : (letGo ? c.steerCenterTime : c.steerFollowTime) / rf;
             const float a = t <= 0.0f ? 0.0f : tau > 0.0f ? t / (tau + t) : 1.0f;   // first order, stable for any step
             float step = (tgt - cur) * a;
-            if (c.steerRate > 0.0f) {
-                const float m = c.steerRate * rf * t * (letGo ? 1.0f : push > 0.3f ? push : 0.3f);
+            const bool back = step * cur < 0.0f;       // toward straight: the faster back limit
+            const float rate = back ? c.steerBackRate : c.steerRate;
+            if (rate > 0.0f) {
+                const float m = rate * rf * t * (letGo ? 1.0f : push > 0.3f ? push : 0.3f);
                 step = step > m ? m : step < -m ? -m : step;
+                if (back && (cur + step) * cur < 0.0f) step = -cur;   // (back stops at straight; out the other way next step)
             }
             float st = cur + step;
             if (tgt == 0.0f && st < 0.002f && st > -0.002f) st = 0.0f;   // (the glide's tail: exactly straight)

@@ -98,6 +98,7 @@ Config ParseConfig(const std::string& text) {
         if (key == "steer_follow_time") { if (Num(val, 0, 2, &d)) c.pad.steerFollowTime = (float)d; else bad("seconds 0 .. 2 (0 = at once)"); continue; }
         if (key == "steer_center_time") { if (Num(val, 0, 10, &d)) c.pad.steerCenterTime = (float)d; else bad("seconds 0 .. 10 (0 = at once)"); continue; }
         if (key == "steer_max_speed") { if (Num(val, 0, 10, &d)) c.pad.steerRate = (float)d; else bad("full turns per second 0 .. 10 (0 = no limit)"); continue; }
+        if (key == "steer_back_speed") { if (Num(val, 0, 10, &d)) c.pad.steerBackRate = (float)d; else bad("full turns per second 0 .. 10 (0 = no limit)"); continue; }
         if (key == "steer_deadzone") { if (Num(val, 0, 0.5, &d)) c.pad.steerDeadzone = (float)d; else bad("a number 0 .. 0.5"); continue; }
         if (key == "steer_curve") { bad("no longer used (2026-10-23: see steer_fine, steer_fine_zone)"); continue; }
         if (key == "steer_fine") { if (Num(val, 0.05, 0.95, &d)) c.pad.steerFine = (float)d; else bad("a number 0.05 .. 0.95"); continue; }

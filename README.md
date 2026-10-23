@@ -174,6 +174,7 @@ middle as you let go, the wheel only goes straight, never past it.
 | Wheel follows the stick (`steer_follow_time`) | smoothing while you hold the stick: how quickly the wheel goes to the stick's place, in seconds (when standing; calmer at speed by itself). More = smoother and calmer | 0.4 s |
 | Let go: back to the middle (`steer_center_time`) | how the wheel comes back when you let go. At once = at the wheel speed below (the default). More = a slow glide, in seconds | at once |
 | Wheel speed at most (`steer_max_speed`) | the fastest the wheel turns, with the stick pushed all the way (a small push turns it slower): seconds from straight to full lock (in config.ini: full turns per second, 0.5 = 2 s). Slower at speed too | 2 s |
+| Wheel speed back to straight (`steer_back_speed`, config.ini only) | the fastest the wheel goes back toward straight: when you let go, or push the stick the other way (a quick swing from one side to the other). Full turns per second (2 = 0.5 s from full lock to straight; 0 = no limit). Slower at speed too | 2 |
 | At 90 km/h (`steer_speed_sens`, `steer_at_speed`) | **speed-sensitive steering**, On / Off: up to 10 km/h the stick steers fully; at 90 km/h and faster full stick turns the wheel only this much (30 %), so small moves are fine. A bend you hold while you speed up stays | On, 30 % |
 
 Too twitchy at speed? Lower "At 90 km/h". Too twitchy everywhere? Make "Wheel follows the stick" slower (more seconds) or
