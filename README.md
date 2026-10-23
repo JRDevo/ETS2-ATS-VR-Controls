@@ -4,8 +4,37 @@ Use your VR controllers as a keyboard and mouse in **Euro Truck Simulator 2** an
 Press a controller button, and the game gets a key press. Move a stick or point the controller, and the mouse pointer moves.
 
 > Status: v0.2.0. Phase 1 (buttons, pointer and click) works in the game. New in v0.2.0 (phase 2): **a VR menu and a full
-> keyboard in the headset** -- tested with a fake game and a fake VR runtime, **not in the real game yet**. Planned: phase 3,
-> single buttons you place anywhere (for example over a cab switch) that press a key.
+> keyboard in the headset**, now being tested in the game. Planned: phase 3, single buttons you place anywhere (for example
+> over a cab switch) that press a key.
+
+> **OpenXR only.** The mod works when the game runs in its **OpenXR** VR mode (`-openxr`). It does not work in the game's
+> `-openvr` (SteamVR native) or `-oculus` (Oculus native) modes. Every headset can use OpenXR, see
+> [Which VR mode?](#which-vr-mode).
+
+## Which VR mode?
+
+ETS2 / ATS have three VR modes, chosen by a launch option (Steam: right-click the game > Properties > Launch options).
+This mod works **only** in the OpenXR one:
+
+| Launch option | VR system | This mod |
+|---|---|---|
+| `-openxr` | OpenXR | **works** |
+| `-openvr` | SteamVR's own system (OpenVR) | does not load |
+| `-oculus` | Meta's old Oculus system | does not load |
+
+SCS also recommends OpenXR: it is the only VR mode in the normal game builds (1.55+; there, also add `-experimental_vr`),
+while `-openvr` and `-oculus` exist only in the `oculus` beta branch on Steam.
+
+How to use OpenXR with your headset:
+
+- **Quest via Virtual Desktop:** `-openxr`, with Virtual Desktop's VDXR as the OpenXR runtime (Virtual Desktop sets it).
+- **Quest via Link / Air Link:** `-openxr`, with the Meta Quest Link app as the OpenXR runtime (Meta app > Settings >
+  General > OpenXR Runtime).
+- **Valve Index, HTC Vive, Pico and other SteamVR headsets:** `-openxr`, with SteamVR as the OpenXR runtime (SteamVR >
+  Settings > OpenXR > Set SteamVR as OpenXR runtime). The game then still runs through SteamVR.
+- **Windows Mixed Reality:** `-openxr`, with the Windows Mixed Reality OpenXR runtime.
+
+Only one OpenXR runtime is active at a time; the last one you set wins.
 
 ## What it does
 
