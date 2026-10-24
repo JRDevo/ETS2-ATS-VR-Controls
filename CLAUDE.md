@@ -38,6 +38,10 @@ Read `README.md` and the header comments of `src/pad_input.h`, `src/layer.cpp`, 
   floats steering / aforward / abackward; no binding in the game needed). The game loads it from
   HKLM\SOFTWARE\SCS Software\<game>\Plugins (install.ps1); the OpenXR loader then gets the same module (same path), so the
   values are shared directly. e2e case `drive`: fake_game --scs plays the game's plugin loader.
+- v0.2.0 (2026-10-24, tested in the game by the user): steer_with = stick / wheel (steer_wheel_grip both / left / right /
+  either: one hand moves round a rim) / point (steer_point_hand); steer_stick_too; a grip that holds the wheel is ONLY the
+  wheel (Mapper::WheelHands). Four button layers: modifier (rgrip) + modifier2 (lgrip). README screenshots come from
+  vr_menu_test (build\menu_test\shots\*.bmp -> docs\images\*.png; keyboard-pointer gets the dot from shot_pointer.txt).
 - User: Quest 3 via Virtual Desktop (VDXR). Also installed: the DLAA mod (dinput8.dll, hooks OpenXR at the runtime too),
   VR EyeCapture (implicit layer), VectorXR.
 

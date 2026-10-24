@@ -668,6 +668,14 @@ int main(int argc, char** argv) {
             }
             CHECK(missing == 0, "every button / row / tab has a help text (%d without)", missing);
         }
+        press(VrMenu::kPanMenu, VrMenu::eTab, 4);           // the Driving tab with the hands: Wheel, then Point (then the stick again)
+        press(VrMenu::kPanMenu, VrMenu::eSet, 156);
+        settle(away);
+        WriteBmp(shots + L"\\menu-driving-wheel.bmp", ms, VrMenu::kPanMenu);
+        press(VrMenu::kPanMenu, VrMenu::eSet, 157);
+        settle(away);
+        WriteBmp(shots + L"\\menu-driving-point.bmp", ms, VrMenu::kPanMenu);
+        press(VrMenu::kPanMenu, VrMenu::eSet, 155);
         press(VrMenu::kPanMenu, VrMenu::eTab, 0);
         press(VrMenu::kPanMenu, VrMenu::eSet, 121);         // the modifier layer (default: right grip + right trigger = right click)
         settle(away);

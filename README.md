@@ -15,9 +15,10 @@ No steering wheel, no gamepad, no keyboard, no mouse, no extra hardware.
 Start the game in VR, put the headset on, and play. You never need to reach for the desk.
 
 > [!NOTE]
-> **Status:** v0.1.0, the first release: controller buttons as keys and mouse, **a VR menu and a full keyboard in the
-> headset**, and **driving with the controllers** (smooth steering, gas and brake). Planned: the keyboard pinned to the
-> cab, and single buttons you place anywhere (for example over a cab switch) that press a key.
+> **Status:** v0.2.0: controller buttons as keys and mouse in **four layers**, **a VR menu and a full keyboard in the
+> headset**, and **driving with the controllers** -- steer with the **stick**, a **wheel held with one or both hands**, or
+> by **pointing**; gas and brake on the triggers. Planned: the keyboard pinned to the cab, and single buttons you place
+> anywhere (for example over a cab switch) that press a key.
 
 > [!IMPORTANT]
 > **OpenXR only.** The mod works when the game runs in its **OpenXR** VR mode (`-openxr`). It does not work in the game's
@@ -26,17 +27,21 @@ Start the game in VR, put the headset on, and play. You never need to reach for 
 
 ## Screenshots
 
-| Buttons tab: picking a key | Buttons tab: with the modifier | Mouse tab |
+| Driving tab: steer with the Wheel | Driving tab: steer by Pointing | Driving tab: the Stick |
 |---|---|---|
-| ![The Buttons tab while a key is picked](docs/images/menu-pick.png) | ![The Buttons tab, with modifier](docs/images/menu-modifier.png) | ![The Mouse tab](docs/images/menu-mouse.png) |
+| ![The Driving tab with Wheel: hand turn for full lock, Stick on / off, hold the wheel with both / left / right / either grip](docs/images/menu-driving-wheel.png) | ![The Driving tab with Point: point angle for full lock, Stick on / off, the hand that points](docs/images/menu-driving-point.png) | ![The Driving tab with the stick](docs/images/menu-driving.png) |
+
+| Buttons tab: picking a key | Buttons tab: the Mod 1 layer (Normal / Mod 1 / Mod 2 / Both) | Mouse tab |
+|---|---|---|
+| ![The Buttons tab while a key is picked](docs/images/menu-pick.png) | ![The Buttons tab, the Mod 1 layer](docs/images/menu-modifier.png) | ![The Mouse tab](docs/images/menu-mouse.png) |
 
 | Panels tab | Look tab | The keyboard |
 |---|---|---|
 | ![The Panels tab](docs/images/menu-panels.png) | ![The Look tab](docs/images/menu-look.png) | ![The on-screen keyboard](docs/images/keyboard.png) |
 
-| Driving tab | Pointing at a setting: its help at the bottom | The compact keyboard (Panels tab > Compact) |
-|---|---|---|
-| ![The Driving tab](docs/images/menu-driving.png) | ![The Driving tab while the pointer is on "Wheel follows the stick": its help line at the bottom](docs/images/menu-driving-help.png) | ![The compact keyboard](docs/images/keyboard-compact.png) |
+| Pointing at a setting: its help at the bottom | The compact keyboard (Panels tab > Compact) |
+|---|---|
+| ![The Driving tab while the pointer is on "Wheel follows the stick": its help line at the bottom](docs/images/menu-driving-help.png) | ![The compact keyboard](docs/images/keyboard-compact.png) |
 
 ![The white pointer dot on the G key of the keyboard](docs/images/keyboard-pointer.png)
 
@@ -87,8 +92,9 @@ Only one OpenXR runtime is active at a time; the last one you set wins.
   buttons; right grip held = layer 2; left grip held = layer 3; **both grips held = layer 4**. Hold the grip(s) first,
   then press the button. A button with nothing set in a layer does its normal job. (Both grips + the left stick click is
   the menu's own combo: that one never sends a key.)
-- **Driving**: the left stick steers, the right trigger is the gas pedal, the left trigger the brake. Smooth, like a
-  gamepad, not on / off keys. Gas and brake can go on any button. See [Driving](#driving-with-one-controller).
+- **Driving**: three ways to steer -- the left stick (default), a **wheel** you hold with one or both grips, or
+  **pointing** a controller left / right. The right trigger is the gas pedal, the left trigger the brake. Smooth, not on /
+  off keys. Gas and brake can go on any button. See [Driving](#driving-with-one-controller).
 - **VR menu + keyboard**: hold both grips + the left stick click for 1 second. A menu opens in front of you. See [The VR menu](#the-vr-menu).
 - The game's own VR controls (the trigger and the left menu button) still work.
 - It only works in the games named in `config.ini`. In every other VR program it does nothing.
@@ -144,7 +150,7 @@ function to a controller button instead (for example `y = l` for the lights).
 
 <a name="driving-with-one-controller"></a>
 <details>
-<summary><h2>Driving with one controller</h2></summary>
+<summary><h2>Driving with the controllers</h2></summary>
 
 By default:
 
@@ -269,8 +275,10 @@ a laser pointer. A **white dot** appears where you point, and the key under it l
 - **Mouse** tab: which stick moves the mouse, its speed and dead zone, the air mouse button, hold or toggle, its speed.
 - **Panels** tab: menu size, keyboard size, show / hide the keyboard, bring both in front of you.
 - **Panels** tab also: the distance of each panel (Closer / Farther).
-- **Driving** tab: driving on / off, the stick that steers (left / right / off), the dead zone, small turns, how far the wheel
-  turns, how quickly it follows the stick and comes back, its top speed, and speed-sensitive steering. Gas and brake: any button, Buttons tab. See [Driving](#driving-with-one-controller).
+- **Driving** tab: **Steer with** Stick / Wheel / Point / Off; for Wheel and Point the hand angle for full lock, Stick on /
+  off, and which grips hold the wheel (Both / Left / Right / Either) or which hand points (Left / Right); for the stick
+  the stick that steers, the dead zone, small turns, how far the wheel turns, how quickly it follows the stick and comes
+  back, its top speed; and speed-sensitive steering. Gas and brake: any button, Buttons tab. See [Driving](#driving-with-one-controller).
 - **Look** tab: colours (Dark, Blue, Grey, Light, Black, Green), how see-through the menu and the keyboard are, and
   **pointer smoothing** (Off / Low / Medium / High): calms a shaky hand, for the menu pointer and the air mouse.
 - **Reset tab** (bottom right of every tab): puts that tab's settings back to the defaults. Press it twice (the first
@@ -294,7 +302,7 @@ ETS2 / ATS DLAA mod's menu (`Delete`). The menu and keyboard float in the room: 
 <details>
 <summary><h2>Install</h2></summary>
 
-1. Download `ETS2-ATS-VR-Controls-v0.1.0.zip` from the [Releases](../../releases) page. Close the game.
+1. Download `ETS2-ATS-VR-Controls-v0.2.0.zip` from the [Releases](../../releases) page. Close the game.
 2. Unzip the folder to a place where it can stay (for example `C:\ETS2 ATS VR Controls`).
 3. Right-click `install.ps1` > **Run with PowerShell**. Click **Yes** in the Windows admin prompt.
    (Admin is needed: ETS2 / ATS only load VR add-ons that are registered for all users.)
