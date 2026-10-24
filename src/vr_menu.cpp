@@ -666,6 +666,13 @@ static bool MenuOnly(const VrPad::Config& p, const std::vector<int>& combo, int 
     }
     return in && all;
 }
+// the layer needs a grip that holds the wheel (steer with the wheel): those grips do nothing else, so the layer is out
+static bool LayerOnWheel(const VrPad::Config& p, int layer) {
+    auto g = [](int m) { return m == VrPad::kLGrip ? 1 : m == VrPad::kRGrip ? 2 : 0; };
+    const int need = ((layer & 1) ? g(p.modBtn) : 0) | ((layer & 2) ? g(p.modBtn2) : 0);
+    if (need & VrPad::WheelGripMask(p)) return true;
+    return p.drive && p.steerWith == 1 && p.steerWheelGrip == 0 && need == 3;   // (both grips together = the wheel)
+}
 // the layer's modifiers are all set (layer 3: both)
 static bool LayerReady(const VrPad::Config& p, int layer) {
     return layer == 0 || (((layer & 1) == 0 || p.modBtn >= 0) && ((layer & 2) == 0 || p.modBtn2 >= 0));
@@ -723,7 +730,8 @@ void VrMenu::LayoutMenu() {
                                            "Show and set what each button does while you hold modifier 2 (" + m2 + ").",
                                            "Show and set what each button does while you hold BOTH modifiers." };
         for (int l = 0; l < 4; ++l) {
-            m0 = el.size(); add(eSet, kChipArg[l], 24 + l * 146, 150, 138, 44, kChip[l], layer_ == l, !LayerReady(pad_, l));
+            m0 = el.size();
+            add(eSet, kChipArg[l], 24 + l * 146, 150, 138, 44, kChip[l], layer_ == l, !LayerReady(pad_, l) || LayerOnWheel(pad_, l));
             tip(m0, kChipHelp[l]);
         }
         m0 = el.size(); add(eSet, 122, 612, 150, 178, 44, "1: " + m1);
@@ -741,7 +749,10 @@ void VrMenu::LayoutMenu() {
                 bool combo = false;                  // (one of the menu's open / close buttons)
                 for (int cb : gate_.btns) combo = combo || cb == btn;
                 const bool menuOnly = MenuOnly(pad_, gate_.btns, layer_, btn);
-                if (layer_ && VrPad::IsModifier(pad_, btn)) { val = btn == pad_.modBtn ? "modifier 1" : "modifier 2"; dim = true; }
+                const int wg = VrPad::WheelGripMask(pad_);
+                if ((btn == VrPad::kLGrip && (wg & 1)) || (btn == VrPad::kRGrip && (wg & 2))) { val = "the wheel"; dim = true; }
+                else if (LayerOnWheel(pad_, layer_)) { val = "(grips = the wheel)"; dim = true; }
+                else if (layer_ && VrPad::IsModifier(pad_, btn)) { val = btn == pad_.modBtn ? "modifier 1" : "modifier 2"; dim = true; }
                 else if (btn == pad_.airBtn) { val = "air mouse"; dim = true; }
                 else if (btn >= VrPad::kLUp && pad_.mouseStick == (btn >= VrPad::kRUp ? 2 : 1)) { val = "moves the mouse"; dim = true; }
                 else if (DrivingUses(pad_, btn)) { val = "steers"; dim = true; }
@@ -868,16 +879,20 @@ void VrMenu::LayoutMenu() {
         add(eInfo, 302, 24, 596, 952, 56, "Smoothing calms a shaky hand (menu pointer and air mouse).");
         add(eInfo, 0, 24, 704, 742, 54, status_.empty() ? "- = more see-through, + = more solid." : status_);
     } else {                                            // Driving (scs_input.h): steering here, gas / brake on any button
-        auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 150 + r * 61, 440, 54, label); };
+        // wheel / point add a row (which grips / which hand): 10 rows, a little closer together
+        const bool hands = pad_.drive && (pad_.steerWith == 1 || pad_.steerWith == 2);
+        const int o = hands ? 1 : 0, pitch = hands ? 55 : 61, rh = hands ? 48 : 54;
+        auto Y = [&](int r) { return 150 + r * pitch; };
+        auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, Y(r), 440, rh, label); };
         auto opts = [&](int r, int base, std::initializer_list<const char*> names, int cur) {
             const int n = (int)names.size(), w = (506 - (n - 1) * 10) / n;
             int i = 0;
-            for (const char* nm : names) { add(eSet, base + i, 470 + i * (w + 10), 150 + r * 61, w, 54, nm, i == cur); ++i; }
+            for (const char* nm : names) { add(eSet, base + i, 470 + i * (w + 10), Y(r), w, rh, nm, i == cur); ++i; }
         };
         auto plusMinus = [&](int r, int base, const std::string& value) {
-            add(eSet, base, 470, 150 + r * 61, 90, 54, "\xE2\x88\x92");
-            add(eInfo, 200 + r, 570, 150 + r * 61, 306, 54, value);
-            add(eSet, base + 1, 886, 150 + r * 61, 90, 54, "+");
+            add(eSet, base, 470, Y(r), 90, rh, "\xE2\x88\x92");
+            add(eInfo, 200 + r, 570, Y(r), 306, rh, value);
+            add(eSet, base + 1, 886, Y(r), 90, rh, "+");
         };
         {                                               // steer with: Stick 155 / Wheel 156 / Point 157 / Off 148 (147 = on)
             m0 = el.size();
@@ -885,74 +900,82 @@ void VrMenu::LayoutMenu() {
             const int cur = !pad_.drive ? 3 : pad_.steerWith == 1 ? 1 : pad_.steerWith == 2 ? 2 : 0;
             static const int kArg[4] = { 155, 156, 157, 148 };
             static const char* const kName[4] = { "Stick", "Wheel", "Point", "Off" };
-            for (int i = 0; i < 4; ++i) add(eSet, kArg[i], 470 + i * 129, 150, 119, 54, kName[i], i == cur);
-            tip(m0, "Stick: the stick steers. Wheel: hold both grips and turn your hands like a steering wheel. Point: point "
-                    "the right controller left / right (not while it points at a panel or the air mouse is on). The stick "
-                    "always works too. Off: no driving.");
+            for (int i = 0; i < 4; ++i) add(eSet, kArg[i], 470 + i * 129, Y(0), 119, rh, kName[i], i == cur);
+            tip(m0, "Stick: the stick steers. Wheel: hold the grip(s) and turn your hands like a steering wheel. Point: point "
+                    "a controller left / right (on a panel the wheel holds). Off: no driving.");
         }
-        if (pad_.drive && (pad_.steerWith == 1 || pad_.steerWith == 2)) {   // the hands: how far to full lock
+        if (hands) {                                    // the hands: [Stick on / off] [-] angle [+], then grips / hand
             const bool wheel = pad_.steerWith == 1;
-            const int y = 150 + 61;                     // [Stick on / off] [-] angle [+]
             m0 = el.size(); row(1, wheel ? "Hands turn for full lock" : "Point for full lock");
             snprintf(b, sizeof(b), "%.0f deg", (double)(wheel ? pad_.steerWheelAngle : pad_.steerPointAngle));
-            add(eSet, 158, 590, y, 80, 54, "\xE2\x88\x92");
-            add(eInfo, 201, 680, y, 196, 54, b);
-            add(eSet, 159, 886, y, 90, 54, "+");
+            add(eSet, 158, 590, Y(1), 80, rh, "\xE2\x88\x92");
+            add(eInfo, 201, 680, Y(1), 196, rh, b);
+            add(eSet, 159, 886, Y(1), 90, rh, "+");
             tip(m0, wheel ? "How far you turn your hands (like a wheel) for full lock. Less = quicker, more = calmer."
                           : "How far you point left / right for full lock. Less = quicker, more = calmer.");
             m0 = el.size();
-            add(eSet, 160, 470, y, 110, 54, pad_.steerStickToo ? "Stick on" : "Stick off", pad_.steerStickToo);
+            add(eSet, 160, 470, Y(1), 110, rh, pad_.steerStickToo ? "Stick on" : "Stick off", pad_.steerStickToo);
             tip(m0, "Stick on: the stick steers too (it wins while you push it). Stick off: only your hands steer, and the "
                     "stick's left / right are normal buttons again.");
+            if (wheel) {
+                m0 = el.size(); row(2, "Hold the wheel with");
+                opts(2, 161, { "Both", "Left", "Right", "Either" }, pad_.steerWheelGrip & 3);
+                tip(m0, "Both: both grips together (one grip alone keeps its own job). Left / Right / Either: one grip is "
+                        "enough -- that grip is then only the wheel (no modifier, no air mouse, no key on it).");
+            } else {
+                m0 = el.size(); row(2, "Hand that points");
+                opts(2, 165, { "Left", "Right" }, pad_.steerPointHand ? 1 : 0);
+                tip(m0, "The controller you point with. The other hand stays free for the keyboard and the menu.");
+            }
         } else {
             m0 = el.size(); row(1, "Stick that steers");
             opts(1, 130, { "Left", "Right", "Off" }, pad_.steerStick == 1 ? 0 : pad_.steerStick == 2 ? 1 : 2);
             tip(m0, "Which stick steers the truck (left / right). Its up / down stay free for other buttons.");
         }
-        m0 = el.size(); row(2, "Steering dead zone");
+        m0 = el.size(); row(2 + o, "Steering dead zone");
         snprintf(b, sizeof(b), "%.2f", (double)pad_.steerDeadzone);
-        plusMinus(2, 133, b);
+        plusMinus(2 + o, 133, b);
         tip(m0, "How far you must push the stick before the wheel turns. More = a calm middle, less = it reacts sooner.");
-        m0 = el.size(); row(3, "Small turns (most of the stick)");
+        m0 = el.size(); row(3 + o, "Small turns (most of the stick)");
         if (pad_.steerFine >= pad_.steerFineZone - 0.001f) snprintf(b, sizeof(b), "even (off)");
         else snprintf(b, sizeof(b), "up to %d %%", (int)(pad_.steerFine * 100.0f + 0.5f));
-        plusMinus(3, 135, b);
+        plusMinus(3 + o, 135, b);
         char hb[200];
         snprintf(hb, sizeof(hb), "Most of the stick (the first %d %% of a push) makes small, careful turns, up to this much of the wheel."
                  " Only the last bit, at the edge, turns hard.", (int)(pad_.steerFineZone * 100.0f + 0.5f));
         tip(m0, hb);
-        m0 = el.size(); row(4, "Full stick turns the wheel");
+        m0 = el.size(); row(4 + o, "Full stick turns the wheel");
         snprintf(b, sizeof(b), "%d %%", (int)(pad_.steerMax * 100.0f + 0.5f));
-        plusMinus(4, 137, b);
+        plusMinus(4 + o, 137, b);
         tip(m0, "How far the wheel turns with the stick pushed all the way. 100 % = full lock.");
-        m0 = el.size(); row(5, "Wheel follows the stick");
+        m0 = el.size(); row(5 + o, "Wheel follows the stick");
         if (pad_.steerFollowTime <= 0.0f) snprintf(b, sizeof(b), "at once");
         else snprintf(b, sizeof(b), "%.3g s", (double)pad_.steerFollowTime);
-        plusMinus(5, 143, b);
+        plusMinus(5 + o, 143, b);
         tip(m0, "Smoothing while you hold the stick: how quickly the wheel goes where the stick points. More = smoother, calmer.");
-        m0 = el.size(); row(6, "Let go: back to the middle");
+        m0 = el.size(); row(6 + o, "Let go: back to the middle");
         if (pad_.steerCenterTime <= 0.0f) snprintf(b, sizeof(b), "at once");
         else snprintf(b, sizeof(b), "%.3g s", (double)pad_.steerCenterTime);
-        plusMinus(6, 145, b);
+        plusMinus(6 + o, 145, b);
         tip(m0, "Let go of the stick: how the wheel comes back to straight. At once = at the wheel speed below. More = a slow glide.");
-        m0 = el.size(); row(7, "Wheel speed at most");
+        m0 = el.size(); row(7 + o, "Wheel speed at most");
         if (pad_.steerRate <= 0.0f) snprintf(b, sizeof(b), "no limit");
         else snprintf(b, sizeof(b), "%.2g s to full", 1.0 / (double)pad_.steerRate);
-        plusMinus(7, 139, b);
+        plusMinus(7 + o, 139, b);
         tip(m0, "The fastest the wheel turns (full push; a small push turns it slower): seconds from straight to full lock.");
         {                                               // speed-sensitive: [On / Off] [-] value [+]
-            const int r = 8, y = 150 + r * 61;
+            const int r = 8 + o, y = Y(r);
             m0 = el.size();
             row(r, "At 90 km/h: steering");
-            add(eSet, 154, 470, y, 110, 54, pad_.steerSpeedSens ? "On" : "Off", pad_.steerSpeedSens);
+            add(eSet, 154, 470, y, 110, rh, pad_.steerSpeedSens ? "On" : "Off", pad_.steerSpeedSens);
             snprintf(b, sizeof(b), "%d %%", (int)(pad_.steerAtSpeed * 100.0f + 0.5f));
-            add(eSet, 152, 590, y, 80, 54, "\xE2\x88\x92");
-            add(eInfo, 200 + r, 680, y, 196, 54, pad_.steerSpeedSens ? b : "(off)");
-            add(eSet, 153, 886, y, 90, 54, "+");
-            tip(m0, "On: at speed the stick turns the wheel less, for calm highway driving. The % = how much at 90 km/h.");
+            add(eSet, 152, 590, y, 80, rh, "\xE2\x88\x92");
+            add(eInfo, 200 + r, 680, y, 196, rh, pad_.steerSpeedSens ? b : "(off)");
+            add(eSet, 153, 886, y, 90, rh, "+");
+            tip(m0, "On: at speed the wheel turns less, for calm highway driving. The % = how much at 90 km/h.");
         }
         add(eInfo, 0, 24, 704, 742, 54, !status_.empty() ? status_ : !pad_.drive ? "Driving off: no steering, gas or brake."
-                                        : pad_.steerWith == 1 ? "Wheel: hold both grips and turn your hands. Let go = straight."
+                                        : pad_.steerWith == 1 ? "Wheel: hold the grip(s) and turn your hands. Let go = straight."
                                         : pad_.steerWith == 2 ? "Point: point left / right. On a panel the wheel holds."
                                         : "Most of the stick = small turns. All the way = hard turns.");
     }
@@ -1276,6 +1299,8 @@ void VrMenu::SetValue(int arg) {
     case 147: case 148: pad_.drive = arg == 147; break;
     case 155: case 156: case 157: pad_.drive = true; pad_.steerWith = arg - 155; break;
     case 160: pad_.steerStickToo = !pad_.steerStickToo; break;
+    case 161: case 162: case 163: case 164: pad_.steerWheelGrip = arg - 161; break;
+    case 165: case 166: pad_.steerPointHand = arg - 165; break;
     case 158: case 159: {                              // the hands' angle to full lock: 5 degree steps
         const bool wheel = pad_.steerWith == 1;
         float& v = wheel ? pad_.steerWheelAngle : pad_.steerPointAngle;
@@ -1403,7 +1428,7 @@ void VrMenu::ResetTab() {
         pad_.steerRate = d.steerRate;
         pad_.steerAtSpeed = d.steerAtSpeed; pad_.steerSpeedSens = d.steerSpeedSens;
         pad_.steerWith = d.steerWith; pad_.steerWheelAngle = d.steerWheelAngle; pad_.steerPointAngle = d.steerPointAngle;
-        pad_.steerStickToo = d.steerStickToo;
+        pad_.steerStickToo = d.steerStickToo; pad_.steerWheelGrip = d.steerWheelGrip; pad_.steerPointHand = d.steerPointHand;
         break;
     }
     LOGI("VR menu: tab %d reset to the defaults", tab_);
@@ -1441,6 +1466,11 @@ void VrMenu::Activate(int h, const Ref& r, const VrPad::Frame&, VrPad::Sink& sin
     case eTab: tab_ = r.arg; status_.clear(); break;
     case eRow:
         if (!LayerReady(pad_, layer_)) { status_ = "Choose that modifier button first (the buttons above)."; break; }
+        if (LayerOnWheel(pad_, layer_)) { status_ = "Steering with the wheel: those grips hold it (Driving tab)."; break; }
+        if ((r.arg == VrPad::kLGrip && (VrPad::WheelGripMask(pad_) & 1)) || (r.arg == VrPad::kRGrip && (VrPad::WheelGripMask(pad_) & 2))) {
+            status_ = std::string(BtnLabel(r.arg)) + " holds the wheel (Driving tab).";
+            break;
+        }
         if (layer_ && VrPad::IsModifier(pad_, r.arg)) {
             status_ = std::string(BtnLabel(r.arg)) + (r.arg == pad_.modBtn ? " is modifier 1." : " is modifier 2.");
             break;

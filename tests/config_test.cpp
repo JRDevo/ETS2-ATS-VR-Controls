@@ -117,6 +117,13 @@ int main(int argc, char** argv) {
     for (const auto& kv : MenuValues(sw.pad, PanelPlace(), PanelPlace(), MenuLook())) w3 += kv.first + " = " + kv.second + "\n";
     const Config swr = ParseConfig(w3);
     CHECK(d.pad.steerStickToo && !ParseConfig("steer_stick_too = 0\n").pad.steerStickToo, "steer_stick_too: on by default, 0 = off");
+    const Config wg = ParseConfig("steer_wheel_grip = either\nsteer_point_hand = left\n");
+    std::string w4;
+    for (const auto& kv : MenuValues(wg.pad, PanelPlace(), PanelPlace(), MenuLook())) w4 += kv.first + " = " + kv.second + "\n";
+    const Config wgr = ParseConfig(w4);
+    CHECK(d.pad.steerWheelGrip == 0 && wg.pad.steerWheelGrip == 3 && wg.pad.steerPointHand == 0 && wgr.pad.steerWheelGrip == 3 &&
+          wgr.pad.steerPointHand == 0 && ParseConfig("steer_wheel_grip = feet\n").notes.size() == 1,
+          "steer_wheel_grip (both by default) and steer_point_hand: parsed, written, read back; a bad word noted");
     CHECK(swr.pad.steerWith == 2 && swr.pad.steerPointAngle == 40.0f && swr.pad.steerWheelAngle == 120.0f && swr.notes.empty(),
           "the menu's steering lines read back the same");
     const Config sb = ParseConfig("steer_with = mouse\nsteer_point_angle = 5\nsteer_point_hand = up\n");

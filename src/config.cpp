@@ -116,6 +116,14 @@ Config ParseConfig(const std::string& text) {
             else bad("left or right");
             continue;
         }
+        if (key == "steer_wheel_grip") {
+            if (lv == "both") c.pad.steerWheelGrip = 0;
+            else if (lv == "left") c.pad.steerWheelGrip = 1;
+            else if (lv == "right") c.pad.steerWheelGrip = 2;
+            else if (lv == "either") c.pad.steerWheelGrip = 3;
+            else bad("both, left, right or either");
+            continue;
+        }
         if (key == "steer_stick_too") { c.pad.steerStickToo = lv != "0" && lv != "off" && lv != "no"; continue; }
         if (key == "steer_point_button") {
             if (lv == "off" || lv == "none" || lv == "0") { c.pad.steerPointBtn = -1; continue; }
@@ -343,6 +351,9 @@ std::vector<std::pair<std::string, std::string>> MenuValues(const VrPad::Config&
     snprintf(b, sizeof(b), "%.0f", (double)p.steerPointAngle);
     kv.push_back({ "steer_point_angle", b });
     kv.push_back({ "steer_stick_too", p.steerStickToo ? "1" : "0" });
+    static const char* const kGrip[4] = { "both", "left", "right", "either" };
+    kv.push_back({ "steer_wheel_grip", kGrip[p.steerWheelGrip & 3] });
+    kv.push_back({ "steer_point_hand", p.steerPointHand ? "right" : "left" });
     if (menu.set) kv.push_back({ "menu_place", PlaceString(menu) });
     if (kb.set) kv.push_back({ "keyboard_place", PlaceString(kb) });
     kv.push_back({ "theme", ThemeNames()[look.theme < 0 || look.theme >= kThemeCount ? 0 : look.theme] });
@@ -470,9 +481,23 @@ std::string DescribePad(const VrPad::Config& p) {
     std::string aim;
     if (p.drive && p.steerWith == 1) {
         char a[120];
-        snprintf(a, sizeof(a), " | two-hand wheel (both grips): %.0f deg to full lock, dead zone %.0f deg, smooth %.2f s, stick too %s",
-                 (double)p.steerWheelAngle, (double)p.steerAimDeadzone, (double)p.steerAimSmooth, p.steerStickToo ? "on" : "off");
+        static const char* const kGrip[4] = { "both grips", "the left grip", "the right grip", "either grip" };
+        snprintf(a, sizeof(a), " | wheel (held with %s): %.0f deg to full lock, dead zone %.0f deg, smooth %.2f s, stick too %s",
+                 kGrip[p.steerWheelGrip & 3], (double)p.steerWheelAngle, (double)p.steerAimDeadzone, (double)p.steerAimSmooth,
+                 p.steerStickToo ? "on" : "off");
         aim = a;
+        // a grip that is the wheel does nothing else: say what that switches off (the log's mapping line)
+        const int wg = VrPad::WheelGripMask(p);
+        for (int h = 0; h < 2; ++h) {
+            if (!(wg & (1 << h))) continue;
+            const int g = h ? VrPad::kRGrip : VrPad::kLGrip;
+            if (g == p.airBtn) aim += std::string(" -- ") + VrPad::BtnNames()[g] + " is the wheel: no air mouse";
+            if (g == p.modBtn) aim += std::string(" -- ") + VrPad::BtnNames()[g] + " is the wheel: no modifier 1 layer";
+            if (g == p.modBtn2) aim += std::string(" -- ") + VrPad::BtnNames()[g] + " is the wheel: no modifier 2 layer";
+        }
+        if (p.steerWheelGrip == 0 && p.modBtn >= 0 && p.modBtn2 >= 0 &&
+            ((p.modBtn == VrPad::kLGrip && p.modBtn2 == VrPad::kRGrip) || (p.modBtn == VrPad::kRGrip && p.modBtn2 == VrPad::kLGrip)))
+            aim += " -- both grips are the wheel: no Both layer";
     } else if (p.drive && p.steerWith == 2) {
         char a[160];
         snprintf(a, sizeof(a), " | point to steer (%s hand, %s): %.0f deg to full lock, dead zone %.0f deg, smooth %.2f s, stick too %s",

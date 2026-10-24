@@ -792,6 +792,69 @@ int main() {
         CHECK(std::fabs(r.drv[0] - k30 * 0.3f) < 0.01f, "at 90 km/h: 0.3 of it (%.3f)", (double)r.drv[0]);
         CHECK(r.Take().empty(), "no key from the grips while they hold the wheel");
     }
+    {   // the wheel with one hand (steerWheelGrip): the hand moves round a rim; that grip is only the wheel
+        Config c = DefaultConfig();
+        c.steerWith = 1; c.steerWheelGrip = 2;          // the right grip alone holds the wheel
+        ParseOut("f6", &c.map[kRGrip]);                 // (a key on that grip: never sent while it is the wheel)
+        ParseOut("f7", &c.modMap[kA]);                  // right grip = modifier 1 by default: A with it would be F7
+        ParseOut("f5", &c.map[kA]);
+        Mapper mp; Rec r; Frame f;
+        f.hand[0] = f.hand[1] = true; f.pos[0] = f.pos[1] = true; f.aim[1] = true;
+        f.p[1][0] = 0.25; f.p[1][1] = 0.0; f.p[1][2] = -0.4;
+        f.grip[1] = 1.0f;
+        run(mp, f, 0.3, c, r);
+        CHECK(mp.WheelHeld() == 2 && mp.AimSteering() && r.drv[0] == 0.0f && r.Take().empty() && !mp.AirOn(),
+              "right grip alone holds the wheel: no key, no air mouse");
+        const double a30 = 30.0 * 3.14159265358979 / 180.0;   // the hand 30 degrees down round the rim (centre 0.2 m left)
+        f.p[1][0] = 0.05 + 0.2 * std::cos(a30); f.p[1][1] = -0.2 * std::sin(a30);
+        run(mp, f, 0.6, c, r);
+        const float k30 = (30.0f - 2.0f) / (90.0f - 2.0f);
+        CHECK(std::fabs(r.drv[0] - k30) < 0.01f, "one hand 30 degrees down the rim: a right turn of %.3f (%.3f)", (double)k30, (double)r.drv[0]);
+        f.prim[1] = true;                               // A while the right grip holds the wheel: A, not the modifier's F7
+        run(mp, f, 0.05, c, r);
+        f.prim[1] = false;
+        run(mp, f, 0.05, c, r);
+        CHECK(r.Take() == "k03fv k03f^", "A while the grip is the wheel = A's own key (no modifier layer)");
+        f.grip[0] = 1.0f;                               // the left hand joins: two hands, the wheel stays where it is
+        f.p[0][0] = -0.25; f.p[0][1] = 0.0; f.p[0][2] = -0.4;
+        run(mp, f, 0.4, c, r);
+        CHECK(mp.WheelHeld() == 3 && std::fabs(r.drv[0] - k30) < 0.02f, "the left hand joins: no jump (%.3f)", (double)r.drv[0]);
+        f.grip[0] = 0.0f;
+        run(mp, f, 0.4, c, r);
+        CHECK(mp.WheelHeld() == 2 && std::fabs(r.drv[0] - k30) < 0.02f, "... and lets go again: still no jump (%.3f)", (double)r.drv[0]);
+        f.grip[1] = 0.0f;
+        run(mp, f, 0.5, c, r);
+        CHECK(r.drv[0] == 0.0f && mp.WheelHeld() == 0 && r.Take().empty(), "let go: straight, and the grip sent nothing");
+        c.steerWheelGrip = 0;                           // both: one grip alone keeps its jobs (air mouse on the right grip)
+        f.grip[1] = 1.0f;
+        run(mp, f, 0.2, c, r);
+        CHECK(mp.WheelHeld() == 0 && mp.AirOn() && !mp.AimSteering(), "Both: the right grip alone is the air mouse, no wheel");
+        f.grip[0] = 1.0f;
+        run(mp, f, 0.2, c, r);
+        CHECK(mp.WheelHeld() == 3 && !mp.AirOn(), "... both grips: the wheel, the air mouse off");
+        f.grip[0] = f.grip[1] = 0.0f;
+        c.steerWheelGrip = 1; ParseOut("brake", &c.map[kLGrip]);   // a pedal on a wheel grip: no brake from it
+        f.grip[0] = 1.0f;
+        f.p[0][0] = -0.25; f.p[0][1] = 0.0;
+        run(mp, f, 0.3, c, r);
+        CHECK(mp.WheelHeld() == 1 && r.drv[2] == 0.0f, "left grip = the wheel: its brake is off");
+        f.grip[0] = 0.0f;
+        run(mp, f, 0.5, c, r);
+        r.Take();
+    }
+    {   // pointing with the LEFT hand
+        Config c = DefaultConfig();
+        c.steerWith = 2; c.steerPointHand = 0;
+        Mapper mp; Rec r; Frame f;
+        f.hand[0] = f.hand[1] = true; f.aim[0] = true;
+        QuatYawPitch(20.0, 0.0, f.q[0]);
+        run(mp, f, 0.6, c, r);
+        CHECK(std::fabs(r.drv[0] - (20.0f - 2.0f) / 33.0f) < 0.01f, "the left hand points 20 degrees right: steers (%.3f)", (double)r.drv[0]);
+        mp.SetHands(false, true, false, false);        // the RIGHT hand on the keyboard: the left keeps steering
+        QuatYawPitch(-20.0, 0.0, f.q[0]);
+        run(mp, f, 0.6, c, r);
+        CHECK(std::fabs(r.drv[0] + (20.0f - 2.0f) / 33.0f) < 0.01f, "the right hand on a panel: the left hand still steers (%.3f)", (double)r.drv[0]);
+    }
     {   // pointing with one hand (the right): ahead = straight; pauses on a panel, for the air mouse, without its button
         Config c = DefaultConfig();
         c.steerWith = 2;                               // 35 degrees to full lock, dead zone 2

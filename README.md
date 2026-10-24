@@ -170,16 +170,19 @@ By default:
 | Steer with | How | Full lock |
 |---|---|---|
 | **Stick** (default) | the stick, as below | the stick all the way |
-| **Wheel** | hold **both grips** and turn your hands like a steering wheel: left hand up = turn right. Let go of the grips: the wheel goes back to straight. The grab does not move the wheel: grab it where your hands are | 90 degrees of hand turn (`steer_wheel_angle`) |
-| **Point** | point the **right** controller left / right: straight ahead = straight. While you point at the VR menu or keyboard, or use the air mouse, the wheel **holds where it is** -- so you can type in a bend | 35 degrees left / right (`steer_point_angle`) |
+| **Wheel** | hold the grips and turn your hands like a steering wheel: left hand up = turn right. **Hold the wheel with** both grips (default), the left, the right or either grip (`steer_wheel_grip`): with one hand, move it round the rim like a real wheel (right hand down = turn right). Let go: the wheel goes back to straight. The grab does not move the wheel, also when a second hand joins or lets go | 90 degrees of hand turn (`steer_wheel_angle`) |
+| **Point** | point a controller left / right (**Hand that points**: left or right, `steer_point_hand`): straight ahead = straight. While you point at the VR menu or keyboard, or use the air mouse, the wheel **holds where it is** -- so you can type in a bend | 35 degrees left / right (`steer_point_angle`) |
 
 - **Stick on / off** (next to the angle; `steer_stick_too`): on = the stick steers too (push it and it wins, let go and
   the hands steer again); off = only your hands steer, and the stick's left / right are normal buttons again.
 - Wheel and Point are speed-sensitive like the stick (At 90 km/h, below). The wheel follows the hands at once (smoothed a
   little: `steer_aim_smooth`, 0.08 s), with no speed limit.
-- While both hands hold the wheel, the air mouse is off. Both grips + other buttons still give the "Both" layer.
-- `config.ini` only: `steer_point_hand = left` (point with the left hand), `steer_point_button = x` (point steers only
-  while X is held; set X itself to none), `steer_aim_deadzone` (degrees around straight that do not steer, 2).
+- **A grip that holds the wheel is only the wheel:** no key, no modifier layer, no air mouse, no gas / brake from it. With
+  "Both", one grip alone keeps its own jobs; both together are the wheel (so no "Both" layer while steering with the
+  wheel). With Left / Right / Either, that grip is always the wheel: the Buttons tab shows it as "the wheel", and a layer
+  that needs it is greyed. Point with the other hand than the one you type with: the pointing hand steers on.
+- `config.ini` only: `steer_point_button = x` (point steers only while X is held; set X itself to none),
+  `steer_aim_deadzone` (degrees around straight that do not steer, 2).
 
 **How the wheel moves:** the stick's place is where the wheel goes. The stick's throw is short, so it has two zones:
 most of it (up to 80 % of a push) makes **small, careful turns** -- up to 20 % of the wheel, for following the road --, and

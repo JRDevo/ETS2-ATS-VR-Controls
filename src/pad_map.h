@@ -234,6 +234,12 @@ struct Config {
     float steerAimSmooth = 0.08f;                      // s, the wheel following the hands (0 = at once)
     int   steerPointHand = 1;                          // 0 left, 1 right
     int   steerPointBtn = -1;                          // -1 = always (but the pauses above); a button = only while held
+    // the wheel: which grips hold it (2026-10-24, the user: "why can't I just grip the wheel with one hand?"): 0 both (both
+    // grips together; one grip alone keeps its own jobs), 1 left, 2 right, 3 either. With one hand the hand moves round a
+    // rim like a real wheel (the hand at 3 / 9 o'clock, the centre kWheelRadius inside); with both, the line between them.
+    // A grip that holds the wheel is ONLY the wheel (no key, modifier, air mouse, gas / brake: WheelGrips); left / right
+    // / either make that grip the wheel's for good while steering with the wheel.
+    int   steerWheelGrip = 0;
     // wheel / point: the stick steers too (it wins while pushed). Off: only the hands steer, and the steering stick's left /
     // right are buttons again (the user 2026-10-24: "an option to keep thumbstick enabled might be good")
     bool  steerStickToo = true;
@@ -329,6 +335,12 @@ inline float SpeedFactor(float kmh, const Config& c) {   // 1 slow .. steerAtSpe
     const float t = kmh <= 10.0f ? 0.0f : kmh >= 90.0f ? 1.0f : (kmh - 10.0f) / 80.0f;
     return 1.0f + (c.steerAtSpeed - 1.0f) * t;
 }
+// the grips that are only the wheel whatever happens (steer with the wheel, one-hand grips): bit 0 left, bit 1 right
+inline int WheelGripMask(const Config& c) {
+    if (!c.drive || c.steerWith != 1) return 0;
+    return c.steerWheelGrip == 1 ? 1 : c.steerWheelGrip == 2 ? 2 : c.steerWheelGrip == 3 ? 3 : 0;
+}
+constexpr double kWheelRadius = 0.2;                   // m, the one-hand wheel's rim: its centre this far inside the hand
 inline int SteerStickOf(const Config& c) {              // the stick that steers now (0 none)
     return c.drive && (c.steerWith == 0 || c.steerStickToo) ? c.steerStick : 0;
 }
@@ -375,6 +387,10 @@ public:
     void Step(const Frame& f, bool active, double dt, const Config& c, Sink& s) {
         bool want[kBtnCount] = {};
         if (active) Want(f, c, want);
+        WheelHands(f, c, active);                      // the grips holding the wheel now (steer with the wheel)
+        const int wheelGrips = WheelGripMask(c) | wheelMask_;
+        for (int h = 0; h < 2; ++h)                    // a grip on the wheel is only the wheel: no key, modifier, air mouse
+            if (wheelGrips & (1 << h)) want[h ? kRGrip : kLGrip] = false;
         const int layer = LayerOf(c, want);
         for (int b = 0; b < kBtnCount; ++b) {
             if (want[b] == down_[b]) continue;
@@ -475,6 +491,7 @@ public:
             dv[0] = sh == 0 || sh == 1 || c.steerWith == 1 || c.steerWith == 2 ? st : 0.0f;
             for (int b = 0; b < kBtnCount; ++b) {      // gas / brake: the most pressed button mapped to each
                 if (b == c.airBtn) continue;
+                if ((b == kLGrip && (wheelGrips & 1)) || (b == kRGrip && (wheelGrips & 2))) continue;   // (on the wheel)
                 const float v = Pressed(f, c, b);
                 if (notPedal_[b]) {                    // pressed as a key / click (e.g. grip + trigger = click, then the
                     if (v <= 0.0f && !down_[b]) notPedal_[b] = false;   // grip let go first): no gas until fully let go
@@ -509,22 +526,53 @@ public:
         handPoint_[0] = pointL; handPoint_[1] = pointR; handHold_[0] = holdL; handHold_[1] = holdR;
     }
     bool AimSteering() const { return aimOn_; }        // the hands steer now (wheel held / pointing)
+    int WheelHeld() const { return wheelMask_; }       // the grips on the wheel at the last Step (bit 0 left, bit 1 right)
 
 private:
     // steering with the hands (Config::steerWith): true + *v (-1 .. 1, the wheel's share before steerMax and the speed range)
     // while they steer. Tracking lost for a moment (< 0.3 s) keeps the last value. sf = the speed factor now, cur = the
     // wheel now (the wheel's grab is relative: grabbing does not move it).
+    // the grips that hold the wheel this frame (Config::steerWheelGrip; a hand holding a panel does not): wheelMask_
+    void WheelHands(const Frame& f, const Config& c, bool active) {
+        bool held[2] = {};
+        for (int h = 0; h < 2; ++h)
+            held[h] = active && f.hand[h] && !handHold_[h] && f.grip[h] > ((wheelMask_ >> h) & 1 ? kReleaseAt : kPressAt);
+        int m = 0;
+        if (active && c.drive && c.steerWith == 1) {
+            switch (c.steerWheelGrip) {
+            case 1: m = held[0] ? (held[1] ? 3 : 1) : 0; break;
+            case 2: m = held[1] ? (held[0] ? 3 : 2) : 0; break;
+            case 3: m = (held[0] ? 1 : 0) | (held[1] ? 2 : 0); break;
+            default: m = held[0] && held[1] ? 3 : 0; break;
+            }
+        }
+        wheelMask_ = m;
+    }
     bool AimSteer(const Frame& f, const Config& c, float t, float sf, float cur, float* v) {
         bool want = false, seen = false;
         double ang = 0.0, lock = 1.0;
-        if (c.steerWith == 1) {                        // the wheel: both grips held, no hand on a panel
-            const float g = aimOn_ ? kReleaseAt : kPressAt;
-            want = f.hand[0] && f.hand[1] && f.grip[0] > g && f.grip[1] > g && !handHold_[0] && !handHold_[1];
-            if (want && f.pos[0] && f.pos[1]) {        // left hand higher = a right turn, whichever way the player faces
+        bool regrab = false;
+        if (c.steerWith == 1) {                        // the wheel: the grips WheelHands found (none on a panel)
+            const int m = wheelMask_;
+            want = m != 0;
+            if (m == 3 && f.pos[0] && f.pos[1]) {      // both: left hand higher = a right turn, whichever way the player faces
                 const double dx = f.p[1][0] - f.p[0][0], dz = f.p[1][2] - f.p[0][2];
                 ang = std::atan2(f.p[0][1] - f.p[1][1], std::sqrt(dx * dx + dz * dz)) * 57.2957795;
                 seen = true;
+            } else if (m == 1 || m == 2) {             // one hand on the rim: round the centre set at the grab
+                const int h = m == 2 ? 1 : 0;
+                if (f.pos[h]) {
+                    if (m != refMask_) {               // (a new grab: the rim's centre kWheelRadius inside the hand)
+                        rimC_[0] = f.p[h][0] + (h ? -kWheelRadius : kWheelRadius);
+                        rimC_[1] = f.p[h][1];
+                    }
+                    const double x = f.p[h][0] - rimC_[0], y = f.p[h][1] - rimC_[1];
+                    ang = (h ? std::atan2(-y, x) : std::atan2(y, -x)) * 57.2957795;   // right hand down / left up = right
+                    seen = true;
+                }
             }
+            if (seen && m != refMask_) { regrab = aimOn_; refMask_ = m; }   // (one hand <-> two: the wheel keeps its place)
+            if (!want) refMask_ = 0;
             lock = c.steerWheelAngle;
         } else if (c.steerWith == 2) {                 // pointing: that hand's yaw, unless it is busy elsewhere
             const int h = c.steerPointHand & 1;
@@ -552,9 +600,11 @@ private:
             return true;
         }
         aimLost_ = 0.0f;
-        if (!aimOn_) {                                 // the grab: the wheel keeps its place (point: absolute, ahead = straight)
-            const float k = c.steerMax * sf;
-            aimRef_ = c.steerWith == 1 && k > 0.01f ? ang - cur / k * lock : 0.0;
+        if (!aimOn_ || regrab) {                       // the grab: the wheel keeps its place (point: absolute, ahead = straight)
+            const float k = c.steerMax * sf;           // (the angle that gives the wheel now, past the dead zone)
+            const double u = k > 0.01f ? cur / k : 0.0, adz = c.steerAimDeadzone < lock * 0.5 ? c.steerAimDeadzone : lock * 0.5;
+            const double du = u == 0.0 ? 0.0 : (u < 0 ? -1.0 : 1.0) * ((u < 0 ? -u : u) * (lock - adz) + adz);
+            aimRef_ = c.steerWith == 1 ? ang - du : 0.0;
             aimOn_ = true;
         }
         double d = ang - aimRef_;
@@ -638,6 +688,8 @@ private:
     double aimRef_ = 0.0;                              // ... the angle that is straight (wheel: set at the grab)
     float  aimLast_ = 0.0f, aimLost_ = 0.0f;           // ... the last value, and how long tracking has been lost (s)
     bool   handPoint_[2] = {}, handHold_[2] = {};      // the VR menu's use of each hand (SetHands)
+    int    wheelMask_ = 0, refMask_ = 0;               // the grips on the wheel now (WheelHands), and at the last grab
+    double rimC_[2] = {};                              // the one-hand wheel's centre (x, y; set at the grab)
 };
 
 }  // namespace VrPad

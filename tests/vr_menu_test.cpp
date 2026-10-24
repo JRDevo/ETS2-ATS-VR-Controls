@@ -345,11 +345,15 @@ int main(int argc, char** argv) {
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 156) && m.Pad().steerWith == 1, "Steer with: Wheel");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 159) && m.Pad().steerWheelAngle == 95.0f, "wheel: 90 -> 95 degrees");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 160) && !m.Pad().steerStickToo, "Stick off");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 163) && m.Pad().steerWheelGrip == 2, "Hold the wheel with: Right");
         for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
         WriteBmp(dir + L"\\menu_drive_wheel.bmp", m, VrMenu::kPanMenu);
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 158) && m.Pad().steerWheelAngle == 90.0f, "... and back to 90");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 160) && m.Pad().steerStickToo, "Stick on again");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 161) && m.Pad().steerWheelGrip == 0, "Hold the wheel with: Both again");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 157) && m.Pad().steerWith == 2, "Steer with: Point");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 165) && m.Pad().steerPointHand == 0, "Hand that points: Left");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 166) && m.Pad().steerPointHand == 1, "... Right again");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 158) && m.Pad().steerPointAngle == 30.0f, "point: 35 -> 30 degrees");
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 159);
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 155) && m.Pad().steerWith == 0 && m.Pad().steerPointAngle == 35.0f, "Stick again");
