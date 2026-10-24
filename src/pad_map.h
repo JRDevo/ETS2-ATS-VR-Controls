@@ -35,7 +35,11 @@ inline int BtnOfName(const char* s) {
 constexpr float kPressAt = 0.75f, kReleaseAt = 0.55f;   // trigger / grip / stick direction hysteresis
 
 // what one button does. Keys = up to 3 scan codes (set 1; + kExt for an E0 key) pressed in order, released in reverse.
+// kVk + a virtual key: a key with no plain scan code, sent as that virtual key (Pause: its scan sequence is E1 1D 45;
+// the ETS2 / ATS DLAA mod reads its hotkeys with GetAsyncKeyState, so the virtual key is what it sees -- the user,
+// 2026-10-24: "the DLAA mod captures logs of pause").
 constexpr uint16_t kExt = 0x100;
+constexpr uint16_t kVk = 0x200;
 // kGas / kBrake: driving pedals -- not a key: how far the button is pressed (a trigger / grip / stick direction: analog, any
 // other button: full) goes to the game as the gas / brake pedal (Sink::Drive, scs_input.h)
 // kKeyboard: a press shows / hides the VR keyboard (vr_menu.h; Mapper::TakeKeyboardToggles)
@@ -77,7 +81,8 @@ inline uint16_t ScanOfName(const char* s) {
         { "num0", 0x52 }, { "num1", 0x4F }, { "num2", 0x50 }, { "num3", 0x51 }, { "num4", 0x4B }, { "num5", 0x4C },
         { "num6", 0x4D }, { "num7", 0x47 }, { "num8", 0x48 }, { "num9", 0x49 }, { "numdot", 0x53 }, { "numplus", 0x4E },
         { "numminus", 0x4A }, { "nummul", 0x37 }, { "numdiv", 0x35 | kExt }, { "numenter", 0x1C | kExt },
-        { "scrolllock", 0x46 },   // (no "pause": its scan sequence is E1 1D 45; a plain 0x45 is NumLock)
+        { "scrolllock", 0x46 }, { "printscreen", 0x37 | kExt }, { "prtsc", 0x37 | kExt },
+        { "pause", 0x13 | kVk },  // (VK_PAUSE: see kVk)
     };
     for (const Named& k : kNamed) if (!_stricmp(s, k.name)) return k.code;
     return 0;
@@ -124,7 +129,7 @@ inline const char* NameOfScan(uint16_t code) {
         "y", "z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10",
         "f11", "f12", "space", "enter", "esc", "tab", "backspace", "up", "down", "left", "right", "insert", "delete", "home", "end",
         "pageup", "pagedown", "shift", "rshift", "ctrl", "rctrl", "alt", "ralt", "capslock", "num0", "num1", "num2", "num3", "num4",
-        "num5", "num6", "num7", "num8", "num9", "numdot", "numplus", "numminus", "nummul", "numdiv", "numenter", "scrolllock",
+        "num5", "num6", "num7", "num8", "num9", "numdot", "numplus", "numminus", "nummul", "numdiv", "numenter", "scrolllock", "printscreen", "pause",
         "-", "=", "[", "]", ";", "'", "`", "\\", ",", ".", "/" };
     for (const char* n : kAll) if (ScanOfName(n) == code) return n;
     return nullptr;
@@ -165,8 +170,14 @@ struct Config {
     // the modifier: while modBtn is held, a button that has a modMap entry sends that instead of its map (e.g. right grip +
     // A / B = left / right click, so one controller does both clicks). -1 = no modifier. The modifier button keeps its own
     // job (the air mouse on the right grip). What a press sends is decided when it goes down (and released the same way).
+    // Two modifiers = four layers (2026-10-24, the user: "no modifier, modifier 1, modifier 2, both"): modBtn alone =
+    // modMap, modBtn2 alone = modMap2, both held = modMapBoth. An empty entry in the layer held = the button's normal map
+    // (never another layer's: what a button does with both grips is only what modMapBoth says). See OutOf.
     int   modBtn = kRGrip;
     Out   modMap[kBtnCount];
+    int   modBtn2 = kLGrip;                            // -1 = no second modifier
+    Out   modMap2[kBtnCount];
+    Out   modMapBoth[kBtnCount];
     // driving -- analog values for the game's own input plugin door (scs_input.h), not keys. Steering: steerStick's x (its
     // left / right directions are then not buttons, and a mouse on that stick is off). The stick (dead zone, two zones --
     // StickShape --, times steerMax and the speed factor) is the wheel's TARGET place; the wheel glides there (Mapper::Step):
@@ -208,6 +219,24 @@ struct Config {
     // 1 = off.
     float steerAtSpeed = 0.3f;
     bool  steerSpeedSens = true;                       // the switch (the Driving tab's On / Off)
+    // what steers (2026-10-24, the user: "three different options to choose from"): 0 the stick (above), 1 a two-hand wheel
+    // (hold both grips; the tilt of the line between the hands is the wheel's turn), 2 pointing with one hand (the aim's
+    // yaw: straight ahead = straight). In 1 / 2 the stick still steers when pushed (it wins: a quick correction). The wheel
+    // follows the hands with steerAimSmooth (no speed limit: the hands are the wheel); speed-sensitive as the stick. Let go
+    // (grips open / the point button released) = back to straight as the stick's let go. Point HOLDS the wheel where it is
+    // while that hand points at a panel (menu / keyboard: SetHands) or the air mouse is on (the user 2026-10-24: typing on
+    // the keyboard in a bend must not throw the wheel straight); with steerPointBtn it lets go while that button is not
+    // held. The wheel lets go while a hand holds a panel (the menu's grab).
+    int   steerWith = 0;
+    float steerWheelAngle = 90.0f;                     // degrees of hand tilt to full lock (wheel)
+    float steerPointAngle = 35.0f;                     // degrees of pointing left / right to full lock (point)
+    float steerAimDeadzone = 2.0f;                     // degrees around straight that do not steer (wheel and point)
+    float steerAimSmooth = 0.08f;                      // s, the wheel following the hands (0 = at once)
+    int   steerPointHand = 1;                          // 0 left, 1 right
+    int   steerPointBtn = -1;                          // -1 = always (but the pauses above); a button = only while held
+    // wheel / point: the stick steers too (it wins while pushed). Off: only the hands steer, and the steering stick's left /
+    // right are buttons again (the user 2026-10-24: "an option to keep thumbstick enabled might be good")
+    bool  steerStickToo = true;
 };
 inline Config DefaultConfig() {
     Config c;
@@ -300,7 +329,9 @@ inline float SpeedFactor(float kmh, const Config& c) {   // 1 slow .. steerAtSpe
     const float t = kmh <= 10.0f ? 0.0f : kmh >= 90.0f ? 1.0f : (kmh - 10.0f) / 80.0f;
     return 1.0f + (c.steerAtSpeed - 1.0f) * t;
 }
-inline int SteerStickOf(const Config& c) { return c.drive ? c.steerStick : 0; }   // the stick that steers now (0 none)
+inline int SteerStickOf(const Config& c) {              // the stick that steers now (0 none)
+    return c.drive && (c.steerWith == 0 || c.steerStickToo) ? c.steerStick : 0;
+}
 inline float SteerOf(float x, const Config& c) { return StickShape(x, c) * c.steerMax; }   // the target at low speed
 inline float PedalOf(float t) {
     constexpr float kRest = 0.05f;                     // a resting finger: no throttle
@@ -318,6 +349,25 @@ inline void YawPitch(const double q[4], double* yaw, double* pitch) {
     *pitch = std::asin(s);
 }
 
+// the layer held now: 0 none, 1 modifier 1, 2 modifier 2, 3 both (want = the buttons held)
+inline int LayerOf(const Config& c, const bool* want) {
+    const bool m1 = c.modBtn >= 0 && c.modBtn < kBtnCount && want[c.modBtn];
+    const bool m2 = c.modBtn2 >= 0 && c.modBtn2 < kBtnCount && c.modBtn2 != c.modBtn && want[c.modBtn2];
+    return (m1 ? 1 : 0) | (m2 ? 2 : 0);
+}
+inline Out* LayerMap(Config& c, int layer) {           // the layer's own entries (layer 1 .. 3); nullptr for 0
+    return layer == 1 ? c.modMap : layer == 2 ? c.modMap2 : layer == 3 ? c.modMapBoth : nullptr;
+}
+inline const Out* LayerMap(const Config& c, int layer) {
+    return layer == 1 ? c.modMap : layer == 2 ? c.modMap2 : layer == 3 ? c.modMapBoth : nullptr;
+}
+inline bool IsModifier(const Config& c, int b) { return b >= 0 && (b == c.modBtn || b == c.modBtn2); }
+// what button b sends in a layer: the layer's entry, or its normal map when that is empty (a modifier keeps its own job)
+inline const Out& OutOf(const Config& c, int layer, int b) {
+    const Out* t = LayerMap(c, layer);
+    return t && !IsModifier(c, b) && t[b].kind != kNone ? t[b] : c.map[b];
+}
+
 class Mapper {
 public:
     // active = send anything at all (enabled, session focused, the game window in front). Inactive = everything held is
@@ -325,7 +375,7 @@ public:
     void Step(const Frame& f, bool active, double dt, const Config& c, Sink& s) {
         bool want[kBtnCount] = {};
         if (active) Want(f, c, want);
-        const bool modOn = c.modBtn >= 0 && c.modBtn < kBtnCount && want[c.modBtn];
+        const int layer = LayerOf(c, want);
         for (int b = 0; b < kBtnCount; ++b) {
             if (want[b] == down_[b]) continue;
             down_[b] = want[b];
@@ -333,8 +383,8 @@ public:
                 if (want[b]) airLatch_ = !airLatch_;   // (toggle mode: each press switches)
                 continue;
             }
-            if (want[b]) {                             // the modifier held: its entry for this button, if it has one
-                sent_[b] = modOn && b != c.modBtn && c.modMap[b].kind != kNone ? c.modMap[b] : c.map[b];
+            if (want[b]) {                             // a modifier held: the layer's entry for this button, if it has one
+                sent_[b] = OutOf(c, layer, b);
                 notPedal_[b] = sent_[b].kind != kGas && sent_[b].kind != kBrake;   // (a click: no gas until let go)
                 if (sent_[b].kind == kKeyboard) ++kbToggles_;
                 Send(sent_[b], true, s);
@@ -346,7 +396,8 @@ public:
         // air mouse
         const int ah = c.airHand & 1;
         const bool airBtnOn = c.airBtn >= 0 && c.airBtn < kBtnCount && (c.airToggle ? airLatch_ : down_[c.airBtn]);
-        const bool air = active && airBtnOn && f.aim[ah];
+        const bool air = active && airBtnOn && f.aim[ah] && !(aimOn_ && c.steerWith == 1);   // (not while both hands hold the
+                                                                                          //  wheel; pointing pauses for it)
         if (air) {
             double yaw, pitch;
             YawPitch(f.q[ah], &yaw, &pitch);
@@ -378,7 +429,7 @@ public:
         // driving: sent only when a value changed (inactive = all 0, at once)
         float dv[3] = {};
         if (active && c.drive) {
-            const int sh = c.steerStick - 1;
+            const int sh = SteerStickOf(c) - 1;
             float x = (sh == 0 || sh == 1) && f.hand[sh] ? f.sx[sh] : 0.0f;
             float y = (sh == 0 || sh == 1) && f.hand[sh] ? f.sy[sh] : 0.0f;
             if (!(x == x)) x = 0.0f;                   // (a NaN stick would stay in the wheel for good)
@@ -394,7 +445,10 @@ public:
             const float sf = SpeedFactor(speed_, c), rf = std::sqrt(sf);
             // (the hold rule and the speed limit go by the push, not the wheel shape: the shape is flat in the fine zone and
             //  steep in the hard zone, the thumb's jitter is the same everywhere)
-            const float shape = StickShape(x, c), push = StickPush(x, c);
+            float shape = StickShape(x, c), push = StickPush(x, c);
+            float av = 0.0f;                           // the hands (steerWith 1 / 2): only while the stick is not pushed
+            const bool aimed = AimSteer(f, c, t, sf, cur, &av) && shape == 0.0f;
+            if (aimed) { shape = av; push = av < 0.0f ? -av : av; }
             if (shape == 0.0f || shape * holdSign_ < 0.0f || sf >= range_ || push < holdPeak_ - 0.03f) {
                 range_ = sf;
                 holdPeak_ = push;
@@ -403,14 +457,14 @@ public:
             }
             holdSign_ = shape;
             float tgt = shape * c.steerMax * range_;
-            const bool other = tgt * cur < 0.0f;       // the other side: straight first, no glide (see Config)
+            const bool other = !aimed && tgt * cur < 0.0f;   // the other side: straight first, no glide (see Config)
             if (other) tgt = 0.0f;
-            const bool letGo = tgt == 0.0f && !other;
-            const float tau = other ? 0.0f : (letGo ? c.steerCenterTime : c.steerFollowTime) / rf;
+            const bool letGo = tgt == 0.0f && !other && !aimed;
+            const float tau = aimed ? c.steerAimSmooth : other ? 0.0f : (letGo ? c.steerCenterTime : c.steerFollowTime) / rf;
             const float a = t <= 0.0f ? 0.0f : tau > 0.0f ? t / (tau + t) : 1.0f;   // first order, stable for any step
             float step = (tgt - cur) * a;
             const bool back = step * cur < 0.0f;       // toward straight: the faster back limit
-            const float rate = back ? c.steerBackRate : c.steerRate;
+            const float rate = aimed ? 0.0f : back ? c.steerBackRate : c.steerRate;   // (the hands: no limit)
             if (rate > 0.0f) {
                 const float m = rate * rf * t * (letGo ? 1.0f : push > 0.3f ? push : 0.3f);
                 step = step > m ? m : step < -m ? -m : step;
@@ -418,7 +472,7 @@ public:
             }
             float st = cur + step;
             if (tgt == 0.0f && st < 0.002f && st > -0.002f) st = 0.0f;   // (the glide's tail: exactly straight)
-            dv[0] = sh == 0 || sh == 1 ? st : 0.0f;
+            dv[0] = sh == 0 || sh == 1 || c.steerWith == 1 || c.steerWith == 2 ? st : 0.0f;
             for (int b = 0; b < kBtnCount; ++b) {      // gas / brake: the most pressed button mapped to each
                 if (b == c.airBtn) continue;
                 const float v = Pressed(f, c, b);
@@ -426,14 +480,14 @@ public:
                     if (v <= 0.0f && !down_[b]) notPedal_[b] = false;   // grip let go first): no gas until fully let go
                     continue;
                 }
-                const Out& o = modOn && b != c.modBtn && c.modMap[b].kind != kNone ? c.modMap[b] : c.map[b];
+                const Out& o = OutOf(c, layer, b);
                 if (o.kind != kGas && o.kind != kBrake) continue;
                 float& d = dv[o.kind == kGas ? 1 : 2];
                 if (v > d) d = v;
             }
         }
         if (!active) for (bool& n : notPedal_) n = false;
-        if (!active || !c.drive) { range_ = 0.0f; holdPeak_ = holdSign_ = 0.0f; }   // (the next push takes the speed's range)
+        if (!active || !c.drive) { range_ = 0.0f; holdPeak_ = holdSign_ = 0.0f; aimOn_ = false; aimLost_ = 0.0f; }
         if (dv[0] != drive_[0] || dv[1] != drive_[1] || dv[2] != drive_[2]) {
             for (int i = 0; i < 3; ++i) drive_[i] = dv[i];
             s.Drive(dv[0], dv[1], dv[2]);
@@ -449,8 +503,68 @@ public:
     float StickX() const { return stickX_; }            // the steering stick's x / y at the last Step (log = 1: the drive line)
     float StickY() const { return stickY_; }
     int TakeKeyboardToggles() { const int n = kbToggles_; kbToggles_ = 0; return n; }   // "keyboard" presses since the last call
+    // the VR menu's use of each hand this frame (before Step): pointing at a panel (point steering pauses), holding one
+    // (a grab / a trigger on it: the wheel lets go)
+    void SetHands(bool pointL, bool pointR, bool holdL, bool holdR) {
+        handPoint_[0] = pointL; handPoint_[1] = pointR; handHold_[0] = holdL; handHold_[1] = holdR;
+    }
+    bool AimSteering() const { return aimOn_; }        // the hands steer now (wheel held / pointing)
 
 private:
+    // steering with the hands (Config::steerWith): true + *v (-1 .. 1, the wheel's share before steerMax and the speed range)
+    // while they steer. Tracking lost for a moment (< 0.3 s) keeps the last value. sf = the speed factor now, cur = the
+    // wheel now (the wheel's grab is relative: grabbing does not move it).
+    bool AimSteer(const Frame& f, const Config& c, float t, float sf, float cur, float* v) {
+        bool want = false, seen = false;
+        double ang = 0.0, lock = 1.0;
+        if (c.steerWith == 1) {                        // the wheel: both grips held, no hand on a panel
+            const float g = aimOn_ ? kReleaseAt : kPressAt;
+            want = f.hand[0] && f.hand[1] && f.grip[0] > g && f.grip[1] > g && !handHold_[0] && !handHold_[1];
+            if (want && f.pos[0] && f.pos[1]) {        // left hand higher = a right turn, whichever way the player faces
+                const double dx = f.p[1][0] - f.p[0][0], dz = f.p[1][2] - f.p[0][2];
+                ang = std::atan2(f.p[0][1] - f.p[1][1], std::sqrt(dx * dx + dz * dz)) * 57.2957795;
+                seen = true;
+            }
+            lock = c.steerWheelAngle;
+        } else if (c.steerWith == 2) {                 // pointing: that hand's yaw, unless it is busy elsewhere
+            const int h = c.steerPointHand & 1;
+            want = f.hand[h] && (c.steerPointBtn < 0 || c.steerPointBtn >= kBtnCount || down_[c.steerPointBtn]);
+            if (want && (handPoint_[h] || handHold_[h] || airOn_)) {   // busy on a panel / the air mouse: the wheel holds
+                if (!aimOn_) return false;
+                aimLost_ = 0.0f;
+                *v = aimLast_;
+                return true;
+            }
+            if (want && f.aim[h]) {
+                double yaw, pitch;
+                YawPitch(f.q[h], &yaw, &pitch);
+                ang = yaw * 57.2957795;
+                seen = true;
+            }
+            lock = c.steerPointAngle;
+        }
+        if (!want) { aimOn_ = false; aimLost_ = 0.0f; return false; }
+        if (lock < 5.0) lock = 5.0;
+        if (!seen) {                                   // tracking lost: hold a moment, then let go
+            aimLost_ += t;
+            if (!aimOn_ || aimLost_ > 0.3f) { aimOn_ = false; return false; }
+            *v = aimLast_;
+            return true;
+        }
+        aimLost_ = 0.0f;
+        if (!aimOn_) {                                 // the grab: the wheel keeps its place (point: absolute, ahead = straight)
+            const float k = c.steerMax * sf;
+            aimRef_ = c.steerWith == 1 && k > 0.01f ? ang - cur / k * lock : 0.0;
+            aimOn_ = true;
+        }
+        double d = ang - aimRef_;
+        const double dz = c.steerAimDeadzone < lock * 0.5 ? c.steerAimDeadzone : lock * 0.5;
+        const double m = d < 0 ? -d : d;
+        d = m <= dz ? 0.0 : (d < 0 ? -1.0 : 1.0) * (m - dz) / (lock - dz);
+        aimLast_ = (float)(d > 1.0 ? 1.0 : d < -1.0 ? -1.0 : d);
+        *v = aimLast_;
+        return true;
+    }
     void Want(const Frame& f, const Config& c, bool* w) const {
         auto ana = [&](int b, float v) { w[b] = down_[b] ? v > kReleaseAt : v > kPressAt; };
         for (int h = 0; h < 2; ++h) {
@@ -520,6 +634,10 @@ private:
     float  stickX_ = 0.0f, stickY_ = 0.0f;             // the steering stick's x / y (StickX / StickY)
     float  range_ = 0.0f;                              // steering: the speed range of the bend held now (see Step)
     float  holdPeak_ = 0.0f, holdSign_ = 0.0f;         // ... the most push in it (StickPush), and its side
+    bool   aimOn_ = false;                             // the hands steer (AimSteer)
+    double aimRef_ = 0.0;                              // ... the angle that is straight (wheel: set at the grab)
+    float  aimLast_ = 0.0f, aimLost_ = 0.0f;           // ... the last value, and how long tracking has been lost (s)
+    bool   handPoint_[2] = {}, handHold_[2] = {};      // the VR menu's use of each hand (SetHands)
 };
 
 }  // namespace VrPad

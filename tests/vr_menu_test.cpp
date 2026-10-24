@@ -341,7 +341,18 @@ int main(int argc, char** argv) {
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 132) && m.Pad().steerStick == 0, "steer: off");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 130) && m.Pad().steerStick == 1, "steer: left again");
         CHECK(m.Pad().drive && click(1, VrMenu::kPanMenu, VrMenu::eSet, 148) && !m.Pad().drive, "Driving: Off");
-        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 147) && m.Pad().drive, "Driving: On");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 155) && m.Pad().drive && m.Pad().steerWith == 0, "Steer with: Stick (driving on)");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 156) && m.Pad().steerWith == 1, "Steer with: Wheel");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 159) && m.Pad().steerWheelAngle == 95.0f, "wheel: 90 -> 95 degrees");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 160) && !m.Pad().steerStickToo, "Stick off");
+        for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
+        WriteBmp(dir + L"\\menu_drive_wheel.bmp", m, VrMenu::kPanMenu);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 158) && m.Pad().steerWheelAngle == 90.0f, "... and back to 90");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 160) && m.Pad().steerStickToo, "Stick on again");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 157) && m.Pad().steerWith == 2, "Steer with: Point");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 158) && m.Pad().steerPointAngle == 30.0f, "point: 35 -> 30 degrees");
+        click(1, VrMenu::kPanMenu, VrMenu::eSet, 159);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 155) && m.Pad().steerWith == 0 && m.Pad().steerPointAngle == 35.0f, "Stick again");
         CHECK(m.Pad().steerFollowTime == 0.4f && m.Pad().steerCenterTime == 0.0f && m.Pad().steerRate == 0.5f,
               "defaults: follow 0.4 s, back to the middle at once, at most 0.5 turns / s");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 144) && m.Pad().steerFollowTime == 0.5f, "follow 0.4 -> 0.5 s (calmer)");
@@ -442,11 +453,30 @@ int main(int argc, char** argv) {
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kRGrip), "row right grip (the modifier)");
         CHECK(!m.Pan(VrMenu::kPanKb).show || m.Describe().find("picking -") != std::string::npos, "the modifier's own row picks nothing");
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 122), "modifier button shown");
-        CHECK(m.Pad().modBtn == VrPad::kLGrip, "the modifier cycles: right grip -> left grip");
+        CHECK(m.Pad().modBtn == VrPad::kA, "modifier 1 cycles: right grip -> A (skips the left grip: modifier 2)");
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 122);
         click(1, VrMenu::kPanMenu, VrMenu::eSet, 122);
         for (int i = 0; i < 8 && m.Pad().modBtn != VrPad::kRGrip; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 122);
         CHECK(m.Pad().modBtn == VrPad::kRGrip, "... round to the right grip again (via off)");
+        // Mod 2 / Both: their own entries; modifier 2's chooser skips modifier 1
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 123) && click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kY) &&
+              click(1, VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("f6")), "Mod 2: row Y, F6");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 124) && click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kY) &&
+              click(1, VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("f7")), "Both: row Y, F7");
+        char o3[64], o4[64];
+        VrPad::OutToString(m.Pad().modMap2[VrPad::kY], o3, sizeof(o3));
+        VrPad::OutToString(m.Pad().modMapBoth[VrPad::kY], o4, sizeof(o4));
+        CHECK(std::string(o3) == "f6" && std::string(o4) == "f7" && m.Pad().modMap[VrPad::kY].kind != VrPad::kNone,
+              "left grip + Y = f6, both + Y = f7, right grip + Y kept (%s / %s)", o3, o4);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eRow, VrPad::kLStick) && m.Describe().find("picking -") != std::string::npos,
+              "Both: the left stick click is the menu's (picks nothing)");
+        for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
+        WriteBmp(dir + L"\\menu_modifier_both.bmp", m, VrMenu::kPanMenu);
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 125) && m.Pad().modBtn2 == VrPad::kA,
+              "modifier 2 cycles: left grip -> A (skips the right grip: modifier 1)");
+        for (int i = 0; i < 10 && m.Pad().modBtn2 != VrPad::kLGrip; ++i) click(1, VrMenu::kPanMenu, VrMenu::eSet, 125);
+        CHECK(m.Pad().modBtn2 == VrPad::kLGrip, "... round to the left grip again");
+        CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 121), "Mod 1 shown again");
         for (int i = 0; i < 2; ++i) { VrPad::Frame f = idle; upd(f); }
         WriteBmp(dir + L"\\menu_modifier.bmp", m, VrMenu::kPanMenu);
         CHECK(click(1, VrMenu::kPanMenu, VrMenu::eSet, 120), "Normal shown");

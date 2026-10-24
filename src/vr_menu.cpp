@@ -32,7 +32,7 @@ const KeyDef kKeys[] = {
     { "F1", "f1", 2, 0, 1, 1 }, { "F2", "f2", 3, 0, 1, 1 }, { "F3", "f3", 4, 0, 1, 1 }, { "F4", "f4", 5, 0, 1, 1 },
     { "F5", "f5", 6.5f, 0, 1, 1 }, { "F6", "f6", 7.5f, 0, 1, 1 }, { "F7", "f7", 8.5f, 0, 1, 1 }, { "F8", "f8", 9.5f, 0, 1, 1 },
     { "F9", "f9", 11, 0, 1, 1 }, { "F10", "f10", 12, 0, 1, 1 }, { "F11", "f11", 13, 0, 1, 1 }, { "F12", "f12", 14, 0, 1, 1 },
-    { "ScrLk", "scrolllock", 16.5f, 0, 1, 1 },
+    { "PrtSc", "printscreen", 15.5f, 0, 1, 1 }, { "ScrLk", "scrolllock", 16.5f, 0, 1, 1 }, { "Pause", "pause", 17.5f, 0, 1, 1 },
     { "`", "`", 0, 1.25f, 1, 1 }, { "1", "1", 1, 1.25f, 1, 1 }, { "2", "2", 2, 1.25f, 1, 1 }, { "3", "3", 3, 1.25f, 1, 1 },
     { "4", "4", 4, 1.25f, 1, 1 }, { "5", "5", 5, 1.25f, 1, 1 }, { "6", "6", 6, 1.25f, 1, 1 }, { "7", "7", 7, 1.25f, 1, 1 },
     { "8", "8", 8, 1.25f, 1, 1 }, { "9", "9", 9, 1.25f, 1, 1 }, { "0", "0", 10, 1.25f, 1, 1 }, { "-", "-", 11, 1.25f, 1, 1 },
@@ -649,6 +649,28 @@ void VrMenu::Close() {
 }
 
 // steering (pad_map.h SteerStickOf) takes that stick's left / right directions
+// the modifier buttons a layer holds, as a label: "Right grip", "Left grip", "Right grip + Left grip" ("" for 0)
+static std::string LayerKeys(const VrPad::Config& p, int layer) {
+    std::string s;
+    if ((layer & 1) && p.modBtn >= 0) s += BtnLabel(p.modBtn);
+    if ((layer & 2) && p.modBtn2 >= 0) s += (s.empty() ? "" : " + ") + std::string(BtnLabel(p.modBtn2));
+    return s;
+}
+// in this layer, button btn + the layer's modifiers = all the menu's open buttons: the menu takes them first (ComboGate runs
+// before the Mapper), so a key set there could never be sent
+static bool MenuOnly(const VrPad::Config& p, const std::vector<int>& combo, int layer, int btn) {
+    bool in = false, all = layer != 0;
+    for (int cb : combo) {
+        in = in || cb == btn;
+        all = all && (cb == btn || ((layer & 1) && cb == p.modBtn) || ((layer & 2) && cb == p.modBtn2));
+    }
+    return in && all;
+}
+// the layer's modifiers are all set (layer 3: both)
+static bool LayerReady(const VrPad::Config& p, int layer) {
+    return layer == 0 || (((layer & 1) == 0 || p.modBtn >= 0) && ((layer & 2) == 0 || p.modBtn2 >= 0));
+}
+
 static bool DrivingUses(const VrPad::Config& p, int btn) {
     return btn >= VrPad::kLUp && (btn - VrPad::kLUp) % 4 >= 2 && VrPad::SteerStickOf(p) == (btn >= VrPad::kRUp ? 2 : 1);
 }
@@ -670,7 +692,7 @@ void VrMenu::LayoutMenu() {
     std::string openCombo;                              // the menu's open / close buttons ("Left grip + Right grip + ...")
     for (int cb : gate_.btns) openCombo += (openCombo.empty() ? "" : " + ") + std::string(BtnLabel(cb));
     const bool picking = pickBtn_ >= 0;
-    const std::string what = picking ? (pickMod_ && pad_.modBtn >= 0 ? std::string(BtnLabel(pad_.modBtn)) + " + " : std::string()) + BtnLabel(pickBtn_)
+    const std::string what = picking ? (pickLayer_ ? LayerKeys(pad_, pickLayer_) + " + " : std::string()) + BtnLabel(pickBtn_)
                                      : std::string();
     add(eBar, 0, 0, 0, kMenuW, 72, picking ? "Set " + what + ": pick a key" : "ETS2 ATS VR Controls", picking);
     m0 = el.size(); add(eSmaller, 0, 600, 11, 64, 50, "\xE2\x88\x92"); tip(m0, "Make this menu smaller.");
@@ -691,28 +713,43 @@ void VrMenu::LayoutMenu() {
                                        VrPad::kLUp, VrPad::kLDown, VrPad::kLLeft, VrPad::kLRight };
         static const int kRight[9] = { VrPad::kRTrig, VrPad::kRGrip, VrPad::kA, VrPad::kB, VrPad::kRStick, VrPad::kRUp,
                                        VrPad::kRDown, VrPad::kRLeft, VrPad::kRRight };
-        // Normal / With modifier: which mapping the rows show and set; the modifier button itself (a click cycles it)
-        m0 = el.size(); add(eSet, 120, 24, 150, 230, 44, "Normal", layer_ == 0);
-        tip(m0, "Show and set what each button does normally.");
-        m0 = el.size(); add(eSet, 121, 264, 150, 230, 44, "With modifier", layer_ == 1);
-        tip(m0, "Show and set what each button does while you hold the modifier button (a second job for it).");
-        m0 = el.size(); add(eSet, 122, 504, 150, 472, 44, pad_.modBtn >= 0 ? std::string("Modifier: ") + BtnLabel(pad_.modBtn) : "Modifier: off");
-        tip(m0, "The modifier button: hold it, and other buttons do their second job. Press here to choose another button.");
+        // the layer the rows show and set (Normal / Mod 1 / Mod 2 / Both = no modifier, modifier 1, modifier 2, both held), and
+        // the two modifier buttons (a click cycles each). Chip args: 120, 121, 123, 124 = layer 0 .. 3; 122 / 125 = the choosers.
+        static const int kChipArg[4] = { 120, 121, 123, 124 };
+        static const char* const kChip[4] = { "Normal", "Mod 1", "Mod 2", "Both" };
+        const std::string m1 = pad_.modBtn >= 0 ? BtnLabel(pad_.modBtn) : "off", m2 = pad_.modBtn2 >= 0 ? BtnLabel(pad_.modBtn2) : "off";
+        const std::string kChipHelp[4] = { "Show and set what each button does normally.",
+                                           "Show and set what each button does while you hold modifier 1 (" + m1 + ").",
+                                           "Show and set what each button does while you hold modifier 2 (" + m2 + ").",
+                                           "Show and set what each button does while you hold BOTH modifiers." };
+        for (int l = 0; l < 4; ++l) {
+            m0 = el.size(); add(eSet, kChipArg[l], 24 + l * 146, 150, 138, 44, kChip[l], layer_ == l, !LayerReady(pad_, l));
+            tip(m0, kChipHelp[l]);
+        }
+        m0 = el.size(); add(eSet, 122, 612, 150, 178, 44, "1: " + m1);
+        tip(m0, "Modifier 1: hold it, and other buttons do their Mod 1 job. Press here to choose another button.");
+        m0 = el.size(); add(eSet, 125, 798, 150, 178, 44, "2: " + m2);
+        tip(m0, "Modifier 2: hold it, and other buttons do their Mod 2 job. Hold both modifiers for the Both jobs. Press here "
+                "to choose another button.");
+        const VrPad::Out* lmap = VrPad::LayerMap(pad_, layer_);
+        const std::string lname = layer_ ? " with " + LayerKeys(pad_, layer_) + ": " : ": ";
         for (int col = 0; col < 2; ++col)
             for (int i = 0; i < (col ? 9 : 10); ++i) {
                 const int btn = col ? kRight[i] : kLeft[i];
-                std::string val = Pretty(layer_ ? pad_.modMap[btn] : pad_.map[btn]);
+                std::string val = Pretty(lmap ? lmap[btn] : pad_.map[btn]);
                 bool dim = false;
-                if (layer_ && btn == pad_.modBtn) { val = "the modifier"; dim = true; }
+                bool combo = false;                  // (one of the menu's open / close buttons)
+                for (int cb : gate_.btns) combo = combo || cb == btn;
+                const bool menuOnly = MenuOnly(pad_, gate_.btns, layer_, btn);
+                if (layer_ && VrPad::IsModifier(pad_, btn)) { val = btn == pad_.modBtn ? "modifier 1" : "modifier 2"; dim = true; }
                 else if (btn == pad_.airBtn) { val = "air mouse"; dim = true; }
                 else if (btn >= VrPad::kLUp && pad_.mouseStick == (btn >= VrPad::kRUp ? 2 : 1)) { val = "moves the mouse"; dim = true; }
                 else if (DrivingUses(pad_, btn)) { val = "steers"; dim = true; }
-                else if (layer_ && (pad_.modBtn < 0 || pad_.modMap[btn].kind == VrPad::kNone)) { val = "as normal"; dim = true; }
-                bool combo = false;                  // (one of the menu's open / close buttons)
-                for (int cb : gate_.btns) combo = combo || cb == btn;
+                else if (menuOnly) { val = "opens the menu"; dim = true; }
+                else if (layer_ && (!LayerReady(pad_, layer_) || lmap[btn].kind == VrPad::kNone)) { val = "as normal"; dim = true; }
                 add(eRow, btn, col ? 508 : 24, 202 + i * 49, 468, 45, BtnLabel(btn), pickBtn_ == btn, dim,
                     combo && !layer_ ? val + "  (+menu)" : val);
-                std::string h = std::string(BtnLabel(btn)) + (layer_ ? " with the modifier: " : ": ");
+                std::string h = std::string(BtnLabel(btn)) + lname;
                 if (dim) h += val + " (set elsewhere).";
                 else h += "now " + val + ". Point here, pull the trigger, then pick a key on the keyboard or a choice below.";
                 if (combo && !layer_) h += " Also part of the menu's open buttons.";
@@ -731,7 +768,8 @@ void VrMenu::LayoutMenu() {
             add(ePickCancel, 0, 852, 704, 124, 54, "Cancel");
         } else {
             add(eInfo, 0, 24, 704, 742, 54, !status_.empty() ? status_
-                : layer_ ? "While the modifier is held, these buttons send this instead." : "Point at a button, pull the trigger, pick its key.");
+                : layer_ ? "Hold " + LayerKeys(pad_, layer_) + " first, then the button."
+                         : std::string("Point at a button, pull the trigger, pick its key."));
         }
     } else if (tab_ == 1) {
         auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 162 + r * 88, 440, 70, label); };
@@ -841,12 +879,36 @@ void VrMenu::LayoutMenu() {
             add(eInfo, 200 + r, 570, 150 + r * 61, 306, 54, value);
             add(eSet, base + 1, 886, 150 + r * 61, 90, 54, "+");
         };
-        m0 = el.size(); row(0, "Driving");
-        opts(0, 147, { "On", "Off" }, pad_.drive ? 0 : 1);
-        tip(m0, "On: the stick steers and the gas / brake buttons drive. Off: no driving; the stick's left / right send keys again.");
-        m0 = el.size(); row(1, "Stick that steers");
-        opts(1, 130, { "Left", "Right", "Off" }, pad_.steerStick == 1 ? 0 : pad_.steerStick == 2 ? 1 : 2);
-        tip(m0, "Which stick steers the truck (left / right). Its up / down stay free for other buttons.");
+        {                                               // steer with: Stick 155 / Wheel 156 / Point 157 / Off 148 (147 = on)
+            m0 = el.size();
+            row(0, "Steer with");
+            const int cur = !pad_.drive ? 3 : pad_.steerWith == 1 ? 1 : pad_.steerWith == 2 ? 2 : 0;
+            static const int kArg[4] = { 155, 156, 157, 148 };
+            static const char* const kName[4] = { "Stick", "Wheel", "Point", "Off" };
+            for (int i = 0; i < 4; ++i) add(eSet, kArg[i], 470 + i * 129, 150, 119, 54, kName[i], i == cur);
+            tip(m0, "Stick: the stick steers. Wheel: hold both grips and turn your hands like a steering wheel. Point: point "
+                    "the right controller left / right (not while it points at a panel or the air mouse is on). The stick "
+                    "always works too. Off: no driving.");
+        }
+        if (pad_.drive && (pad_.steerWith == 1 || pad_.steerWith == 2)) {   // the hands: how far to full lock
+            const bool wheel = pad_.steerWith == 1;
+            const int y = 150 + 61;                     // [Stick on / off] [-] angle [+]
+            m0 = el.size(); row(1, wheel ? "Hands turn for full lock" : "Point for full lock");
+            snprintf(b, sizeof(b), "%.0f deg", (double)(wheel ? pad_.steerWheelAngle : pad_.steerPointAngle));
+            add(eSet, 158, 590, y, 80, 54, "\xE2\x88\x92");
+            add(eInfo, 201, 680, y, 196, 54, b);
+            add(eSet, 159, 886, y, 90, 54, "+");
+            tip(m0, wheel ? "How far you turn your hands (like a wheel) for full lock. Less = quicker, more = calmer."
+                          : "How far you point left / right for full lock. Less = quicker, more = calmer.");
+            m0 = el.size();
+            add(eSet, 160, 470, y, 110, 54, pad_.steerStickToo ? "Stick on" : "Stick off", pad_.steerStickToo);
+            tip(m0, "Stick on: the stick steers too (it wins while you push it). Stick off: only your hands steer, and the "
+                    "stick's left / right are normal buttons again.");
+        } else {
+            m0 = el.size(); row(1, "Stick that steers");
+            opts(1, 130, { "Left", "Right", "Off" }, pad_.steerStick == 1 ? 0 : pad_.steerStick == 2 ? 1 : 2);
+            tip(m0, "Which stick steers the truck (left / right). Its up / down stay free for other buttons.");
+        }
         m0 = el.size(); row(2, "Steering dead zone");
         snprintf(b, sizeof(b), "%.2f", (double)pad_.steerDeadzone);
         plusMinus(2, 133, b);
@@ -890,6 +952,8 @@ void VrMenu::LayoutMenu() {
             tip(m0, "On: at speed the stick turns the wheel less, for calm highway driving. The % = how much at 90 km/h.");
         }
         add(eInfo, 0, 24, 704, 742, 54, !status_.empty() ? status_ : !pad_.drive ? "Driving off: no steering, gas or brake."
+                                        : pad_.steerWith == 1 ? "Wheel: hold both grips and turn your hands. Let go = straight."
+                                        : pad_.steerWith == 2 ? "Point: point left / right. On a panel the wheel holds."
                                         : "Most of the stick = small turns. All the way = hard turns.");
     }
     if (!(tab_ == 0 && picking))                        // every tab: back to the defaults (a second press does it)
@@ -1156,11 +1220,11 @@ void VrMenu::SavePlaces() {
 
 void VrMenu::Pick(const VrPad::Out& o) {
     if (pickBtn_ < 0) return;
-    if (pickMod_) {                                     // the entry for while the modifier is held (None = as normal)
-        pad_.modMap[pickBtn_] = o;
-        status_ = std::string("Set: ") + (pad_.modBtn >= 0 ? BtnLabel(pad_.modBtn) : "Modifier") + " + " + BtnLabel(pickBtn_) + " = " +
+    if (VrPad::Out* t = VrPad::LayerMap(pad_, pickLayer_)) {   // a layer's entry (None = as normal)
+        t[pickBtn_] = o;
+        status_ = "Set: " + LayerKeys(pad_, pickLayer_) + " + " + BtnLabel(pickBtn_) + " = " +
                   (o.kind == VrPad::kNone ? std::string("as normal") : Pretty(o));
-        LOGI("VR menu: modifier + %s = %s", VrPad::BtnNames()[pickBtn_], Pretty(o).c_str());
+        LOGI("VR menu: layer %d + %s = %s", pickLayer_, VrPad::BtnNames()[pickBtn_], Pretty(o).c_str());
     } else {
         pad_.map[pickBtn_] = o;
         status_ = std::string("Set: ") + BtnLabel(pickBtn_) + " = " + Pretty(o);
@@ -1210,6 +1274,16 @@ void VrMenu::SetValue(int arg) {
         break;
     }
     case 147: case 148: pad_.drive = arg == 147; break;
+    case 155: case 156: case 157: pad_.drive = true; pad_.steerWith = arg - 155; break;
+    case 160: pad_.steerStickToo = !pad_.steerStickToo; break;
+    case 158: case 159: {                              // the hands' angle to full lock: 5 degree steps
+        const bool wheel = pad_.steerWith == 1;
+        float& v = wheel ? pad_.steerWheelAngle : pad_.steerPointAngle;
+        const float lo = 10.0f, hi = wheel ? 180.0f : 90.0f;
+        v = (float)(int)((v + (arg == 159 ? 5.0f : -5.0f)) / 5.0f + 0.5f) * 5.0f;
+        v = v < lo ? lo : v > hi ? hi : v;
+        break;
+    }
     case 154: pad_.steerSpeedSens = !pad_.steerSpeedSens; break;
     case 152: case 153: {                              // at 90 km/h: 10 .. 100 % in 5 % steps
         const float v = pad_.steerAtSpeed + (arg == 153 ? 0.05f : -0.05f);
@@ -1251,14 +1325,24 @@ void VrMenu::SetValue(int arg) {
         break;
     }
     case 100: case 101: case 102: case 103: case 104: case 105: look_.theme = arg - 100; needRedraw_ = true; break;
-    case 120: case 121: layer_ = arg - 120; pickBtn_ = -1; status_.clear(); return;
-    case 122: {                                         // the modifier button: the next of these (off at the end)
+    case 120: case 121: case 123: case 124:            // the layer chips
+        layer_ = arg == 120 ? 0 : arg == 121 ? 1 : arg == 123 ? 2 : 3;
+        pickBtn_ = -1;
+        status_.clear();
+        return;
+    case 122: case 125: {                               // a modifier button: the next of these (off at the end), never the other one
         static const int kChoices[] = { VrPad::kRGrip, VrPad::kLGrip, VrPad::kA, VrPad::kB, VrPad::kX, VrPad::kY, VrPad::kRStick,
                                         VrPad::kLStick, VrPad::kMenu, -1 };
         constexpr int n = (int)(sizeof(kChoices) / sizeof(kChoices[0]));
+        int& m = arg == 122 ? pad_.modBtn : pad_.modBtn2;
+        const int other = arg == 122 ? pad_.modBtn2 : pad_.modBtn;
         int i = 0;
-        while (i < n && kChoices[i] != pad_.modBtn) ++i;
-        pad_.modBtn = kChoices[(i + 1) % n];
+        while (i < n && kChoices[i] != m) ++i;
+        do {                                            // (not both stick clicks: VR EyeCapture records on that pair)
+            i = (i + 1) % n;
+        } while (kChoices[i] >= 0 && (kChoices[i] == other || (kChoices[i] == VrPad::kLStick && other == VrPad::kRStick) ||
+                                      (kChoices[i] == VrPad::kRStick && other == VrPad::kLStick)));
+        m = kChoices[i];
         pickBtn_ = -1;
         break;
     }
@@ -1284,8 +1368,11 @@ void VrMenu::ResetTab() {
     const VrPad::Config d = VrPad::DefaultConfig();
     switch (tab_) {
     case 0:                                             // every button, both layers, the modifier button
-        for (int b = 0; b < VrPad::kBtnCount; ++b) { pad_.map[b] = d.map[b]; pad_.modMap[b] = d.modMap[b]; }
+        for (int b = 0; b < VrPad::kBtnCount; ++b) {
+            pad_.map[b] = d.map[b]; pad_.modMap[b] = d.modMap[b]; pad_.modMap2[b] = d.modMap2[b]; pad_.modMapBoth[b] = d.modMapBoth[b];
+        }
         pad_.modBtn = d.modBtn;
+        pad_.modBtn2 = d.modBtn2;
         pickBtn_ = -1;
         break;
     case 1:
@@ -1315,6 +1402,8 @@ void VrMenu::ResetTab() {
         pad_.steerMax = d.steerMax; pad_.steerFollowTime = d.steerFollowTime; pad_.steerCenterTime = d.steerCenterTime;
         pad_.steerRate = d.steerRate;
         pad_.steerAtSpeed = d.steerAtSpeed; pad_.steerSpeedSens = d.steerSpeedSens;
+        pad_.steerWith = d.steerWith; pad_.steerWheelAngle = d.steerWheelAngle; pad_.steerPointAngle = d.steerPointAngle;
+        pad_.steerStickToo = d.steerStickToo;
         break;
     }
     LOGI("VR menu: tab %d reset to the defaults", tab_);
@@ -1351,16 +1440,20 @@ void VrMenu::Activate(int h, const Ref& r, const VrPad::Frame&, VrPad::Sink& sin
         break;
     case eTab: tab_ = r.arg; status_.clear(); break;
     case eRow:
-        if (layer_ && pad_.modBtn < 0) { status_ = "Choose a modifier button first (the button above)."; break; }
-        if (layer_ && r.arg == pad_.modBtn) { status_ = std::string(BtnLabel(r.arg)) + " is the modifier."; break; }
+        if (!LayerReady(pad_, layer_)) { status_ = "Choose that modifier button first (the buttons above)."; break; }
+        if (layer_ && VrPad::IsModifier(pad_, r.arg)) {
+            status_ = std::string(BtnLabel(r.arg)) + (r.arg == pad_.modBtn ? " is modifier 1." : " is modifier 2.");
+            break;
+        }
         if (r.arg == pad_.airBtn) { status_ = std::string(BtnLabel(r.arg)) + " is the air mouse button (Mouse tab)."; break; }
+        if (MenuOnly(pad_, gate_.btns, layer_, r.arg)) { status_ = "With these modifiers, " + std::string(BtnLabel(r.arg)) + " opens the menu."; break; }
         if (r.arg >= VrPad::kLUp && pad_.mouseStick == (r.arg >= VrPad::kRUp ? 2 : 1)) {
             status_ = "That stick moves the mouse (Mouse tab).";
             break;
         }
         if (DrivingUses(pad_, r.arg)) { status_ = "That stick steers (Driving tab)."; break; }
-        pickBtn_ = pickBtn_ == r.arg && pickMod_ == (layer_ == 1) ? -1 : r.arg;
-        pickMod_ = layer_ == 1;
+        pickBtn_ = pickBtn_ == r.arg && pickLayer_ == layer_ ? -1 : r.arg;
+        pickLayer_ = layer_;
         for (bool& l : latch_) l = false;
         if (pickBtn_ >= 0 && !pan_[kPanKb].show) ShowKb(true);
         break;
@@ -1511,7 +1604,7 @@ std::string VrMenu::ContentKey(int p) const {
         return b;
     }
     // the menu: everything its tabs show (not whether it is shown itself)
-    snprintf(b, sizeof(b), "%d|%d|%d|%d%d|%.3f,%.3f|%d|%.2f|%.2f|%d|%d|", pan_[1].show, tab_, pickBtn_, pickMod_, layer_, pan_[0].width,
+    snprintf(b, sizeof(b), "%d|%d|%d|%d%d|%.3f,%.3f|%d|%.2f|%.2f|%d|%d|", pan_[1].show, tab_, pickBtn_, pickLayer_, layer_, pan_[0].width,
              pan_[1].width, look_.theme, look_.menuOpacity, look_.kbOpacity, look_.smoothing, look_.kbCompact);
     char dr[160];                                       // the Driving tab's values (DescribePad leaves them out while off)
     snprintf(dr, sizeof(dr), "|%d%d|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|", pad_.drive ? 1 : 0, pad_.steerStick,

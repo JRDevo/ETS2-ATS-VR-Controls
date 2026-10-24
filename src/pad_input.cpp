@@ -445,9 +445,11 @@ void PadInput::ReadLocked(XrSession s, SessionData& sd, VrPad::Frame& f) {
     int fails = 0;
     XrResult firstFail = XR_SUCCESS;
     // the aim poses: for the menu / keyboard pointer, the air mouse (its button may be on either hand: located for both hands
-    // whenever the air mouse could run) -- with the menu closed and no air mouse, 2 runtime calls fewer per frame
+    // whenever the air mouse could run), steering with the hands (wheel / point: every frame) -- with the menu closed, no air
+    // mouse and stick steering, 2 runtime calls fewer per frame
     const bool needAim = (menu_ && (menu_->AnyShown() || menu_->Pending())) || (cfg_.pad.airBtn >= 0 &&
-                         (cfg_.pad.airToggle || sd.mapper.AirOn() || sd.airHeld));
+                         (cfg_.pad.airToggle || sd.mapper.AirOn() || sd.airHeld)) ||
+                         (cfg_.pad.drive && (cfg_.pad.steerWith == 1 || cfg_.pad.steerWith == 2));
     auto note = [&](XrResult r) { if (XR_FAILED(r) && !fails++) firstFail = r; };
     for (int h = 0; h < 2; ++h) {
         XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};
@@ -613,6 +615,8 @@ void PadInput::BeginFrame(XrSession s) {
     {
         Part pm(meas, &split_[1]);
         sd.mapper.SetSpeed(DriveSpeedKmh());             // (speed-sensitive steering; -1 = no telemetry)
+        sd.mapper.SetHands(menu_ && menu_->HandOnPanel(0), menu_ && menu_->HandOnPanel(1),   // (point / wheel steering pause)
+                           menu_ && menu_->HandHolding(0), menu_ && menu_->HandHolding(1));
         sd.mapper.Step(f, live, dt, cfg_.pad, Sink());   // (not live = everything held is released)
         DriveStickSet(sd.mapper.StickX(), sd.mapper.StickY());               // (log = 1: the drive line shows the thumb too)
         const int kb = sd.mapper.TakeKeyboardToggles();  // a button set to "keyboard": show / hide the VR keyboard

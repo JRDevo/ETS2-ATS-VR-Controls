@@ -117,8 +117,14 @@ void InputSink::Key(uint16_t code, bool down) {
     if (test_) return;
     INPUT in{};
     in.type = INPUT_KEYBOARD;
-    in.ki.wScan = (WORD)(code & 0xFF);
-    in.ki.dwFlags = KEYEVENTF_SCANCODE | ((code & VrPad::kExt) ? KEYEVENTF_EXTENDEDKEY : 0) | (down ? 0 : KEYEVENTF_KEYUP);
+    if (code & VrPad::kVk) {                           // a virtual key (Pause): Windows fills in its scan code
+        in.ki.wVk = (WORD)(code & 0xFF);
+        in.ki.wScan = (WORD)MapVirtualKeyW(code & 0xFF, MAPVK_VK_TO_VSC);
+        in.ki.dwFlags = down ? 0 : KEYEVENTF_KEYUP;
+    } else {
+        in.ki.wScan = (WORD)(code & 0xFF);
+        in.ki.dwFlags = KEYEVENTF_SCANCODE | ((code & VrPad::kExt) ? KEYEVENTF_EXTENDEDKEY : 0) | (down ? 0 : KEYEVENTF_KEYUP);
+    }
     Queue(in);
 }
 

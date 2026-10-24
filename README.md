@@ -1,10 +1,14 @@
-# ETS2 ATS VR Controls
+# <img src="docs/images/logo.png" alt="" width="44" align="top"> ETS2 ATS VR Controls
+
+![ETS2 / ATS VR Controls: drive with your VR controllers](docs/images/banner.png)
 
 Play **Euro Truck Simulator 2** and **American Truck Simulator** in VR with **only your headset and its own controllers**.
 No steering wheel, no gamepad, no keyboard, no mouse, no extra hardware.
 
-- **Drive with the controllers:** one stick steers (smooth, like a gamepad), the triggers are gas and brake.
-- **Every key on a button:** indicators, horn, lights, anything. Pick the keys in a menu in the headset.
+- **Drive with the controllers:** three ways to steer -- a stick (smooth, like a gamepad), a **two-hand wheel** (hold both
+  grips and turn your hands) or **pointing** with one controller. The triggers are gas and brake.
+- **Every key on a button:** indicators, horn, lights, anything, in **four layers** (hold the right grip, the left grip or
+  both for more buttons). Pick the keys in a menu in the headset.
 - **A mouse in your hand:** a stick or the controller's aim moves the pointer, a button clicks. For the game's menus and the map.
 - **A full keyboard in the headset:** point and pull the trigger. For the few things that need typing.
 
@@ -79,6 +83,10 @@ Only one OpenXR runtime is active at a time; the last one you set wins.
 - **Modifier**: while you hold the modifier button (right grip), buttons can send something else. Default: **right grip +
   A or right trigger = left click, right grip + B = right click** -- so one controller does everything: hold the grip (the
   pointer follows), press A or the trigger to click, hold B to right-click (drag the map). Set any button's modified key in the VR menu.
+- **Two modifiers = four layers of buttons**: modifier 1 (right grip) and modifier 2 (left grip). No grip = your normal
+  buttons; right grip held = layer 2; left grip held = layer 3; **both grips held = layer 4**. Hold the grip(s) first,
+  then press the button. A button with nothing set in a layer does its normal job. (Both grips + the left stick click is
+  the menu's own combo: that one never sends a key.)
 - **Driving**: the left stick steers, the right trigger is the gas pedal, the left trigger the brake. Smooth, like a
   gamepad, not on / off keys. Gas and brake can go on any button. See [Driving](#driving-with-one-controller).
 - **VR menu + keyboard**: hold both grips + the left stick click for 1 second. A menu opens in front of you. See [The VR menu](#the-vr-menu).
@@ -150,12 +158,28 @@ By default:
 **You choose what drives.** Gas and brake are normal button choices, like a key:
 
 - In the VR menu: Buttons tab, point at a button, then pick **Gas** or **Brake** in the bar at the bottom. Also with the
-  modifier ("With modifier": for example right grip + right trigger = brake).
+  modifiers ("Mod 1" / "Mod 2" / "Both": for example right grip + right trigger = brake).
 - In `config.ini`: `rtrigger = brake`, `lgrip = brake`, `lup = gas` (stick forward), `modifier_keys = rtrigger:brake` ...
 - Triggers and grips are analog (press harder = more). A stick direction too. Any other button (A, B, X, Y, stick click)
   is full gas / full brake.
 - The steering stick: left, right or off (Driving tab, or `steer = left / right / off`). That stick's left / right then
   steer; its up / down are still free buttons (for example gas and brake).
+
+**Three ways to steer** (Driving tab: **Steer with**, or `steer_with = stick / wheel / point`):
+
+| Steer with | How | Full lock |
+|---|---|---|
+| **Stick** (default) | the stick, as below | the stick all the way |
+| **Wheel** | hold **both grips** and turn your hands like a steering wheel: left hand up = turn right. Let go of the grips: the wheel goes back to straight. The grab does not move the wheel: grab it where your hands are | 90 degrees of hand turn (`steer_wheel_angle`) |
+| **Point** | point the **right** controller left / right: straight ahead = straight. While you point at the VR menu or keyboard, or use the air mouse, the wheel **holds where it is** -- so you can type in a bend | 35 degrees left / right (`steer_point_angle`) |
+
+- **Stick on / off** (next to the angle; `steer_stick_too`): on = the stick steers too (push it and it wins, let go and
+  the hands steer again); off = only your hands steer, and the stick's left / right are normal buttons again.
+- Wheel and Point are speed-sensitive like the stick (At 90 km/h, below). The wheel follows the hands at once (smoothed a
+  little: `steer_aim_smooth`, 0.08 s), with no speed limit.
+- While both hands hold the wheel, the air mouse is off. Both grips + other buttons still give the "Both" layer.
+- `config.ini` only: `steer_point_hand = left` (point with the left hand), `steer_point_button = x` (point steers only
+  while X is held; set X itself to none), `steer_aim_deadzone` (degrees around straight that do not steer, 2).
 
 **How the wheel moves:** the stick's place is where the wheel goes. The stick's throw is short, so it has two zones:
 most of it (up to 80 % of a push) makes **small, careful turns** -- up to 20 % of the wheel, for following the road --, and
@@ -236,8 +260,9 @@ a laser pointer. A **white dot** appears where you point, and the key under it l
   While you point at the menu, the game does not get that trigger.
 - **Buttons** tab: every controller button and what it sends. Point at one, pull the trigger, then press a key on the
   keyboard (or pick Mouse L / Mouse R / Wheel / None at the bottom). For Shift + F: press Shift, then F.
-  **Normal / With modifier** at the top: "With modifier" shows and sets what each button sends while the modifier is held
-  ("as normal" = no entry). **Modifier: ...** picks the modifier button (each press: the next button, or off).
+  **Normal / Mod 1 / Mod 2 / Both** at the top: the layer the rows show and set -- what each button sends while modifier 1,
+  modifier 2 or both are held ("as normal" = no entry). **1: ...** and **2: ...** pick the two modifier buttons (each
+  press: the next button, or off).
 - **Mouse** tab: which stick moves the mouse, its speed and dead zone, the air mouse button, hold or toggle, its speed.
 - **Panels** tab: menu size, keyboard size, show / hide the keyboard, bring both in front of you.
 - **Panels** tab also: the distance of each panel (Closer / Farther).

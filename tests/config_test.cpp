@@ -57,7 +57,8 @@ int main(int argc, char** argv) {
     CHECK(k.pad.map[VrPad::kX].kind == VrPad::kKeys && k.pad.map[VrPad::kX].code[0] == 0x27, "x = ; is the ; key");
     CHECK(k.pad.map[VrPad::kY].kind == VrPad::kKeys && k.pad.map[VrPad::kY].code[0] == 0x28, "y = ' with a comment");
     CHECK(k.pad.mouseSpeed == 500.0f && k.notes.empty(), "mouse_speed = 500 # px (%zu notes)", k.notes.size());
-    CHECK(!VrPad::ParseOut("pause", &o), "no pause key (it would be NumLock)");
+    CHECK(VrPad::ParseOut("pause", &o) && o.code[0] == (0x13 | VrPad::kVk) && o.code[0] != 0x45,
+          "pause = the virtual key VK_PAUSE (never the scan code 0x45: that is NumLock)");
     // the VR menu keys
     CHECK(c.menu && c.menuCombo == d.menuCombo && c.menuCombo.size() == 3 && c.menuCombo[2] == VrPad::kLStick && c.menuHold == 1.0f &&
           !c.pad.airToggle, "shipped: menu on, lgrip+rgrip+lstick, 1 s, air hold");
@@ -89,6 +90,38 @@ int main(int argc, char** argv) {
     const Config mr = ParseConfig(w);
     CHECK(mr.pad.modBtn == VrPad::kLGrip && SameOut(mr.pad.modMap[VrPad::kA], mo.pad.modMap[VrPad::kA]) &&
           SameOut(mr.pad.modMap[VrPad::kX], mo.pad.modMap[VrPad::kX]) && mr.notes.empty(), "the menu's modifier lines read back the same");
+    // two modifiers (four layers): defaults, parsing, the menu's lines read back; clashes refused
+    CHECK(d.pad.modBtn2 == VrPad::kLGrip && mo.pad.modBtn2 == -1 && mo.notes.empty(),
+          "modifier 2 = left grip by default; an old file with modifier = lgrip: modifier 2 quietly off");
+    const Config m2 = ParseConfig("modifier = rgrip\nmodifier2 = x\nmodifier2_keys = a:f2 | b:mouse_middle\nmodifier_both_keys = a:f3 | y:keyboard\n");
+    CHECK(m2.pad.modBtn2 == VrPad::kX && m2.pad.modMap2[VrPad::kA].kind == VrPad::kKeys && m2.pad.modMap2[VrPad::kB].kind == VrPad::kMouseM &&
+          m2.pad.modMapBoth[VrPad::kA].kind == VrPad::kKeys && m2.pad.modMapBoth[VrPad::kY].kind == VrPad::kKeyboard &&
+          m2.pad.modMapBoth[VrPad::kB].kind == VrPad::kNone && m2.notes.empty(), "modifier2 + its keys + the both keys (%zu notes)", m2.notes.size());
+    std::string w2;
+    for (const auto& kv : MenuValues(m2.pad, PanelPlace(), PanelPlace(), MenuLook())) w2 += kv.first + " = " + kv.second + "\n";
+    const Config m2r = ParseConfig(w2);
+    CHECK(m2r.pad.modBtn2 == VrPad::kX && SameOut(m2r.pad.modMap2[VrPad::kA], m2.pad.modMap2[VrPad::kA]) &&
+          SameOut(m2r.pad.modMap2[VrPad::kB], m2.pad.modMap2[VrPad::kB]) && SameOut(m2r.pad.modMapBoth[VrPad::kY], m2.pad.modMapBoth[VrPad::kY]) &&
+          m2r.pad.modMapBoth[VrPad::kB].kind == VrPad::kNone && m2r.notes.empty(), "the menu's layer lines read back the same");
+    const Config ms = ParseConfig("modifier = rgrip\nmodifier2 = rgrip\n");
+    const Config mk = ParseConfig("modifier = lstick\nmodifier2 = rstick\n");
+    CHECK(ms.pad.modBtn2 == -1 && ms.notes.size() == 1 && mk.pad.modBtn2 == -1 && mk.notes.size() == 1,
+          "modifier2 = modifier, or both stick clicks (VR EyeCapture): modifier 2 off, noted");
+    // steering with the hands: stick by default; wheel / point and their settings; the menu's lines read back
+    const Config sw = ParseConfig("steer_with = point\nsteer_point_angle = 40\nsteer_wheel_angle = 120\nsteer_aim_deadzone = 3\n"
+                                  "steer_aim_smooth = 0.1\nsteer_point_hand = left\nsteer_point_button = x\n");
+    CHECK(d.pad.steerWith == 0 && sw.pad.steerWith == 2 && sw.pad.steerPointAngle == 40.0f && sw.pad.steerWheelAngle == 120.0f &&
+          sw.pad.steerAimDeadzone == 3.0f && sw.pad.steerAimSmooth == 0.1f && sw.pad.steerPointHand == 0 &&
+          sw.pad.steerPointBtn == VrPad::kX && sw.notes.empty(), "steer_with = point and its settings (%zu notes)", sw.notes.size());
+    std::string w3;
+    for (const auto& kv : MenuValues(sw.pad, PanelPlace(), PanelPlace(), MenuLook())) w3 += kv.first + " = " + kv.second + "\n";
+    const Config swr = ParseConfig(w3);
+    CHECK(d.pad.steerStickToo && !ParseConfig("steer_stick_too = 0\n").pad.steerStickToo, "steer_stick_too: on by default, 0 = off");
+    CHECK(swr.pad.steerWith == 2 && swr.pad.steerPointAngle == 40.0f && swr.pad.steerWheelAngle == 120.0f && swr.notes.empty(),
+          "the menu's steering lines read back the same");
+    const Config sb = ParseConfig("steer_with = mouse\nsteer_point_angle = 5\nsteer_point_hand = up\n");
+    CHECK(sb.pad.steerWith == 0 && sb.pad.steerPointAngle == 10.0f && sb.pad.steerPointHand == 1 && sb.notes.size() == 2,
+          "bad steering words noted (defaults kept), a number out of range clamped (%zu notes)", sb.notes.size());
     // driving: shipped = defaults; parsing; the menu's lines read back
     CHECK(c.pad.steerStick == d.pad.steerStick && d.pad.steerStick == 1 && c.pad.steerDeadzone == d.pad.steerDeadzone &&
           c.pad.steerFine == d.pad.steerFine && c.pad.steerFineZone == d.pad.steerFineZone && c.pad.steerMax == d.pad.steerMax && c.pad.steerRate == d.pad.steerRate &&

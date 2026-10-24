@@ -63,6 +63,9 @@ int main() {
     CHECK(ScanOfName("F13") == 0 && ScanOfName("F0") == 0, "bad F keys");
     CHECK(ScanOfName("Delete") == (0x53 | kExt) && ScanOfName("UP") == (0x48 | kExt), "extended");
     CHECK(ScanOfName("space") == 0x39 && ScanOfName("Esc") == 0x01 && ScanOfName("numenter") == (0x1C | kExt), "named");
+    CHECK(ScanOfName("pause") == (0x13 | kVk) && ScanOfName("printscreen") == (0x37 | kExt) && ScanOfName("prtsc") == (0x37 | kExt) &&
+          ScanOfName("scrolllock") == 0x46, "pause (a virtual key: the DLAA mod reads VK_PAUSE), print screen, scroll lock");
+    CHECK(!strcmp(NameOfScan(0x13 | kVk), "pause") && !strcmp(NameOfScan(0x37 | kExt), "printscreen"), "... and their names back");
     CHECK(ScanOfName("bogus") == 0 && ScanOfName("") == 0, "unknown");
     Out o;
     CHECK(ParseOut(" none ", &o) && o.kind == kNone, "none");
@@ -113,6 +116,55 @@ int main() {
         f.grip[1] = 0.0f; f.trig[1] = 0.0f;
         m.Step(f, true, 0.011, c, r);
         CHECK(r.Take() == "m0v m0^", "modifier off: the trigger is the left click");
+    }
+    {   // two modifiers = four layers: right grip (1), left grip (2), both (3); an empty entry = normal, not another layer
+        Config c = OldDefaults();
+        c.map[kLGrip] = Out();
+        ParseOut("f5", &c.map[kA]);
+        ParseOut("f1", &c.modMap[kA]);
+        ParseOut("f2", &c.modMap2[kA]);
+        ParseOut("f3", &c.modMapBoth[kA]);
+        Mapper m; Rec r; Frame f;
+        f.hand[0] = f.hand[1] = true;
+        auto tapA = [&](float lg, float rg) {
+            f.grip[0] = lg; f.grip[1] = rg;
+            m.Step(f, true, 0.011, c, r);
+            f.prim[1] = true;
+            m.Step(f, true, 0.011, c, r);
+            f.prim[1] = false;
+            m.Step(f, true, 0.011, c, r);
+            f.grip[0] = f.grip[1] = 0.0f;
+            m.Step(f, true, 0.011, c, r);
+            return r.Take();
+        };
+        CHECK(tapA(0, 0) == "k03fv k03f^", "A alone = F5");
+        CHECK(tapA(0, 1) == "k03bv k03b^", "right grip + A = F1 (layer 1)");
+        CHECK(tapA(1, 0) == "k03cv k03c^", "left grip + A = F2 (layer 2)");
+        CHECK(tapA(1, 1) == "k03dv k03d^", "both grips + A = F3 (layer 3)");
+        c.modMapBoth[kA] = Out();
+        CHECK(tapA(1, 1) == "k03fv k03f^", "both grips, no entry: A as normal (not layer 1's F1)");
+        c.modBtn2 = -1;
+        CHECK(tapA(1, 0) == "k03fv k03f^" && tapA(1, 1) == "k03bv k03b^", "modifier 2 off: the left grip changes nothing");
+        c.modBtn2 = kLGrip;
+        f.prim[1] = true;                              // A held, then the left grip: A still releases what it pressed
+        m.Step(f, true, 0.011, c, r);
+        f.grip[0] = 1.0f;
+        m.Step(f, true, 0.011, c, r);
+        f.prim[1] = false;
+        m.Step(f, true, 0.011, c, r);
+        f.grip[0] = 0.0f;
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "k03fv k03f^", "a modifier pressed while A is held changes nothing");
+        ParseOut("brake", &c.map[kLGrip]);             // a modifier keeps its own job: the left grip is still the brake
+        f.grip[0] = 0.9f;
+        m.Step(f, true, 0.011, c, r);
+        CHECK(std::fabs(r.drv[2] - PedalOf(0.9f)) < 1e-4f && r.Take().empty(), "left grip = brake AND modifier 2 (%.3f)", (double)r.drv[2]);
+        f.prim[1] = true;
+        m.Step(f, true, 0.011, c, r);
+        CHECK(r.Take() == "k03cv", "... and A with it = F2");
+        f.prim[1] = false; f.grip[0] = 0.0f;
+        m.Step(f, true, 0.011, c, r);
+        r.Take();
     }
     {   // the defaults since 2026-10-23: A = left click, B = Esc, right grip (air mouse, the modifier) + A / B = left / right
         // click, + right trigger = left click; the right trigger alone = gas, the left trigger = brake
@@ -668,6 +720,138 @@ int main() {
         CHECK(StickShape(0.95f, dz) == 1.0f && StickShape(-0.97f, dz) == -1.0f && StickPush(0.95f, dz) == 1.0f,
               "0.95 (the user's thumb at the rim) = full lock");
         CHECK(std::fabs(StickShape(0.75f, dz) - 0.1912f) < 1e-3f, "75 %% of the stick: 0.19 of the wheel (%.4f)", (double)StickShape(0.75f, dz));
+    }
+    printf("(4) steering with the hands\n");
+    {   // the two-hand wheel: both grips held; the tilt of the line between the hands; the grab keeps the wheel's place
+        Config c = DefaultConfig();
+        c.steerWith = 1;                               // 90 degrees to full lock, dead zone 2, smooth 0.08 s
+        Mapper mp; Rec r; Frame f;
+        f.hand[0] = f.hand[1] = true; f.pos[0] = f.pos[1] = true;
+        auto tilt = [&](double deg) {                  // hands 0.5 m apart, 0.4 m ahead; + = left hand higher = a right turn
+            const double h = 0.25 * std::tan(deg * 3.14159265358979 / 180.0);
+            f.p[0][0] = -0.25; f.p[0][1] = h;  f.p[0][2] = -0.4;
+            f.p[1][0] = 0.25;  f.p[1][1] = -h; f.p[1][2] = -0.4;
+        };
+        const float k30 = (30.0f - 2.0f) / (90.0f - 2.0f);
+        tilt(0.0);
+        f.grip[0] = f.grip[1] = 1.0f;
+        run(mp, f, 0.5, c, r);
+        CHECK(r.drv[0] == 0.0f && mp.AimSteering(), "both grips, hands level: straight, the hands steer");
+        tilt(30.0);
+        run(mp, f, 1.0, c, r);
+        CHECK(std::fabs(r.drv[0] - k30) < 0.01f, "left hand up 30 degrees: a right turn of %.3f (%.3f)", (double)k30, (double)r.drv[0]);
+        tilt(-30.0);
+        run(mp, f, 0.6, c, r);
+        CHECK(std::fabs(r.drv[0] + k30) < 0.01f, "... and the other way at once (no speed limit: the hands are the wheel) (%.3f)", (double)r.drv[0]);
+        f.grip[0] = f.grip[1] = 0.0f;
+        run(mp, f, 0.5, c, r);
+        CHECK(r.drv[0] == 0.0f && !mp.AimSteering(), "grips let go: back to straight");
+        f.grip[0] = f.grip[1] = 1.0f;                  // grabbed with the hands still tilted: the wheel does not jump
+        run(mp, f, 0.5, c, r);
+        CHECK(std::fabs(r.drv[0]) < 0.01f, "grabbed tilted: the wheel stays straight (%.3f)", (double)r.drv[0]);
+        tilt(0.0);
+        run(mp, f, 0.6, c, r);
+        CHECK(std::fabs(r.drv[0] - k30) < 0.02f, "... and turning from there turns it (%.3f)", (double)r.drv[0]);
+        f.pos[1] = false;                              // tracking lost a moment: held; longer: let go
+        run(mp, f, 0.2, c, r);
+        CHECK(std::fabs(r.drv[0] - k30) < 0.02f, "tracking lost 0.2 s: held (%.3f)", (double)r.drv[0]);
+        run(mp, f, 0.5, c, r);
+        CHECK(r.drv[0] == 0.0f, "tracking lost longer: back to straight (%.3f)", (double)r.drv[0]);
+        f.pos[1] = true;
+        f.grip[0] = f.grip[1] = 0.0f;
+        run(mp, f, 0.1, c, r);
+        f.grip[0] = f.grip[1] = 1.0f;
+        tilt(0.0);
+        run(mp, f, 0.2, c, r);
+        tilt(30.0);
+        run(mp, f, 0.6, c, r);
+        f.sx[0] = -1.0f;                               // the stick wins while pushed
+        run(mp, f, 1.0, c, r);
+        CHECK(r.drv[0] < -0.2f, "the stick pushed left wins over the hands (%.3f)", (double)r.drv[0]);
+        f.sx[0] = 0.0f;
+        run(mp, f, 0.6, c, r);
+        CHECK(std::fabs(r.drv[0] - k30) < 0.02f, "stick let go: the hands again (%.3f)", (double)r.drv[0]);
+        mp.SetHands(false, false, true, false);        // the left hand holds a panel (the menu's grab): let go
+        run(mp, f, 0.5, c, r);
+        CHECK(r.drv[0] == 0.0f, "a hand holds a panel: the wheel lets go");
+        mp.SetHands(false, true, false, false);        // only pointing at a panel: the wheel steers (grabbed level again)
+        tilt(0.0);
+        run(mp, f, 0.2, c, r);
+        tilt(30.0);
+        run(mp, f, 0.6, c, r);
+        CHECK(std::fabs(r.drv[0]) > 0.0f, "pointing at a panel while holding the wheel: still steers (%.3f)", (double)r.drv[0]);
+        mp.SetSpeed(90.0f);                            // speed-sensitive as the stick: 0.3 of it at 90 km/h
+        f.grip[0] = f.grip[1] = 0.0f;
+        mp.SetHands(false, false, false, false);
+        run(mp, f, 0.5, c, r);
+        f.grip[0] = f.grip[1] = 1.0f;
+        tilt(0.0);
+        run(mp, f, 0.2, c, r);
+        tilt(30.0);
+        run(mp, f, 0.6, c, r);
+        CHECK(std::fabs(r.drv[0] - k30 * 0.3f) < 0.01f, "at 90 km/h: 0.3 of it (%.3f)", (double)r.drv[0]);
+        CHECK(r.Take().empty(), "no key from the grips while they hold the wheel");
+    }
+    {   // pointing with one hand (the right): ahead = straight; pauses on a panel, for the air mouse, without its button
+        Config c = DefaultConfig();
+        c.steerWith = 2;                               // 35 degrees to full lock, dead zone 2
+        Mapper mp; Rec r; Frame f;
+        f.hand[0] = f.hand[1] = true; f.aim[1] = true;
+        const float k20 = (20.0f - 2.0f) / (35.0f - 2.0f);
+        QuatYawPitch(0.0, -20.0, f.q[1]);
+        run(mp, f, 0.5, c, r);
+        CHECK(r.drv[0] == 0.0f && mp.AimSteering(), "pointing ahead (and down: pitch does not steer): straight");
+        QuatYawPitch(20.0, -20.0, f.q[1]);
+        run(mp, f, 0.6, c, r);
+        CHECK(std::fabs(r.drv[0] - k20) < 0.01f, "pointing 20 degrees right: %.3f (%.3f)", (double)k20, (double)r.drv[0]);
+        QuatYawPitch(-20.0, -20.0, f.q[1]);
+        run(mp, f, 0.6, c, r);
+        CHECK(std::fabs(r.drv[0] + k20) < 0.01f, "20 degrees left: the other way (%.3f)", (double)r.drv[0]);
+        mp.SetHands(false, true, false, false);        // pointing at the keyboard / menu: the wheel holds where it is
+        QuatYawPitch(30.0, -20.0, f.q[1]);
+        run(mp, f, 0.5, c, r);
+        CHECK(std::fabs(r.drv[0] + k20) < 0.01f && mp.AimSteering(), "the right hand points at a panel: the wheel holds (%.3f)", (double)r.drv[0]);
+        QuatYawPitch(-20.0, -20.0, f.q[1]);
+        mp.SetHands(false, false, false, false);
+        run(mp, f, 0.6, c, r);
+        CHECK(std::fabs(r.drv[0] + k20) < 0.01f, "off the panel: steers again");
+        f.grip[1] = 1.0f;                              // the air mouse (right grip): the wheel holds while it moves the pointer
+        QuatYawPitch(30.0, -20.0, f.q[1]);
+        run(mp, f, 0.5, c, r);
+        CHECK(std::fabs(r.drv[0] + k20) < 0.01f && mp.AirOn(), "air mouse on: the wheel holds, the pointer moves (%.3f)", (double)r.drv[0]);
+        QuatYawPitch(-20.0, -20.0, f.q[1]);
+        f.grip[1] = 0.0f;
+        run(mp, f, 0.6, c, r);
+        CHECK(std::fabs(r.drv[0] + k20) < 0.01f, "air mouse off: steers again");
+        mp.SetHands(false, true, false, false);        // the stick on a panel... the stick still steers (it wins)
+        f.sx[0] = 1.0f;
+        run(mp, f, 1.0, c, r);
+        CHECK(r.drv[0] > 0.2f, "pointing at a panel, the stick pushed right: the stick steers (%.3f)", (double)r.drv[0]);
+        f.sx[0] = 0.0f;
+        mp.SetHands(false, false, false, false);
+        run(mp, f, 0.6, c, r);
+        c.steerStickToo = false;                       // stick off: only the hand steers; the stick's left / right are buttons
+        ParseOut("f9", &c.map[kLRight]);
+        f.sx[0] = 1.0f;
+        run(mp, f, 1.0, c, r);
+        CHECK(std::fabs(r.drv[0] + k20) < 0.01f && r.Take() == "k043v", "stick off: pushing it does not steer, it is a key (F9)");
+        f.sx[0] = 0.0f;
+        run(mp, f, 0.1, c, r);
+        r.Take();
+        c.steerStickToo = true;
+        c.steerPointBtn = kX;                          // only while X is held
+        c.map[kX] = Out();
+        run(mp, f, 0.5, c, r);
+        CHECK(r.drv[0] == 0.0f, "with a point button: nothing while it is not held");
+        f.prim[0] = true;
+        run(mp, f, 0.6, c, r);
+        CHECK(std::fabs(r.drv[0] + k20) < 0.01f, "... and steers while it is held");
+        f.prim[0] = false;
+        c.steerPointBtn = -1;
+        c.steerWith = 0;                               // the stick again: pointing does nothing
+        run(mp, f, 0.6, c, r);
+        CHECK(r.drv[0] == 0.0f && !mp.AimSteering(), "steer with the stick: pointing does nothing");
+        r.Take();
     }
     printf("%d checks, %d failed\n", g_checks, g_fails);
     return g_fails ? 1 : 0;

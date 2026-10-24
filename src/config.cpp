@@ -33,6 +33,7 @@ Config ParseConfig(const std::string& text) {
     c.apps = { L"eurotrucks2.exe", L"amtrucks.exe" };
     size_t pos = 0;
     int lineNo = 0;
+    bool mod2Set = false;                              // (modifier2 in the file: a clash with modifier is then noted)
     while (pos < text.size()) {
         size_t nl = text.find('\n', pos);
         if (nl == std::string::npos) nl = text.size();
@@ -98,6 +99,31 @@ Config ParseConfig(const std::string& text) {
         if (key == "steer_follow_time") { if (Num(val, 0, 2, &d)) c.pad.steerFollowTime = (float)d; else bad("seconds 0 .. 2 (0 = at once)"); continue; }
         if (key == "steer_center_time") { if (Num(val, 0, 10, &d)) c.pad.steerCenterTime = (float)d; else bad("seconds 0 .. 10 (0 = at once)"); continue; }
         if (key == "steer_max_speed") { if (Num(val, 0, 10, &d)) c.pad.steerRate = (float)d; else bad("full turns per second 0 .. 10 (0 = no limit)"); continue; }
+        if (key == "steer_with") {                      // what steers: the stick, a two-hand wheel, pointing with one hand
+            if (lv == "stick") c.pad.steerWith = 0;
+            else if (lv == "wheel") c.pad.steerWith = 1;
+            else if (lv == "point") c.pad.steerWith = 2;
+            else bad("stick, wheel or point");
+            continue;
+        }
+        if (key == "steer_wheel_angle") { if (Num(val, 10, 180, &d)) c.pad.steerWheelAngle = (float)d; else bad("degrees 10 .. 180"); continue; }
+        if (key == "steer_point_angle") { if (Num(val, 10, 90, &d)) c.pad.steerPointAngle = (float)d; else bad("degrees 10 .. 90"); continue; }
+        if (key == "steer_aim_deadzone") { if (Num(val, 0, 10, &d)) c.pad.steerAimDeadzone = (float)d; else bad("degrees 0 .. 10"); continue; }
+        if (key == "steer_aim_smooth") { if (Num(val, 0, 1, &d)) c.pad.steerAimSmooth = (float)d; else bad("seconds 0 .. 1 (0 = at once)"); continue; }
+        if (key == "steer_point_hand") {
+            if (lv == "left") c.pad.steerPointHand = 0;
+            else if (lv == "right") c.pad.steerPointHand = 1;
+            else bad("left or right");
+            continue;
+        }
+        if (key == "steer_stick_too") { c.pad.steerStickToo = lv != "0" && lv != "off" && lv != "no"; continue; }
+        if (key == "steer_point_button") {
+            if (lv == "off" || lv == "none" || lv == "0") { c.pad.steerPointBtn = -1; continue; }
+            const int b = VrPad::BtnOfName(lv.c_str());
+            if (b < 0 || b >= VrPad::kLUp) { bad("a button name such as lgrip, or none (= always)"); continue; }
+            c.pad.steerPointBtn = b;
+            continue;
+        }
         if (key == "steer_back_speed") { if (Num(val, 0, 10, &d)) c.pad.steerBackRate = (float)d; else bad("full turns per second 0 .. 10 (0 = no limit)"); continue; }
         if (key == "steer_deadzone") { if (Num(val, 0, 0.5, &d)) c.pad.steerDeadzone = (float)d; else bad("a number 0 .. 0.5"); continue; }
         if (key == "steer_curve") { bad("no longer used (2026-10-23: see steer_fine, steer_fine_zone)"); continue; }
@@ -175,15 +201,19 @@ Config ParseConfig(const std::string& text) {
             (key == "menu_place" ? c.menuPlace : c.kbPlace) = p;
             continue;
         }
-        if (key == "modifier") {
-            if (lv == "off" || lv == "none" || lv == "0") { c.pad.modBtn = -1; continue; }
+        if (key == "modifier" || key == "modifier2") {  // the two modifiers (see VrPad::Config: four layers)
+            int& m = key == "modifier" ? c.pad.modBtn : c.pad.modBtn2;
+            if (key == "modifier2") mod2Set = true;
+            if (lv == "off" || lv == "none" || lv == "0") { m = -1; continue; }
             const int b = VrPad::BtnOfName(lv.c_str());
             if (b < 0 || b >= VrPad::kLUp) { bad("a button name such as rgrip, or off"); continue; }
-            c.pad.modBtn = b;
+            m = b;
             continue;
         }
-        if (key == "modifier_keys") {                  // "rtrigger:mouse_right | a:shift+f" (all of them; none = no entries)
-            for (VrPad::Out& o : c.pad.modMap) o = VrPad::Out();
+        if (key == "modifier_keys" || key == "modifier2_keys" || key == "modifier_both_keys") {
+            // "rtrigger:mouse_right | a:shift+f" (all of them; none = no entries)
+            VrPad::Out* t = key == "modifier_keys" ? c.pad.modMap : key == "modifier2_keys" ? c.pad.modMap2 : c.pad.modMapBoth;
+            for (int i = 0; i < VrPad::kBtnCount; ++i) t[i] = VrPad::Out();
             if (lv == "none" || lv.empty()) continue;
             size_t a = 0;
             while (a <= val.size()) {
@@ -196,7 +226,7 @@ Config ParseConfig(const std::string& text) {
                 const int b = colon == std::string::npos ? -1 : VrPad::BtnOfName(Lower(Trim(item.substr(0, colon))).c_str());
                 VrPad::Out o;
                 if (b < 0 || !VrPad::ParseOut(item.substr(colon + 1).c_str(), &o)) { bad(("'" + item + "': button:key").c_str()); continue; }
-                c.pad.modMap[b] = o;
+                t[b] = o;
             }
             continue;
         }
@@ -216,6 +246,15 @@ Config ParseConfig(const std::string& text) {
             continue;
         }
         c.notes.push_back("line " + std::to_string(lineNo) + ": unknown key '" + key + "' -- ignored");
+    }
+    // the two modifiers: not the same button, and never both stick clicks (VR EyeCapture records on that pair)
+    if (c.pad.modBtn2 >= 0 && c.pad.modBtn2 == c.pad.modBtn) {   // (an old file with modifier = lgrip: quietly off)
+        if (mod2Set) c.notes.push_back("modifier2 is the same button as modifier -- modifier2 off");
+        c.pad.modBtn2 = -1;
+    }
+    if ((c.pad.modBtn == VrPad::kLStick && c.pad.modBtn2 == VrPad::kRStick) || (c.pad.modBtn == VrPad::kRStick && c.pad.modBtn2 == VrPad::kLStick)) {
+        c.notes.push_back("modifier + modifier2 = both stick clicks (VR EyeCapture's record combo) -- modifier2 off");
+        c.pad.modBtn2 = -1;
     }
     return c;
 }
@@ -263,13 +302,18 @@ std::vector<std::pair<std::string, std::string>> MenuValues(const VrPad::Config&
     kv.push_back({ "air_mouse", p.airBtn >= 0 ? VrPad::BtnNames()[p.airBtn] : "off" });
     kv.push_back({ "air_mode", p.airToggle ? "toggle" : "hold" });
     kv.push_back({ "modifier", p.modBtn >= 0 ? VrPad::BtnNames()[p.modBtn] : "off" });
-    std::string mk;
-    for (int i = 0; i < VrPad::kBtnCount; ++i) {
-        if (p.modMap[i].kind == VrPad::kNone) continue;
-        VrPad::OutToString(p.modMap[i], b, sizeof(b));
-        mk += (mk.empty() ? "" : " | ") + std::string(VrPad::BtnNames()[i]) + ":" + b;
+    kv.push_back({ "modifier2", p.modBtn2 >= 0 ? VrPad::BtnNames()[p.modBtn2] : "off" });
+    const struct { const char* key; const VrPad::Out* t; } layers[] = {
+        { "modifier_keys", p.modMap }, { "modifier2_keys", p.modMap2 }, { "modifier_both_keys", p.modMapBoth } };
+    for (const auto& l : layers) {
+        std::string mk;
+        for (int i = 0; i < VrPad::kBtnCount; ++i) {
+            if (l.t[i].kind == VrPad::kNone) continue;
+            VrPad::OutToString(l.t[i], b, sizeof(b));
+            mk += (mk.empty() ? "" : " | ") + std::string(VrPad::BtnNames()[i]) + ":" + b;
+        }
+        kv.push_back({ l.key, mk.empty() ? "none" : mk });
     }
-    kv.push_back({ "modifier_keys", mk.empty() ? "none" : mk });
     snprintf(b, sizeof(b), "%.0f", (double)p.airGain);
     kv.push_back({ "air_speed", b });
     kv.push_back({ "drive", p.drive ? "1" : "0" });
@@ -293,6 +337,12 @@ std::vector<std::pair<std::string, std::string>> MenuValues(const VrPad::Config&
     snprintf(b, sizeof(b), "%.2f", (double)p.steerAtSpeed);
     kv.push_back({ "steer_at_speed", b });
     kv.push_back({ "steer_speed_sens", p.steerSpeedSens ? "1" : "0" });
+    kv.push_back({ "steer_with", p.steerWith == 1 ? "wheel" : p.steerWith == 2 ? "point" : "stick" });
+    snprintf(b, sizeof(b), "%.0f", (double)p.steerWheelAngle);
+    kv.push_back({ "steer_wheel_angle", b });
+    snprintf(b, sizeof(b), "%.0f", (double)p.steerPointAngle);
+    kv.push_back({ "steer_point_angle", b });
+    kv.push_back({ "steer_stick_too", p.steerStickToo ? "1" : "0" });
     if (menu.set) kv.push_back({ "menu_place", PlaceString(menu) });
     if (kb.set) kv.push_back({ "keyboard_place", PlaceString(kb) });
     kv.push_back({ "theme", ThemeNames()[look.theme < 0 || look.theme >= kThemeCount ? 0 : look.theme] });
@@ -396,12 +446,19 @@ std::string DescribePad(const VrPad::Config& p) {
              p.mouseStick == 1 ? "left" : p.mouseStick == 2 ? "right" : "off", (double)p.mouseSpeed, (double)p.deadzone,
              p.airBtn >= 0 ? VrPad::BtnNames()[p.airBtn] : "off", (double)p.airGain);
     if (p.airToggle) strncat_s(tail, sizeof(tail), " (toggle)", _TRUNCATE);
-    std::string mod = p.modBtn >= 0 ? std::string(" | modifier ") + VrPad::BtnNames()[p.modBtn] + ":" : std::string(" | no modifier");
-    for (int b = 0; p.modBtn >= 0 && b < VrPad::kBtnCount; ++b) {
-        if (p.modMap[b].kind == VrPad::kNone) continue;
-        char v[48];
-        VrPad::OutToString(p.modMap[b], v, sizeof(v));
-        mod += std::string(" ") + VrPad::BtnNames()[b] + "=" + v;
+    std::string mod;
+    const char* const layerName[3] = { "modifier", "modifier2", "both" };
+    for (int l = 1; l <= 3; ++l) {
+        const int m = l == 1 ? p.modBtn : l == 2 ? p.modBtn2 : (p.modBtn >= 0 && p.modBtn2 >= 0 ? 0 : -1);
+        if (m < 0) { if (l < 3) mod += std::string(" | no ") + layerName[l - 1]; continue; }
+        mod += std::string(" | ") + layerName[l - 1] + (l < 3 ? std::string(" ") + VrPad::BtnNames()[m] : std::string()) + ":";
+        const VrPad::Out* t = VrPad::LayerMap(p, l);
+        for (int b = 0; b < VrPad::kBtnCount; ++b) {
+            if (t[b].kind == VrPad::kNone) continue;
+            char v[48];
+            VrPad::OutToString(t[b], v, sizeof(v));
+            mod += std::string(" ") + VrPad::BtnNames()[b] + "=" + v;
+        }
     }
     char dr[260] = " | no steering";
     if (!p.drive) snprintf(dr, sizeof(dr), " | driving off");
@@ -410,7 +467,20 @@ std::string DescribePad(const VrPad::Config& p) {
                  p.steerStick == 1 ? "left" : "right", (double)p.steerDeadzone, (double)p.steerFine, (double)p.steerFineZone, (double)p.steerFullAt, (double)p.steerMax,
                  (double)p.steerFollowTime, (double)p.steerCenterTime, (double)p.steerRate, (double)p.steerAtSpeed,
                  p.steerSpeedSens ? "" : " off");
-    return s + tail + mod + dr;
+    std::string aim;
+    if (p.drive && p.steerWith == 1) {
+        char a[120];
+        snprintf(a, sizeof(a), " | two-hand wheel (both grips): %.0f deg to full lock, dead zone %.0f deg, smooth %.2f s, stick too %s",
+                 (double)p.steerWheelAngle, (double)p.steerAimDeadzone, (double)p.steerAimSmooth, p.steerStickToo ? "on" : "off");
+        aim = a;
+    } else if (p.drive && p.steerWith == 2) {
+        char a[160];
+        snprintf(a, sizeof(a), " | point to steer (%s hand, %s): %.0f deg to full lock, dead zone %.0f deg, smooth %.2f s, stick too %s",
+                 p.steerPointHand ? "right" : "left", p.steerPointBtn >= 0 ? VrPad::BtnNames()[p.steerPointBtn] : "always",
+                 (double)p.steerPointAngle, (double)p.steerAimDeadzone, (double)p.steerAimSmooth, p.steerStickToo ? "on" : "off");
+        aim = a;
+    }
+    return s + tail + mod + dr + aim;
 }
 
 }  // namespace ck

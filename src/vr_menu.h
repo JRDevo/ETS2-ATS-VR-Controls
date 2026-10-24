@@ -99,6 +99,8 @@ public:
     void ToggleKeyboard() { ShowKb(!pan_[kPanKb].show); }   // a button set to "keyboard" (pad_map.h kKeyboard)
     bool AnyShown() const { return pan_[0].show || pan_[1].show; }
     bool HandOnPanel(int h) const { return h >= 0 && h < 2 && (hov_[h].pan >= 0 || press_[h].pan >= 0 || grab_[h].pan >= 0 || own_[h]); }
+    // the hand holds a panel (a grab, or a trigger pressed on it) -- not only points at it (the two-hand wheel lets go)
+    bool HandHolding(int h) const { return h >= 0 && h < 2 && (press_[h].pan >= 0 || grab_[h].pan >= 0 || own_[h]); }
     bool Pending() const { return kbPending_; }  // the keyboard waits for the head pose to be placed
     const MenuLook& Look() const { return look_; }
     const Panel& Pan(int i) const { return pan_[i]; }
@@ -165,8 +167,8 @@ private:
     PanelPlace    place_[kPanCount];
     int           tab_ = 0;               // 0 Buttons, 1 Mouse, 2 Panels, 3 Look, 4 Driving
     int           pickBtn_ = -1;          // the button being set (a key / mouse button is picked next)
-    bool          pickMod_ = false;       // ... its entry for while the modifier is held
-    int           layer_ = 0;             // Buttons tab: 0 normal, 1 with the modifier held
+    int           pickLayer_ = 0;         // ... in this layer (0 normal, 1 modifier 1, 2 modifier 2, 3 both)
+    int           layer_ = 0;             // Buttons tab: the layer the rows show (as pickLayer_)
     int           resetArm_ = -1;         // the tab whose Reset was pressed once (the next press resets it)
     MenuLook      look_;
     bool          kbPending_ = false;     // keyboard_show without a saved place: shown at the first frame with the head
