@@ -1,3 +1,14 @@
+> [!CAUTION]
+> ## THIS GITHUB PAGE IS THE ONLY PLACE THIS MOD EXISTS
+> **`https://github.com/JRDevo/ETS2-ATS-VR-Controls` is the only source of truth for this mod: the only place it is
+> published, the only place it is documented, and the only place to download it (its [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases) page).**
+>
+> - There is **no website** for this mod. There **never will be** one. No Discord, no Patreon, no Nexus, no Steam Workshop, no app store.
+> - **DO NOT DOWNLOAD THIS MOD FROM ANYWHERE ELSE.** Any other site, mirror, "launcher", "installer", video link or forum attachment that
+>   offers it is not mine and may carry anything. If it did not come from this GitHub page, do not run it.
+> - Updates, release notes, the button and settings reference and the troubleshooting guide live here and only here. If someone tells you
+>   to get the mod somewhere else, they are wrong.
+
 # <img src="docs/images/logo.png" alt="" width="44" align="top"> ETS2 ATS VR Controls
 
 ![ETS2 / ATS VR Controls: drive with your VR controllers](docs/images/banner.png)
