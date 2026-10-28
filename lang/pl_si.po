@@ -1,0 +1,1258 @@
+# ETS2 ATS VR Controls -- the VR menu and keyboard in Ślōnskŏ gŏdka. Best effort (AI drafts): fixes welcome, see lang/README.md.
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8\nLanguage: pl_si\nX-Native-Name: Ślōnskŏ gŏdka\n"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "Esc"
+msgstr "Esc"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "PrtSc"
+msgstr "PrtSc"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "ScrLk"
+msgstr "ScrLk"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "Pause"
+msgstr "Pause"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "Backspace"
+msgstr "Backspace"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "Ins"
+msgstr "Ins"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "Home"
+msgstr "Home"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "PgUp"
+msgstr "PgUp"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "Tab"
+msgstr "Tab"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "Enter"
+msgstr "Enter"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "Del"
+msgstr "Del"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "End"
+msgstr "End"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "PgDn"
+msgstr "PgDn"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "Caps"
+msgstr "Caps"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "Shift"
+msgstr "Shift"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "Ctrl"
+msgstr "Ctrl"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "Alt"
+msgstr "Alt"
+
+#. Key on the VR keyboard (very short: about 6 Latin characters; use what keyboards in your country have printed)
+#: src/vr_menu.cpp
+msgid "Space"
+msgstr "Spacja"
+
+#. Controller button name (about 16 Latin characters)
+#: src/vr_menu.cpp
+msgid "Left trigger"
+msgstr "Lewy spust"
+
+#. Controller button name (about 16 Latin characters)
+#: src/vr_menu.cpp
+msgid "Right trigger"
+msgstr "Prawy spust"
+
+#. Controller button name (about 16 Latin characters)
+#: src/vr_menu.cpp
+msgid "Left grip"
+msgstr "Lewy chwyt"
+
+#. Controller button name (about 16 Latin characters)
+#: src/vr_menu.cpp
+msgid "Right grip"
+msgstr "Prawy chwyt"
+
+#. Controller button name (about 16 Latin characters)
+#: src/vr_menu.cpp
+msgid "Left stick click"
+msgstr "Klik lewyj gałki"
+
+#. Controller button name (about 16 Latin characters)
+#: src/vr_menu.cpp
+msgid "Right stick click"
+msgstr "Klik prawyj gałki"
+
+#. Controller button name (about 16 Latin characters)
+#: src/vr_menu.cpp
+msgid "Left menu"
+msgstr "Lewe menu"
+
+#. Controller button name (about 16 Latin characters)
+#: src/vr_menu.cpp
+msgid "Left stick up"
+msgstr "Lewŏ gałka do gōry"
+
+#. Controller button name (about 16 Latin characters)
+#: src/vr_menu.cpp
+msgid "Left stick down"
+msgstr "Lewŏ gałka w dōł"
+
+#. Controller button name (about 16 Latin characters)
+#: src/vr_menu.cpp
+msgid "Left stick left"
+msgstr "Lewŏ gałka w lewo"
+
+#. Controller button name (about 16 Latin characters)
+#: src/vr_menu.cpp
+msgid "Left stick right"
+msgstr "Lewŏ gałka w prawo"
+
+#. Controller button name (about 16 Latin characters)
+#: src/vr_menu.cpp
+msgid "Right stick up"
+msgstr "Prawŏ gałka do gōry"
+
+#. Controller button name (about 16 Latin characters)
+#: src/vr_menu.cpp
+msgid "Right stick down"
+msgstr "Prawŏ gałka w dōł"
+
+#. Controller button name (about 16 Latin characters)
+#: src/vr_menu.cpp
+msgid "Right stick left"
+msgstr "Prawŏ gałka w lewo"
+
+#. Controller button name (about 16 Latin characters)
+#: src/vr_menu.cpp
+msgid "Right stick right"
+msgstr "Prawŏ gałka w prawo"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "Mouse left"
+msgstr "Mysz: lewy"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "Mouse right"
+msgstr "Mysz: prawy"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "Mouse middle"
+msgstr "Mysz: strzodek"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Wheel up"
+msgstr "Kōłko do gōry"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "Wheel down"
+msgstr "Kōłko w dōł"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Gas"
+msgstr "Gaz"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Brake"
+msgstr "Hamulec"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Keyboard"
+msgstr "Klawiatura"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "Num %s"
+msgstr "Num %s"
+
+#. Title bar (one line, about 40 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "Set %s: pick a key"
+msgstr "Nastŏw %s: wybier klawisz"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Make this menu smaller."
+msgstr "Zmyńsza to menu."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Make this menu bigger."
+msgstr "Zwiynksza to menu."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Show or hide the VR keyboard."
+msgstr "Pokazuje abo chowo klawiatura VR."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "Close this menu. To open it again: hold %s."
+msgstr "Zawiyro to menu. Coby ôtworzić zaś: trzimej %s."
+
+#. Tab name at the top of the menu (about 11 Latin characters)
+#: src/vr_menu.cpp
+msgid "Buttons"
+msgstr "Knefle"
+
+#. Tab name at the top of the menu (about 11 Latin characters)
+#: src/vr_menu.cpp
+msgid "Mouse"
+msgstr "Mysz"
+
+#. Tab name at the top of the menu (about 11 Latin characters)
+#: src/vr_menu.cpp
+msgid "Panels"
+msgstr "Panele"
+
+#. Tab name at the top of the menu (about 11 Latin characters)
+#: src/vr_menu.cpp
+msgid "Look"
+msgstr "Wyglōnd"
+
+#. Tab name at the top of the menu (about 11 Latin characters)
+#: src/vr_menu.cpp
+msgid "Driving"
+msgstr "Jazda"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Choose what each controller button does."
+msgstr "Wybier, co robi kożdy knefel kōntrolera."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "The stick mouse and the air mouse (point with the controller)."
+msgstr "Mysz na gałce i mysz w lufcie (pokazowanie kōntrolerym)."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Size and place of this menu and the keyboard."
+msgstr "Srogość i plac tego menu i klawiatury."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Colours, how see-through the panels are, pointer smoothing and the language."
+msgstr "Farby, przezroczystość paneli, wygładzanie wskaźnika i gŏdka."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Steering, gas and brake: how the truck's wheel follows your stick."
+msgstr "Kerowanie, gaz i hamulec: jak kierownica ciynżarōwki idzie za gałkōm."
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Normal"
+msgstr "Zwykły"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Mod 1"
+msgstr "Mod 1"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Mod 2"
+msgstr "Mod 2"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Both"
+msgstr "Ôba"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "off"
+msgstr "wył."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Show and set what each button does normally."
+msgstr "Pokazuje i nastawio, co kożdy knefel robi normalnie."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "Show and set what each button does while you hold modifier 1 (%s)."
+msgstr "Pokazuje i nastawio, co knefle robiōm, jak trzimiesz modyfikatōr 1 (%s)."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "Show and set what each button does while you hold modifier 2 (%s)."
+msgstr "Pokazuje i nastawio, co knefle robiōm, jak trzimiesz modyfikatōr 2 (%s)."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Show and set what each button does while you hold BOTH modifiers."
+msgstr "Pokazuje i nastawio, co knefle robiōm, jak trzimiesz ÔBA modyfikatory."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid ""
+"Modifier 1: hold it, and other buttons do their Mod 1 job. Press here to choose another button."
+msgstr "Modyfikatōr 1: trzimej go, a inksze knefle robiōm robota Mod 1. Naciś, coby wybrać inkszy."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid ""
+"Modifier 2: hold it, and other buttons do their Mod 2 job. Hold both modifiers for the Both jobs. "
+"Press here to choose another button."
+msgstr ""
+"Modyfikatōr 2: trzimej go, a knefle robiōm robota Mod 2. Ôba modyfikatory = roboty Ôba. Naciś, "
+"coby wybrać inkszy."
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "the wheel"
+msgstr "kierownica"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "(grips = the wheel)"
+msgstr "(chwyty = kierownica)"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "modifier 1"
+msgstr "modyfikatōr 1"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "modifier 2"
+msgstr "modyfikatōr 2"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "air mouse"
+msgstr "mysz w lufcie"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "moves the mouse"
+msgstr "rusza myszōm"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "steers"
+msgstr "keruje"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "opens the menu"
+msgstr "ôtwiyro menu"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "as normal"
+msgstr "jak zwykle"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "(+menu)"
+msgstr "(+menu)"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "%s with %s: %s (set elsewhere)."
+msgstr "%s z %s: %s (nastawione kaj indzij)."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "%s: %s (set elsewhere)."
+msgstr "%s: %s (nastawione kaj indzij)."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid ""
+"%s with %s: now %s. Point here, pull the trigger, then pick a key on the keyboard or a choice "
+"below."
+msgstr ""
+"%s z %s: teroz %s. Pokŏż sam, pociōngnij spust i wybier klawisz na klawiaturze abo ôpcyjõ niżyj."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "%s: now %s. Point here, pull the trigger, then pick a key on the keyboard or a choice below."
+msgstr "%s: teroz %s. Pokŏż sam, pociōngnij spust i wybier klawisz na klawiaturze abo ôpcyjõ niżyj."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Also part of the menu's open buttons."
+msgstr "To tyż jedyn ze knefli ôtwiyrajōncych menu."
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Mouse L"
+msgstr "Mysz L"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Mouse R"
+msgstr "Mysz P"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Mouse M"
+msgstr "Mysz S"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Wheel dn"
+msgstr "Kōłko w dōł"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#. Translate only the part after the |, and make it fit a small 2-line button (about 2 x 9 characters)
+#: src/vr_menu.cpp
+msgid "pick|Keyboard"
+msgstr "Klawiatura"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "None"
+msgstr "Nic"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Left mouse click."
+msgstr "Lewy knefel myszy."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Right mouse click."
+msgstr "Prawy knefel myszy."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Middle mouse click."
+msgstr "Strzodkowy knefel myszy."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Mouse wheel up (one step per press)."
+msgstr "Kōłko myszy do gōry (jedyn krok na naciśniyńcie)."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Mouse wheel down (one step per press)."
+msgstr "Kōłko myszy w dōł (jedyn krok na naciśniyńcie)."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Gas pedal: press harder = more gas."
+msgstr "Pedał gazu: mocnij = wiyncyj gazu."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Brake: press harder = more brake."
+msgstr "Hamulec: mocnij = mocnij hamuje."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Shows / hides the VR keyboard."
+msgstr "Pokazuje / chowo klawiatura VR."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Nothing."
+msgstr "Nic."
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Cancel"
+msgstr "Ôdwołej"
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "Hold %s first, then the button."
+msgstr "Nojprzōd trzimej %s, potym knefel."
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+msgid "Point at a button, pull the trigger, pick its key."
+msgstr "Pokŏż na knefel, pociōngnij spust, wybier jego klawisz."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Stick that moves the mouse"
+msgstr "Gałka co rusza myszōm"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "Left"
+msgstr "Lewo"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "Right"
+msgstr "Prawo"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Off"
+msgstr "Wył."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Which stick moves the mouse pointer (for the game's menus and map). Off = no stick mouse."
+msgstr "Kero gałka rusza wskaźnikym (menu gry i mapa). Wył. = ni ma myszy na gałce."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Stick mouse speed"
+msgstr "Wartkość myszy na gałce"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "%.0f px/s"
+msgstr "%.0f px/s"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "How fast the pointer moves with the stick pushed all the way, in pixels per second."
+msgstr "Jak wartko wskaźnik idzie przi gałce wychylōnyj do kōńca, we pikselach na sekunda."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Stick dead zone"
+msgstr "Martwo strefa gałki"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "How far you must push the stick before the pointer moves. More = no creeping pointer."
+msgstr "Jak mocno pchnōńć gałka, podwiela wskaźnik ruszy. Wiyncyj = wskaźnik nie pełznie."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Air mouse button"
+msgstr "Knefel myszy w lufcie"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid ""
+"Hold this button and turn the controller: the pointer follows, like a laser pointer. Off = no air "
+"mouse."
+msgstr ""
+"Trzimej tyn knefel i ôbracej kōntroler: wskaźnik idzie za nim jak laser. Wył. = ni ma myszy w "
+"lufcie."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Air mouse works while"
+msgstr "Mysz w lufcie dziŏło"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "Button held"
+msgstr "Trzimany knefel"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "Toggled on"
+msgstr "Przełōnczōno"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid ""
+"Button held: only while you hold the button. Toggled on: one press switches it on, the next press "
+"off."
+msgstr "Trzimany: yno jak trzimiesz knefel. Przełōnczōno: jedyn naciś włōnczo, drugi wyłōnczo."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Air mouse speed"
+msgstr "Wartkość myszy w lufcie"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "%.0f px/deg"
+msgstr "%.0f px/°"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "How far the pointer moves when you turn the controller, in pixels per degree."
+msgstr "Jak daleko wskaźnik idzie przi ôbrocie kōntrolera, we pikselach na stopiyń."
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+msgid "Changes work at once and are saved."
+msgstr "Zmiany dziŏłajōm zaroz i sōm spamiyntane."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Menu size"
+msgstr "Srogość menu"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "%.2f m wide"
+msgstr "%.2f m szyr."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "How big this menu is (its width in metres)."
+msgstr "Jak srogie je to menu (szyrokość we metrach)."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Menu distance"
+msgstr "Ôddalyni menu"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "%.2f m"
+msgstr "%.2f m"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Closer"
+msgstr "Bliżyj"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Farther"
+msgstr "Dalij"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "How far this menu is from your head."
+msgstr "Jak daleko to menu je ôd twojij gowy."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Keyboard size"
+msgstr "Srogość klawiatury"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "How big the VR keyboard is (its width in metres)."
+msgstr "Jak srogo je klawiatura VR (szyrokość we metrach)."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Keyboard distance"
+msgstr "Ôddalyni klawiatury"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "(hidden)"
+msgstr "(skryto)"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "How far the VR keyboard is from your head."
+msgstr "Jak daleko klawiatura VR je ôd twojij gowy."
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Show"
+msgstr "Pokŏż"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Hide"
+msgstr "Skryj"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Full"
+msgstr "Połno"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Compact"
+msgstr "Zwarto"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Show / hide the VR keyboard. Full = every key; Compact = only the main keys (narrower)."
+msgstr "Pokŏż / skryj klawiatura VR. Połno = wszyjske klawisze; Zwarto = yno głōwne (wōnsze)."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Bring the menu and the keyboard in front of me"
+msgstr "Przysuń menu i klawiatura przede mie"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Moves the menu and the keyboard to where you look now."
+msgstr "Przesuwo menu i klawiatura tam, kaj teroz zyrkŏsz."
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "Menu open / close: hold %s for %.1f s"
+msgstr "Ôtwōrz / zawrzij menu: trzimej %s bez %.1f s"
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+msgid "Move: point at a panel, hold the grip, move. Its stick: farther / closer."
+msgstr "Przesuń: pokŏż na panel, trzimej chwyt, przesuń. Jego gałka: dalij / bliżyj."
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+msgid "The keyboard stays when the menu closes (its x hides it)."
+msgstr "Klawiatura ôstŏwŏ po zawarciu menu (jeji x jã chowo)."
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Dark"
+msgstr "Ciymny"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Blue"
+msgstr "Modry"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Grey"
+msgstr "Siwy"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Light"
+msgstr "Jasny"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Black"
+msgstr "Czŏrny"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Green"
+msgstr "Zielōny"
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Colours"
+msgstr "Farby"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "The colours of the menu and the keyboard."
+msgstr "Farby menu i klawiatury."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Menu see-through"
+msgstr "Przezroczystość menu"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "%d %% solid"
+msgstr "%d %% krycio"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "How solid this menu is. - = more see-through, + = more solid."
+msgstr "Jak nieprzezroczyste je to menu. - = barzyj przezroczyste, + = barzyj kryjōnce."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Keyboard see-through"
+msgstr "Przezroczystość klawiatury"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "How solid the VR keyboard is. - = more see-through, + = more solid."
+msgstr "Jak nieprzezroczysto je klawiatura VR. - = barzyj przezroczyste, + = barzyj kryjōnce."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Pointer smoothing"
+msgstr "Wygładzanie wskaźnika"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Low"
+msgstr "Niske"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Medium"
+msgstr "Postrzednie"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "High"
+msgstr "Wysoke"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid ""
+"Calms a shaky hand: the menu pointer and the air mouse. Higher = steadier, but it follows a bit "
+"later."
+msgstr ""
+"Uspokŏjŏ drżōncõ rynka: wskaźnik menu i mysz w lufcie. Wiyncyj = stabilnij, ale idzie ździebko "
+"niyskorzij."
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "%s (no font)"
+msgstr "%s (ni ma fōntu)"
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Language"
+msgstr "Gŏdka"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "Auto: %s"
+msgstr "Auto: %s"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "The menu's language. Auto = the language the game is set to."
+msgstr "Gŏdka menu. Auto = gŏdka nastawiōno w grze."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Keyboard letters"
+msgstr "Litery klawiatury"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid ""
+"The letters on the VR keyboard, as printed in that country. Auto = as the menu. A key always "
+"presses the same key in the game."
+msgstr ""
+"Litery na klawiaturze VR, jak w tym kraju. Auto = jak menu. Klawisz dycki śle tyn sōm klawisz do "
+"gry."
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+msgid "- = more see-through, + = more solid."
+msgstr "- = barzyj przezroczyste, + = barzyj kryjōnce."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Steer with"
+msgstr "Keruj czym"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Stick"
+msgstr "Gałka"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Wheel"
+msgstr "Kierownica"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Point"
+msgstr "Pokŏż"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid ""
+"Stick: the stick steers. Wheel: hold the grip(s) and turn your hands like a steering wheel. "
+"Point: point a controller left / right (on a panel the wheel holds). Off: no driving."
+msgstr ""
+"Gałka: steruje gałka. Kierownica: trzimej chwyt(y) i ôbracej rynkami jak kołym. Pokŏż: pokazuj "
+"kōntrolerym lewo / prawo (na panelu co trzimie koło). Wył.: ni ma jazdy."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Hands turn for full lock"
+msgstr "Ôbrōt rōnk do połnego skryntu"
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Point for full lock"
+msgstr "Pokŏzŏwanie do połnego skryntu"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "%.0f deg"
+msgstr "%.0f °"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "How far you turn your hands (like a wheel) for full lock. Less = quicker, more = calmer."
+msgstr ""
+"Jak mocno ôbrŏcŏsz rynce (jak kołym) do połnego skryntu. Myni = wartcij, wiyncyj = spokojnij."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "How far you point left / right for full lock. Less = quicker, more = calmer."
+msgstr "Jak mocno pokazujesz lewo / prawo do połnego skryntu. Myni = wartcij, wiyncyj = spokojnij."
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Stick on"
+msgstr "Gałka włōn."
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Stick off"
+msgstr "Gałka wył."
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid ""
+"Stick on: the stick steers too (it wins while you push it). Stick off: only your hands steer, and "
+"the stick's left / right are normal buttons again."
+msgstr ""
+"Gałka włōn.: gałka tyż steruje (mŏ piyrszyństwo, jak jã pchŏsz). Gałka wył.: sterujōm yno rynce, "
+"a lewo / prawo gałki zaś sōm zwykłe knefle."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Hold the wheel with"
+msgstr "Kierownica trzimie"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "Either"
+msgstr "Byle kery"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid ""
+"Both: both grips together (one grip alone keeps its own job). Left / Right / Either: one grip is "
+"enough -- that grip is then only the wheel (no modifier, no air mouse, no key on it)."
+msgstr ""
+"Ôba: ôba chwyty razym (jedyn chwyt sōm trzimie swoja robota). Lewy / Prawy / Byle kery: styknie "
+"jedyn chwyt -- tyn chwyt to już yno kierownica (bez modyfikatora, myszy w lufcie i klawisza)."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Hand that points"
+msgstr "Rynka co pokazuje"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "The controller you point with. The other hand stays free for the keyboard and the menu."
+msgstr "Kōntroler, kerym pokazujesz. Drugo rynka ôstŏwŏ wolno do klawiatury i menu."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Stick that steers"
+msgstr "Gałka co steruje"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Which stick steers the truck (left / right). Its up / down stay free for other buttons."
+msgstr ""
+"Kero gałka steruje ciynżarōwkōm (lewo / prawo). Jeji gōra / dōł ôstŏwajōm wolne do inkszych "
+"knefli."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Steering dead zone"
+msgstr "Martwo strefa kerowanio"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid ""
+"How far you must push the stick before the wheel turns. More = a calm middle, less = it reacts "
+"sooner."
+msgstr ""
+"Jak mocno pchnōńć gałka, podwiela koło skryńci. Wiyncyj = spokojny strzodek, myni = reaguje "
+"wczaśnij."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Small turns (most of the stick)"
+msgstr "Małe skrynty (wiynkszość gałki)"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "even (off)"
+msgstr "rōwno (wył.)"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "up to %d %%"
+msgstr "do %d %%"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid ""
+"Most of the stick (the first %d %% of a push) makes small, careful turns, up to this much of the "
+"wheel. Only the last bit, at the edge, turns hard."
+msgstr ""
+"Wiynkszość gałki (piyrsze %d %% wychylynio) dŏwŏ małe, ôstrożne skrynty, aż do tela koła. Yno "
+"kōniec, kole kraja, skryńcŏ mocno."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Full stick turns the wheel"
+msgstr "Połno gałka skryńcŏ koło"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "How far the wheel turns with the stick pushed all the way. 100 % = full lock."
+msgstr "Jak mocno koło skryńcŏ przi gałce do kōńca. 100 % = połny skrynt."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Wheel follows the stick"
+msgstr "Koło idzie za gałkōm"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "at once"
+msgstr "zaroz"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "%.3g s"
+msgstr "%.3g s"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid ""
+"Smoothing while you hold the stick: how quickly the wheel goes where the stick points. More = "
+"smoother, calmer."
+msgstr ""
+"Wygładzanie przi trzimanyj gałce: jak wartko koło idzie tam, kaj gałka. Wiyncyj = gładzij, "
+"spokojnij."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Let go: back to the middle"
+msgstr "Puść: nazŏd na strzodek"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid ""
+"Let go of the stick: how the wheel comes back to straight. At once = at the wheel speed below. "
+"More = a slow glide."
+msgstr ""
+"Po puszczyniu gałki: jak koło wrŏcŏ na prosto. Zaroz = z wartkościōm koła niżyj. Wiyncyj = "
+"powolne suniyńcie."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "Wheel speed at most"
+msgstr "Nojwiynkszo wartkość koła"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "no limit"
+msgstr "bez granicy"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "%.2g s to full"
+msgstr "%.2g s do połna"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid ""
+"The fastest the wheel turns (full push; a small push turns it slower): seconds from straight to "
+"full lock."
+msgstr ""
+"Nojwartszy skrynt koła (połne wychylyni; małe skryńcŏ wolnij): sekundy ôd prosto do połnego "
+"skryntu."
+
+#. Name of a setting row (about 30 Latin characters)
+#: src/vr_menu.cpp
+msgid "At 90 km/h: steering"
+msgstr "Przi 90 km/h: skrynt"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "On"
+msgstr "Włōn."
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+msgid "(off)"
+msgstr "(wył.)"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "On: at speed the wheel turns less, for calm highway driving. The % = how much at 90 km/h."
+msgstr ""
+"Włōn.: przi wartkości koło skryńcŏ myni, do spokojnyj jazdy autostradōm. % = wiela przi 90 km/h."
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+msgid "Driving off: no steering, gas or brake."
+msgstr "Jazda wył.: ni ma kerowanio, gazu i hamulca."
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+msgid "Wheel: hold the grip(s) and turn your hands. Let go = straight."
+msgstr "Kierownica: trzimej chwyt(y) i ôbracej rynkami. Puść = na prosto."
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+msgid "Point: point left / right. On a panel the wheel holds."
+msgstr "Pokŏż: pokazuj lewo / prawo. Na panelu co trzimie koło."
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+msgid "Most of the stick = small turns. All the way = hard turns."
+msgstr "Wiynkszość gałki = małe skrynty. Do kōńca = mocne skrynty."
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Sure? Reset"
+msgstr "Na zicher?"
+
+#. Button (short: about 10 Latin characters; the font shrinks a little when needed)
+#: src/vr_menu.cpp
+msgid "Reset tab"
+msgstr "Reset karty"
+
+#. Help shown at the bottom while the pointer is on something (up to 2 lines, about 110 Latin characters)
+#: src/vr_menu.cpp
+msgid "Puts this tab back to the default settings. Press twice to be sure."
+msgstr "Prziwrŏcŏ ta karta do dōmyślnych nastawiyń. Naciś dwa razy dlŏ pewności."
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "Set: %s + %s = %s"
+msgstr "Nastŏw: %s + %s = %s"
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "Set: %s = %s"
+msgstr "Nastŏw: %s = %s"
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+msgid "Press again: this tab goes back to the defaults."
+msgstr "Naciś zaś: ta karta wrŏcŏ do dōmyślnych."
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+msgid "Back to the defaults. Saved."
+msgstr "Nazŏd do dōmyślnych. Spamiyntane."
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+msgid "Saved."
+msgstr "Spamiyntane."
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+msgid "Choose that modifier button first (the buttons above)."
+msgstr "Nojprzōd wybier tyn knefel modyfikatora (knefle wyżyj)."
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+msgid "Steering with the wheel: those grips hold it (Driving tab)."
+msgstr "Kerowanie kołym: te chwyty je trzimiōm (karta Jazda)."
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "%s holds the wheel (Driving tab)."
+msgstr "%s trzimie kierownica (karta Jazda)."
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "%s is modifier 1."
+msgstr "%s to modyfikatōr 1."
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "%s is modifier 2."
+msgstr "%s to modyfikatōr 2."
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "%s is the air mouse button (Mouse tab)."
+msgstr "%s to knefel myszy w lufcie (karta Mysz)."
+
+#. Value or choice (about 18 Latin characters)
+#: src/vr_menu.cpp
+#, c-format
+msgid "With these modifiers, %s opens the menu."
+msgstr "Ze tymi modyfikatorami %s ôtwiyro menu."
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+msgid "That stick moves the mouse (Mouse tab)."
+msgstr "Ta gałka rusza myszōm (karta Mysz)."
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+msgid "That stick steers (Driving tab)."
+msgstr "Ta gałka steruje (karta Jazda)."
+
+#. Status / hint line at the bottom (one line, about 55 Latin characters)
+#: src/vr_menu.cpp
+msgid "Could not save config.ini (the change works until the game ends)."
+msgstr "Niy szło spamiyntać config.ini (zmiana dziŏło do kōńca gry)."
+

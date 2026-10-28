@@ -11,6 +11,8 @@
 #include <atomic>
 #include <thread>
 #include <utility>
+#include "kb_layout.h"
+#include "lang.h"
 #include "log.h"
 
 namespace ck {
@@ -25,43 +27,58 @@ constexpr double kGap = 0.15;
 constexpr double kKbUnit = (kKbW - 16) / (23.0 - 2 * (0.5 - kGap));
 constexpr int kKbCompactW = (int)(16 + kKbUnit * 15.0 + 0.5);
 
-// ---- the keyboard (units of one key; x 0..15 main block, 15.5..18.5 navigation, 19..23 number pad)
-struct KeyDef { const char* label; const char* name; float x, y, w, h; };
+// ---- the keyboard (units of one key; x 0..15 main block, 15.5..18.5 navigation, 19..23 number pad). geo: the key shapes
+// (kb_layout.h Geo) that have this key here -- a key that sits elsewhere in another shape has one entry per place. part: the
+// lower half of the tall ISO / JIS Enter (no label; pressed and lit together with the upper half, the entry before it).
+// label: the English name; a character key's label comes from the layout (KeyLabel), a named key's is translated (N_).
+enum : uint8_t { gA = 1, gI = 2, gB = 4, gJ = 8, gAll = 15, gAIB = 7, gAJ = 9, gIB = 6, gIBJ = 14, gBJ = 12 };
+struct KeyDef { const char* label; const char* name; float x, y, w, h; uint8_t geo = gAll; bool part = false; };
 const KeyDef kKeys[] = {
-    { "Esc", "esc", 0, 0, 1, 1 },
+    { N_("Esc"), "esc", 0, 0, 1, 1 },
     { "F1", "f1", 2, 0, 1, 1 }, { "F2", "f2", 3, 0, 1, 1 }, { "F3", "f3", 4, 0, 1, 1 }, { "F4", "f4", 5, 0, 1, 1 },
     { "F5", "f5", 6.5f, 0, 1, 1 }, { "F6", "f6", 7.5f, 0, 1, 1 }, { "F7", "f7", 8.5f, 0, 1, 1 }, { "F8", "f8", 9.5f, 0, 1, 1 },
     { "F9", "f9", 11, 0, 1, 1 }, { "F10", "f10", 12, 0, 1, 1 }, { "F11", "f11", 13, 0, 1, 1 }, { "F12", "f12", 14, 0, 1, 1 },
-    { "PrtSc", "printscreen", 15.5f, 0, 1, 1 }, { "ScrLk", "scrolllock", 16.5f, 0, 1, 1 }, { "Pause", "pause", 17.5f, 0, 1, 1 },
+    { N_("PrtSc"), "printscreen", 15.5f, 0, 1, 1 }, { N_("ScrLk"), "scrolllock", 16.5f, 0, 1, 1 },
+    { N_("Pause"), "pause", 17.5f, 0, 1, 1 },
     { "`", "`", 0, 1.25f, 1, 1 }, { "1", "1", 1, 1.25f, 1, 1 }, { "2", "2", 2, 1.25f, 1, 1 }, { "3", "3", 3, 1.25f, 1, 1 },
     { "4", "4", 4, 1.25f, 1, 1 }, { "5", "5", 5, 1.25f, 1, 1 }, { "6", "6", 6, 1.25f, 1, 1 }, { "7", "7", 7, 1.25f, 1, 1 },
     { "8", "8", 8, 1.25f, 1, 1 }, { "9", "9", 9, 1.25f, 1, 1 }, { "0", "0", 10, 1.25f, 1, 1 }, { "-", "-", 11, 1.25f, 1, 1 },
-    { "=", "=", 12, 1.25f, 1, 1 }, { "Backspace", "backspace", 13, 1.25f, 2, 1 },
-    { "Ins", "insert", 15.5f, 1.25f, 1, 1 }, { "Home", "home", 16.5f, 1.25f, 1, 1 }, { "PgUp", "pageup", 17.5f, 1.25f, 1, 1 },
+    { "=", "=", 12, 1.25f, 1, 1 }, { N_("Backspace"), "backspace", 13, 1.25f, 2, 1, gAIB },
+    { "\xC2\xA5", "intl3", 13, 1.25f, 1, 1, gJ }, { N_("Backspace"), "backspace", 14, 1.25f, 1, 1, gJ },
+    { N_("Ins"), "insert", 15.5f, 1.25f, 1, 1 }, { N_("Home"), "home", 16.5f, 1.25f, 1, 1 },
+    { N_("PgUp"), "pageup", 17.5f, 1.25f, 1, 1 },
     { "/", "numdiv", 20, 1.25f, 1, 1 }, { "*", "nummul", 21, 1.25f, 1, 1 }, { "-", "numminus", 22, 1.25f, 1, 1 },
-    { "Tab", "tab", 0, 2.25f, 1.5f, 1 }, { "Q", "q", 1.5f, 2.25f, 1, 1 }, { "W", "w", 2.5f, 2.25f, 1, 1 },
+    { N_("Tab"), "tab", 0, 2.25f, 1.5f, 1 }, { "Q", "q", 1.5f, 2.25f, 1, 1 }, { "W", "w", 2.5f, 2.25f, 1, 1 },
     { "E", "e", 3.5f, 2.25f, 1, 1 }, { "R", "r", 4.5f, 2.25f, 1, 1 }, { "T", "t", 5.5f, 2.25f, 1, 1 },
     { "Y", "y", 6.5f, 2.25f, 1, 1 }, { "U", "u", 7.5f, 2.25f, 1, 1 }, { "I", "i", 8.5f, 2.25f, 1, 1 },
     { "O", "o", 9.5f, 2.25f, 1, 1 }, { "P", "p", 10.5f, 2.25f, 1, 1 }, { "[", "[", 11.5f, 2.25f, 1, 1 },
-    { "]", "]", 12.5f, 2.25f, 1, 1 }, { "\\", "\\", 13.5f, 2.25f, 1.5f, 1 },
-    { "Del", "delete", 15.5f, 2.25f, 1, 1 }, { "End", "end", 16.5f, 2.25f, 1, 1 }, { "PgDn", "pagedown", 17.5f, 2.25f, 1, 1 },
+    { "]", "]", 12.5f, 2.25f, 1, 1 }, { "\\", "\\", 13.5f, 2.25f, 1.5f, 1, gA },
+    { N_("Enter"), "enter", 13.5f, 2.25f, 1.5f, 1, gIBJ }, { "", "enter", 13.75f, 3.0f, 1.25f, 1.25f, gIBJ, true },
+    { N_("Del"), "delete", 15.5f, 2.25f, 1, 1 }, { N_("End"), "end", 16.5f, 2.25f, 1, 1 },
+    { N_("PgDn"), "pagedown", 17.5f, 2.25f, 1, 1 },
     { "7", "num7", 19, 2.25f, 1, 1 }, { "8", "num8", 20, 2.25f, 1, 1 }, { "9", "num9", 21, 2.25f, 1, 1 },
     { "+", "numplus", 22, 2.25f, 1, 2 },
-    { "Caps", "capslock", 0, 3.25f, 1.75f, 1 }, { "A", "a", 1.75f, 3.25f, 1, 1 }, { "S", "s", 2.75f, 3.25f, 1, 1 },
+    { N_("Caps"), "capslock", 0, 3.25f, 1.75f, 1 }, { "A", "a", 1.75f, 3.25f, 1, 1 }, { "S", "s", 2.75f, 3.25f, 1, 1 },
     { "D", "d", 3.75f, 3.25f, 1, 1 }, { "F", "f", 4.75f, 3.25f, 1, 1 }, { "G", "g", 5.75f, 3.25f, 1, 1 },
     { "H", "h", 6.75f, 3.25f, 1, 1 }, { "J", "j", 7.75f, 3.25f, 1, 1 }, { "K", "k", 8.75f, 3.25f, 1, 1 },
     { "L", "l", 9.75f, 3.25f, 1, 1 }, { ";", ";", 10.75f, 3.25f, 1, 1 }, { "'", "'", 11.75f, 3.25f, 1, 1 },
-    { "Enter", "enter", 12.75f, 3.25f, 2.25f, 1 },
+    { N_("Enter"), "enter", 12.75f, 3.25f, 2.25f, 1, gA }, { "\\", "\\", 12.75f, 3.25f, 1, 1, gIBJ },
     { "4", "num4", 19, 3.25f, 1, 1 }, { "5", "num5", 20, 3.25f, 1, 1 }, { "6", "num6", 21, 3.25f, 1, 1 },
-    { "Shift", "shift", 0, 4.25f, 2.25f, 1 }, { "Z", "z", 2.25f, 4.25f, 1, 1 }, { "X", "x", 3.25f, 4.25f, 1, 1 },
+    { N_("Shift"), "shift", 0, 4.25f, 2.25f, 1, gAJ }, { N_("Shift"), "shift", 0, 4.25f, 1.25f, 1, gIB },
+    { "\\", "oem102", 1.25f, 4.25f, 1, 1, gIB }, { "Z", "z", 2.25f, 4.25f, 1, 1 }, { "X", "x", 3.25f, 4.25f, 1, 1 },
     { "C", "c", 4.25f, 4.25f, 1, 1 }, { "V", "v", 5.25f, 4.25f, 1, 1 }, { "B", "b", 6.25f, 4.25f, 1, 1 },
     { "N", "n", 7.25f, 4.25f, 1, 1 }, { "M", "m", 8.25f, 4.25f, 1, 1 }, { ",", ",", 9.25f, 4.25f, 1, 1 },
-    { ".", ".", 10.25f, 4.25f, 1, 1 }, { "/", "/", 11.25f, 4.25f, 1, 1 }, { "Shift", "rshift", 12.25f, 4.25f, 2.75f, 1 },
+    { ".", ".", 10.25f, 4.25f, 1, 1 }, { "/", "/", 11.25f, 4.25f, 1, 1 },
+    { N_("Shift"), "rshift", 12.25f, 4.25f, 2.75f, 1, gA | gI }, { "\\", "intl1", 12.25f, 4.25f, 1, 1, gBJ },
+    { N_("Shift"), "rshift", 13.25f, 4.25f, 1.75f, 1, gBJ },
     { "\xE2\x86\x91", "up", 16.5f, 4.25f, 1, 1 },
     { "1", "num1", 19, 4.25f, 1, 1 }, { "2", "num2", 20, 4.25f, 1, 1 }, { "3", "num3", 21, 4.25f, 1, 1 },
-    { "Enter", "numenter", 22, 4.25f, 1, 2 },
-    { "Ctrl", "ctrl", 0, 5.25f, 1.5f, 1 }, { "Alt", "alt", 1.5f, 5.25f, 1.5f, 1 }, { "Space", "space", 3, 5.25f, 9, 1 },
-    { "Alt", "ralt", 12, 5.25f, 1.5f, 1 }, { "Ctrl", "rctrl", 13.5f, 5.25f, 1.5f, 1 },
+    { N_("Enter"), "numenter", 22, 4.25f, 1, 2 },
+    { N_("Ctrl"), "ctrl", 0, 5.25f, 1.5f, 1 }, { N_("Alt"), "alt", 1.5f, 5.25f, 1.5f, 1 },
+    { N_("Space"), "space", 3, 5.25f, 9, 1, gAIB },
+    { "\xE7\x84\xA1\xE5\xA4\x89\xE6\x8F\x9B", "muhenkan", 3, 5.25f, 1.25f, 1, gJ }, { N_("Space"), "space", 4.25f, 5.25f, 4.5f, 1, gJ },
+    { "\xE5\xA4\x89\xE6\x8F\x9B", "henkan", 8.75f, 5.25f, 1.5f, 1, gJ }, { "\xE3\x81\x8B\xE3\x81\xAA", "kana", 10.25f, 5.25f, 1.75f, 1, gJ },
+    { N_("Alt"), "ralt", 12, 5.25f, 1.5f, 1 }, { N_("Ctrl"), "rctrl", 13.5f, 5.25f, 1.5f, 1 },
     { "\xE2\x86\x90", "left", 15.5f, 5.25f, 1, 1 }, { "\xE2\x86\x93", "down", 16.5f, 5.25f, 1, 1 },
     { "\xE2\x86\x92", "right", 17.5f, 5.25f, 1, 1 },
     { "0", "num0", 19, 5.25f, 2, 1 }, { ".", "numdot", 21, 5.25f, 1, 1 },
@@ -76,28 +93,40 @@ int ModOf(const char* name) {
 }
 const char* const kModName[3] = { "shift", "ctrl", "alt" };
 
+// a controller button's name in the menu's language (X / Y / A / B: as printed on the controller)
 const char* BtnLabel(int b) {
-    static const char* const k[VrPad::kBtnCount] = { "Left trigger", "Right trigger", "Left grip", "Right grip", "X", "Y", "A", "B",
-        "Left stick click", "Right stick click", "Left menu", "Left stick up", "Left stick down", "Left stick left",
-        "Left stick right", "Right stick up", "Right stick down", "Right stick left", "Right stick right" };
-    return b >= 0 && b < VrPad::kBtnCount ? k[b] : "?";
+    static const char* const k[VrPad::kBtnCount] = { N_("Left trigger"), N_("Right trigger"), N_("Left grip"), N_("Right grip"),
+        "X", "Y", "A", "B", N_("Left stick click"), N_("Right stick click"), N_("Left menu"), N_("Left stick up"),
+        N_("Left stick down"), N_("Left stick left"), N_("Left stick right"), N_("Right stick up"), N_("Right stick down"),
+        N_("Right stick left"), N_("Right stick right") };
+    return b >= 0 && b < VrPad::kBtnCount ? Lang::Tr(k[b]) : "?";
 }
-// "shift+f" -> "Shift + F", "mouse_left" -> "Mouse left", "none" -> "-"
-std::string Pretty(const VrPad::Out& o) {
+// a keyboard key's label in layout `kb`: main (big) + small (the second legend, "" = none). Character keys: as that country's
+// keyboards have them (kb_layout.h); named keys (Esc, Enter ...): translated.
+void KeyLabel(const KeyDef& d, const std::string& kb, std::string* main, std::string* small) {
+    if (!d.part && KbLayout::Label(kb, VrPad::ScanOfName(d.name), main, small)) return;
+    *main = Lang::Tr(d.label);
+    small->clear();
+}
+// "shift+f" -> "Shift + F", "mouse_left" -> "Mouse left", "none" -> "-" (in the menu's language and keyboard layout `kb`)
+std::string Pretty(const VrPad::Out& o, const std::string& kb) {
+    static const char* const kKinds[] = { "-", "", N_("Mouse left"), N_("Mouse right"), N_("Mouse middle"), N_("Wheel up"),
+                                          N_("Wheel down"), N_("Gas"), N_("Brake"), N_("Keyboard") };
+    if (o.kind != VrPad::kKeys) return o.kind < sizeof(kKinds) / sizeof(kKinds[0]) ? Lang::Tr(kKinds[o.kind]) : "?";
     char raw[64];
     VrPad::OutToString(o, raw, sizeof(raw));
-    if (o.kind == VrPad::kNone) return "-";
-    if (o.kind != VrPad::kKeys) {
-        std::string s = raw;
-        for (char& c : s) if (c == '_') c = ' ';
-        s[0] = (char)toupper((unsigned char)s[0]);
-        return s;
-    }
-    std::string out, part;
+    std::string out, part, small;
     for (const char* p = raw;; ++p) {
         if ((*p == '+' && !part.empty()) || !*p) {
             for (const KeyDef& k : kKeys)
-                if (part == k.name) { part = k.name[0] == 'n' && k.name[1] == 'u' ? std::string("Num ") + k.label : k.label; break; }
+                if (part == k.name && !k.part) {
+                    std::string m;
+                    KeyLabel(k, kb, &m, &small);
+                    char b[64];
+                    if (k.name[0] == 'n' && k.name[1] == 'u') snprintf(b, sizeof(b), TRF("Num %s"), m.c_str());
+                    part = k.name[0] == 'n' && k.name[1] == 'u' ? std::string(b) : m;
+                    break;
+                }
             if (part.size() == 1) part[0] = (char)toupper((unsigned char)part[0]);
             out += (out.empty() ? "" : " + ") + part;
             part.clear();
@@ -108,6 +137,8 @@ std::string Pretty(const VrPad::Out& o) {
     }
     return out;
 }
+// a label's characters (UTF-8 code points), for "one big character" keys
+int CodePoints(const std::string& s) { int n = 0; for (unsigned char c : s) n += (c & 0xC0) != 0x80; return n; }
 
 // ---- GDI drawing into a top-down 32-bit DIB
 std::wstring Wide(const std::string& s) {
@@ -152,36 +183,95 @@ public:
         SelectObject(dc_, ob);
         DeleteObject(b);
     }
-    // fit = true: a smaller font (down to 60 %) when the text is wider than the box minus 12 px, before "..." is used
-    void Text(int x, int y, int w, int h, const std::string& s, int px, bool bold, COLORREF c, UINT align, bool fit = false) {
+    // the GDI face of the texts from now on (the menu's language / the keyboard layout: lang.h); a new face drops the fonts made
+    void SetFace(const std::wstring& face) {
+        if (face.empty() || face == face_) return;
+        face_ = face;
+        if (old_) SelectObject(dc_, old_);              // (a font still selected would not be deleted)
+        for (int i = 0; i < 2; ++i) { for (auto& f : fonts_[i]) if (f.second) DeleteObject(f.second); fonts_[i].clear(); }
+    }
+    // a smaller font (down to 60 %) when the text is wider than the box minus 12 px, before "..." is used (a translation may be
+    // longer than the English: every text shrinks to fit first). Still too wide: "..." + the text goes to Clipped() (tests).
+    void Text(int x, int y, int w, int h, const std::string& s, int px, bool bold, COLORREF c, UINT align) {
         if (s.empty()) return;
         const std::wstring wt = Wide(s);
-        for (int min = px * 6 / 10; fit && px > min; px -= 2) {
+        SIZE sz{};
+        for (int min = px * 6 / 10;; px -= 2) {
             SelectObject(dc_, Font(px, bold));
-            SIZE sz{};
-            if (!GetTextExtentPoint32W(dc_, wt.c_str(), (int)wt.size(), &sz) || sz.cx <= w - 12) break;
+            if (!GetTextExtentPoint32W(dc_, wt.c_str(), (int)wt.size(), &sz) || sz.cx <= w - 12 || px <= min) break;
         }
-        SelectObject(dc_, Font(px, bold));
+        if (sz.cx > w) NoteClipped(s);
         SetTextColor(dc_, c);
         RECT r{ x, y, x + w, y + h };
-        const std::wstring ws = Wide(s);
-        DrawTextW(dc_, ws.c_str(), (int)ws.size(), &r, align | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+        DrawTextW(dc_, wt.c_str(), (int)wt.size(), &r, align | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
     }
-    // up to two lines, word-wrapped and centred in the box; a smaller font (down to 70 %) when it does not fit
-    void TextWrap(int x, int y, int w, int h, const std::string& s, int px, COLORREF c) {
+    // the text fits one line of the box at the smallest size Text() shrinks it to
+    bool FitsLine(int w, const std::string& s, int px, bool bold) {
+        const std::wstring wt = Wide(s);
+        SIZE sz{};
+        SelectObject(dc_, Font(px * 6 / 10, bold));
+        return GetTextExtentPoint32W(dc_, wt.c_str(), (int)wt.size(), &sz) && sz.cx <= w - 12;
+    }
+    static std::vector<std::string> TakeClipped() {
+        std::lock_guard<std::mutex> lk(clipM_);
+        std::vector<std::string> v;
+        v.swap(clipped_);
+        return v;
+    }
+    // up to two lines, word-wrapped and centred in the box (vertically; center: also across); a smaller font (down to 70 %)
+    // when it does not fit
+    void TextWrap(int x, int y, int w, int h, const std::string& s, int px, COLORREF c, bool bold = false, bool center = false) {
         if (s.empty()) return;
         const std::wstring ws = Wide(s);
         RECT m{};
         for (int min = px * 7 / 10;; px -= 1) {
-            SelectObject(dc_, Font(px, false));
+            SelectObject(dc_, Font(px, bold));
             m = RECT{ 0, 0, w, 0 };
             DrawTextW(dc_, ws.c_str(), (int)ws.size(), &m, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX);
             if (m.bottom <= h || px <= min) break;
         }
+        if (m.bottom > h || m.right > w) NoteClipped(s);   // (more lines, or one word wider than the box)
         SetTextColor(dc_, c);
         const int top = y + (h - (m.bottom < h ? m.bottom : h)) / 2;
         RECT r{ x, top, x + w, y + h };
-        DrawTextW(dc_, ws.c_str(), (int)ws.size(), &r, DT_WORDBREAK | DT_NOPREFIX | DT_END_ELLIPSIS);
+        DrawTextW(dc_, ws.c_str(), (int)ws.size(), &r, DT_WORDBREAK | DT_NOPREFIX | DT_END_ELLIPSIS | (center ? DT_CENTER : 0));
+    }
+    // a padlock in colour c, centred in the box, smooth edges (4 x 4 samples a pixel; GDI has no anti-aliased shapes); open =
+    // the shackle lifted with its right leg out of the body. Drawn on a 24-unit grid (a common icon's proportions).
+    void Padlock(int x, int y, int w, int h, bool closed, COLORREF c) {
+        GdiFlush();
+        const double ux = 0.6 * w / 16.0, uy = 0.62 * h / 23.0, u = ux < uy ? ux : uy;   // body 16 units wide, all 23 tall
+        const double ox = x + w * 0.5 - 12.0 * u, oy = y + h * 0.5 - 10.5 * u;            // grid x 4..20, y -1..22
+        const double lift = closed ? 0.0 : 3.0, cy = 7.0 - lift;                          // the shackle's arc centre
+        auto inside = [&](double gx, double gy) {
+            if (gx >= 4 && gx <= 20 && gy >= 10 && gy <= 22) {                            // the body (corners r 2) ...
+                const double dx = gx < 6 ? 6 - gx : gx > 18 ? gx - 18 : 0, dy = gy < 12 ? 12 - gy : gy > 20 ? gy - 20 : 0;
+                if (dx * dx + dy * dy > 4) return false;
+                const double kx = gx - 12, ky = gy - 15;                                  // ... less its keyhole
+                return !(kx * kx + ky * ky < 3.2 || (std::fabs(kx) < 0.8 && ky > 0 && ky < 3.2));
+            }
+            const double ax = gx - 12, ay = gy - cy, r2 = ax * ax + ay * ay;
+            if (ay <= 0) return r2 >= 9 && r2 <= 25;                                      // the arc (r 3 .. 5)
+            if (gx >= 7 && gx <= 9) return gy <= 10.5;                                    // left leg
+            if (gx >= 15 && gx <= 17) return gy <= (closed ? 10.5 : cy + 1.5);            // right leg (open: short)
+            return false;
+        };
+        const int px0 = (int)(ox + 3 * u), px1 = (int)(ox + 21 * u) + 1, py0 = (int)(oy - 2 * u), py1 = (int)(oy + 23 * u) + 1;
+        for (int py = py0 < 0 ? 0 : py0; py < py1 && py < h_; ++py)
+            for (int px = px0 < 0 ? 0 : px0; px < px1 && px < w_; ++px) {
+                int n = 0;
+                for (int sy = 0; sy < 4; ++sy)
+                    for (int sx = 0; sx < 4; ++sx) n += inside((px + (sx + 0.5) / 4 - ox) / u, (py + (sy + 0.5) / 4 - oy) / u);
+                if (!n) continue;
+                uint32_t& d = static_cast<uint32_t*>(bits_)[(size_t)py * w_ + px];         // (BGRA; COLORREF is RGB)
+                const uint32_t src[3] = { GetBValue(c), GetGValue(c), GetRValue(c) };
+                uint32_t o = 0;
+                for (int k = 0; k < 3; ++k) {
+                    const uint32_t b = (d >> (8 * k)) & 0xFFu;
+                    o |= ((b * (16 - n) + src[k] * n + 8) / 16) << (8 * k);
+                }
+                d = o;
+            }
     }
     // the picture's area [x0, x1) x [y0, y1) into `out` (w x h) with `alpha` (0..255) everywhere, premultiplied (GDI leaves
     // alpha 0); `out` of another size: all of it
@@ -204,7 +294,7 @@ private:
     HFONT Font(int px, bool bold) {
         for (auto& f : fonts_[bold ? 1 : 0]) if (f.first == px) return f.second;
         HFONT f = CreateFontW(-px, 0, 0, 0, bold ? FW_SEMIBOLD : FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
-                              CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH, L"Segoe UI");
+                              CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH, face_.c_str());
         fonts_[bold ? 1 : 0].push_back({ px, f });
         return f;
     }
@@ -214,7 +304,13 @@ private:
     HGDIOBJ old_ = nullptr;
     void* bits_ = nullptr;
     std::vector<std::pair<int, HFONT>> fonts_[2];
+    std::wstring face_ = L"Segoe UI";
+    static void NoteClipped(const std::string& s) { std::lock_guard<std::mutex> lk(clipM_); if (clipped_.size() < 200) clipped_.push_back(s); }
+    static std::mutex clipM_;
+    static std::vector<std::string> clipped_;
 };
+std::mutex MenuCanvas::clipM_;
+std::vector<std::string> MenuCanvas::clipped_;
 
 namespace {
 
@@ -228,7 +324,6 @@ const Theme kThemes[kThemeCount] = {
     { RGB(0, 0, 0), RGB(20, 20, 20), RGB(34, 34, 34), RGB(70, 70, 70), RGB(200, 140, 0), RGB(255, 190, 40), RGB(255, 255, 255), RGB(150, 150, 150), RGB(255, 190, 40) },          // black
     { RGB(18, 34, 26), RGB(28, 52, 40), RGB(38, 70, 54), RGB(56, 100, 78), RGB(40, 150, 90), RGB(90, 200, 130), RGB(232, 245, 236), RGB(130, 160, 140), RGB(250, 200, 70) },      // green
 };
-const char* const kThemeLabel[kThemeCount] = { "Dark", "Blue", "Grey", "Light", "Black", "Green" };
 
 }  // namespace
 
@@ -326,6 +421,7 @@ public:
         int w = 0, h = 0, theme = 0, alpha = 255;
         std::vector<VrMenu::Elem> el;
         std::vector<uint8_t> st;
+        std::wstring face;                                     // the GDI face of its texts (the language's: lang.h)
         std::wstring path;                                     // save: config.ini
         std::vector<std::pair<std::string, std::string>> kv;
     };
@@ -402,6 +498,7 @@ private:
         if (!cvp || cvp->W() != j.w || cvp->H() != j.h) { cvp = std::make_unique<MenuCanvas>(j.w, j.h); full = true; }
         MenuCanvas& c = *cvp;
         if (!c.Ok()) return;
+        c.SetFace(j.face);
         if (full && !j.full) return;                          // a partial job for a canvas never drawn whole: wait for a full one
         const Theme& T = kThemes[j.theme];
         int d[4] = { 0, 0, 0, 0 };
@@ -547,6 +644,7 @@ VrMenu::VrMenu(const Config& cfg, const std::wstring& path) : pad_(cfg.pad), pat
         if (place_[kPanKb].set) pan_[kPanKb].show = true;   //   the head at the first frame that has the head)
         else kbPending_ = true;
     }
+    RefreshLang();                                      // the game's language (its files; not in a frame: the session starts)
     // both panels drawn now (on the painter's thread, while the game loads): opening the menu then only shows them
     RedrawAll();
     // the pointer dot: white with a dark ring, soft edge, premultiplied alpha
@@ -564,9 +662,69 @@ VrMenu::VrMenu(const Config& cfg, const std::wstring& path) : pad_(cfg.pad), pat
         }
 }
 
-int VrMenu::KeyIndex(const char* name) {
-    for (int k = 0; k < kKeyCount; ++k) if (!strcmp(kKeys[k].name, name)) return k;
-    return -1;
+int VrMenu::KeyIndex(const char* name) {               // (the US keyboard's entry when a key sits elsewhere in other shapes)
+    int any = -1;
+    for (int k = 0; k < kKeyCount; ++k)
+        if (!strcmp(kKeys[k].name, name) && !kKeys[k].part) {
+            if (kKeys[k].geo & gA) return k;
+            if (any < 0) any = k;
+        }
+    return any;
+}
+
+std::vector<std::string> VrMenu::TakeClipped() { return MenuCanvas::TakeClipped(); }
+bool VrMenu::FitsForTest(const std::string& s, int w, int h, int px, bool wrap) {
+    MenuCanvas c(w + 32, h + 32);
+    c.SetFace(Lang::Face());
+    MenuCanvas::TakeClipped();
+    if (wrap && px < 24) {                              // a pick button: one line when it fits, else two (as DrawElem)
+        if (c.FitsLine(w, s, 24, true)) c.Text(0, 0, w, h, s, 24, true, 0, DT_CENTER);
+        else c.TextWrap(3, 0, w - 6, h, s, px, 0, true, true);
+    } else if (wrap) c.TextWrap(0, 0, w, h, s, px, 0);
+    else c.Text(0, 0, w, h, s, px, true, 0, DT_CENTER);
+    return MenuCanvas::TakeClipped().empty();
+}
+
+void VrMenu::RefreshLang() {
+    Lang::SetSetting(look_.lang);
+    Lang::Refresh();
+    std::string kb = KbLayout::For(look_.kbLang == "auto" ? std::string(Lang::Wanted()) : look_.kbLang);
+    static std::string s_faceOf;                        // (the font probe: only when the layout changes)
+    static std::wstring s_face;
+    if (kb != s_faceOf) {
+        const wchar_t* f = Lang::FaceFor(kb, KbLayout::Chars(kb));
+        s_faceOf = kb;
+        s_face = f ? f : L"";
+        if (!f) LOGW("VR menu: no font on this PC has the letters of the %s keyboard -- the US keyboard is shown", kb.c_str());
+        else LOGI("VR menu: keyboard layout %s, font %ls", kb.c_str(), f);
+    }
+    std::wstring face = s_face;
+    if (face.empty()) { kb = "en_us"; face = L"Segoe UI"; }
+    if (kb != kbCode_ || face != kbFace_ || Lang::Gen() != langGen_) {
+        kbCode_ = kb;
+        kbFace_ = face;
+        langGen_ = Lang::Gen();
+        needRedraw_ = true;
+    }
+}
+
+void VrMenu::CycleLang(bool kb, int step) {
+    std::string& cur = kb ? look_.kbLang : look_.lang;
+    const int n = kb ? 1 + KbLayout::Count() : Lang::Count();
+    auto at = [&](int i) { return kb ? (i == 0 ? std::string("auto") : std::string(KbLayout::CodeAt(i - 1))) : std::string(Lang::CodeAt(i)); };
+    int i = 0;
+    while (i < n && at(i) != cur) ++i;
+    i = i >= n ? 0 : (i + step + n) % n;
+    cur = at(i);
+    RefreshLang();
+    LOGI("VR menu: %s = %s", kb ? "keyboard_language" : "language", cur.c_str());
+}
+
+void VrMenu::SetLanguage(const std::string& lang, const std::string& kbLang) {
+    look_.lang = lang;
+    look_.kbLang = kbLang;
+    RefreshLang();
+    needRedraw_ = true;
 }
 
 const VrMenu::Elem* VrMenu::Find(int p, int kind, int arg) const {
@@ -601,6 +759,7 @@ void VrMenu::Place(int p, bool headOk, const Pose& head, bool force) {
 }
 
 void VrMenu::Open(bool headOk, const Pose& head) {
+    RefreshLang();                                      // (the player may have changed the game's language meanwhile)
     Place(kPanMenu, headOk, head, false);
     pan_[kPanMenu].show = true;
     status_.clear();                                    // (redrawn in Update only if what it shows changed meanwhile)
@@ -608,7 +767,7 @@ void VrMenu::Open(bool headOk, const Pose& head) {
 }
 
 void VrMenu::ShowKb(bool on) {
-    if (on && !pan_[kPanKb].show) Place(kPanKb, lastHeadOk_, lastHead_, false);
+    if (on && !pan_[kPanKb].show) { RefreshLang(); Place(kPanKb, lastHeadOk_, lastHead_, false); }
     if (!on) pickBtn_ = -1;
     pan_[kPanKb].show = on;
     kbPending_ = false;
@@ -695,26 +854,32 @@ void VrMenu::LayoutMenu() {
     };
     // the help of everything added since `from` (a row: its label, buttons and value)
     auto tip = [&](size_t from, const std::string& t) { for (size_t i = from; i < el.size(); ++i) el[i].help = t; };
+    char b[96], hb[400];
+    // a translated printf format filled in (a text of the menu's language with values in it)
+    auto fmt = [&](const char* f, auto... a) { snprintf(hb, sizeof(hb), f, a...); return std::string(hb); };
     size_t m0 = 0;
     std::string openCombo;                              // the menu's open / close buttons ("Left grip + Right grip + ...")
     for (int cb : gate_.btns) openCombo += (openCombo.empty() ? "" : " + ") + std::string(BtnLabel(cb));
     const bool picking = pickBtn_ >= 0;
     const std::string what = picking ? (pickLayer_ ? LayerKeys(pad_, pickLayer_) + " + " : std::string()) + BtnLabel(pickBtn_)
                                      : std::string();
-    add(eBar, 0, 0, 0, kMenuW, 72, picking ? "Set " + what + ": pick a key" : "ETS2 ATS VR Controls", picking);
-    m0 = el.size(); add(eSmaller, 0, 600, 11, 64, 50, "\xE2\x88\x92"); tip(m0, "Make this menu smaller.");
-    m0 = el.size(); add(eBigger, 0, 672, 11, 64, 50, "+"); tip(m0, "Make this menu bigger.");
-    m0 = el.size(); add(eKbBtn, 0, 744, 11, 170, 50, "Keyboard", pan_[kPanKb].show); tip(m0, "Show or hide the VR keyboard.");
+    add(eBar, 0, 0, 0, kMenuW, 72, picking ? fmt(TRF("Set %s: pick a key"), what.c_str()) : "ETS2 ATS VR Controls", picking);
+    m0 = el.size(); add(eSmaller, 0, 600, 11, 64, 50, "\xE2\x88\x92"); tip(m0, TR("Make this menu smaller."));
+    m0 = el.size(); add(eBigger, 0, 672, 11, 64, 50, "+"); tip(m0, TR("Make this menu bigger."));
+    m0 = el.size(); add(eKbBtn, 0, 744, 11, 170, 50, TR("Keyboard"), pan_[kPanKb].show); tip(m0, TR("Show or hide the VR keyboard."));
     m0 = el.size(); add(eClose, 0, 924, 11, 64, 50, "\xC3\x97");
-    tip(m0, "Close this menu. To open it again: hold " + openCombo + ".");
-    static const char* const kTabs[5] = { "Buttons", "Mouse", "Panels", "Look", "Driving" };
-    static const char* const kTabHelp[5] = { "Choose what each controller button does.",
-                                             "The stick mouse and the air mouse (point with the controller).",
-                                             "Size and place of this menu and the keyboard.",
-                                             "Colours, how see-through the panels are, and pointer smoothing.",
-                                             "Steering, gas and brake: how the truck's wheel follows your stick." };
-    for (int t = 0; t < 5; ++t) { m0 = el.size(); add(eTab, t, 24 + t * 193, 84, 181, 56, kTabs[t], tab_ == t); tip(m0, kTabHelp[t]); }
-    char b[96];
+    tip(m0, fmt(TRF("Close this menu. To open it again: hold %s."), openCombo.c_str()));
+    static const char* const kTabs[5] = { N_("Buttons"), N_("Mouse"), N_("Panels"), N_("Look"), N_("Driving") };
+    static const char* const kTabHelp[5] = { N_("Choose what each controller button does."),
+                                             N_("The stick mouse and the air mouse (point with the controller)."),
+                                             N_("Size and place of this menu and the keyboard."),
+                                             N_("Colours, how see-through the panels are, pointer smoothing and the language."),
+                                             N_("Steering, gas and brake: how the truck's wheel follows your stick.") };
+    for (int t = 0; t < 5; ++t) {
+        m0 = el.size();
+        add(eTab, t, 24 + t * 193, 84, 181, 56, Lang::Tr(kTabs[t]), tab_ == t);
+        tip(m0, Lang::Tr(kTabHelp[t]));
+    }
     if (tab_ == 0) {
         static const int kLeft[10] = { VrPad::kLTrig, VrPad::kLGrip, VrPad::kX, VrPad::kY, VrPad::kLStick, VrPad::kMenu,
                                        VrPad::kLUp, VrPad::kLDown, VrPad::kLLeft, VrPad::kLRight };
@@ -723,64 +888,74 @@ void VrMenu::LayoutMenu() {
         // the layer the rows show and set (Normal / Mod 1 / Mod 2 / Both = no modifier, modifier 1, modifier 2, both held), and
         // the two modifier buttons (a click cycles each). Chip args: 120, 121, 123, 124 = layer 0 .. 3; 122 / 125 = the choosers.
         static const int kChipArg[4] = { 120, 121, 123, 124 };
-        static const char* const kChip[4] = { "Normal", "Mod 1", "Mod 2", "Both" };
-        const std::string m1 = pad_.modBtn >= 0 ? BtnLabel(pad_.modBtn) : "off", m2 = pad_.modBtn2 >= 0 ? BtnLabel(pad_.modBtn2) : "off";
-        const std::string kChipHelp[4] = { "Show and set what each button does normally.",
-                                           "Show and set what each button does while you hold modifier 1 (" + m1 + ").",
-                                           "Show and set what each button does while you hold modifier 2 (" + m2 + ").",
-                                           "Show and set what each button does while you hold BOTH modifiers." };
+        static const char* const kChip[4] = { N_("Normal"), N_("Mod 1"), N_("Mod 2"), N_("Both") };
+        const std::string m1 = pad_.modBtn >= 0 ? BtnLabel(pad_.modBtn) : TR("off"),
+                          m2 = pad_.modBtn2 >= 0 ? BtnLabel(pad_.modBtn2) : TR("off");
+        const std::string kChipHelp[4] = { TR("Show and set what each button does normally."),
+                                           fmt(TRF("Show and set what each button does while you hold modifier 1 (%s)."), m1.c_str()),
+                                           fmt(TRF("Show and set what each button does while you hold modifier 2 (%s)."), m2.c_str()),
+                                           TR("Show and set what each button does while you hold BOTH modifiers.") };
         for (int l = 0; l < 4; ++l) {
             m0 = el.size();
-            add(eSet, kChipArg[l], 24 + l * 146, 150, 138, 44, kChip[l], layer_ == l, !LayerReady(pad_, l) || LayerOnWheel(pad_, l));
+            add(eSet, kChipArg[l], 24 + l * 146, 150, 138, 44, Lang::Tr(kChip[l]), layer_ == l,
+                !LayerReady(pad_, l) || LayerOnWheel(pad_, l));
             tip(m0, kChipHelp[l]);
         }
         m0 = el.size(); add(eSet, 122, 612, 150, 178, 44, "1: " + m1);
-        tip(m0, "Modifier 1: hold it, and other buttons do their Mod 1 job. Press here to choose another button.");
+        tip(m0, TR("Modifier 1: hold it, and other buttons do their Mod 1 job. Press here to choose another button."));
         m0 = el.size(); add(eSet, 125, 798, 150, 178, 44, "2: " + m2);
-        tip(m0, "Modifier 2: hold it, and other buttons do their Mod 2 job. Hold both modifiers for the Both jobs. Press here "
-                "to choose another button.");
+        tip(m0, TR("Modifier 2: hold it, and other buttons do their Mod 2 job. Hold both modifiers for the Both jobs. Press here "
+                   "to choose another button."));
         const VrPad::Out* lmap = VrPad::LayerMap(pad_, layer_);
-        const std::string lname = layer_ ? " with " + LayerKeys(pad_, layer_) + ": " : ": ";
+        const std::string lkeys = layer_ ? LayerKeys(pad_, layer_) : std::string();
         for (int col = 0; col < 2; ++col)
             for (int i = 0; i < (col ? 9 : 10); ++i) {
                 const int btn = col ? kRight[i] : kLeft[i];
-                std::string val = Pretty(lmap ? lmap[btn] : pad_.map[btn]);
+                std::string val = Pretty(lmap ? lmap[btn] : pad_.map[btn], kbCode_);
                 bool dim = false;
                 bool combo = false;                  // (one of the menu's open / close buttons)
                 for (int cb : gate_.btns) combo = combo || cb == btn;
                 const bool menuOnly = MenuOnly(pad_, gate_.btns, layer_, btn);
                 const int wg = VrPad::WheelGripMask(pad_);
-                if ((btn == VrPad::kLGrip && (wg & 1)) || (btn == VrPad::kRGrip && (wg & 2))) { val = "the wheel"; dim = true; }
-                else if (LayerOnWheel(pad_, layer_)) { val = "(grips = the wheel)"; dim = true; }
-                else if (layer_ && VrPad::IsModifier(pad_, btn)) { val = btn == pad_.modBtn ? "modifier 1" : "modifier 2"; dim = true; }
-                else if (btn == pad_.airBtn) { val = "air mouse"; dim = true; }
-                else if (btn >= VrPad::kLUp && pad_.mouseStick == (btn >= VrPad::kRUp ? 2 : 1)) { val = "moves the mouse"; dim = true; }
-                else if (DrivingUses(pad_, btn)) { val = "steers"; dim = true; }
-                else if (menuOnly) { val = "opens the menu"; dim = true; }
-                else if (layer_ && (!LayerReady(pad_, layer_) || lmap[btn].kind == VrPad::kNone)) { val = "as normal"; dim = true; }
+                if ((btn == VrPad::kLGrip && (wg & 1)) || (btn == VrPad::kRGrip && (wg & 2))) { val = TR("the wheel"); dim = true; }
+                else if (LayerOnWheel(pad_, layer_)) { val = TR("(grips = the wheel)"); dim = true; }
+                else if (layer_ && VrPad::IsModifier(pad_, btn)) { val = btn == pad_.modBtn ? TR("modifier 1") : TR("modifier 2"); dim = true; }
+                else if (btn == pad_.airBtn) { val = TR("air mouse"); dim = true; }
+                else if (btn >= VrPad::kLUp && pad_.mouseStick == (btn >= VrPad::kRUp ? 2 : 1)) { val = TR("moves the mouse"); dim = true; }
+                else if (DrivingUses(pad_, btn)) { val = TR("steers"); dim = true; }
+                else if (menuOnly) { val = TR("opens the menu"); dim = true; }
+                else if (layer_ && (!LayerReady(pad_, layer_) || lmap[btn].kind == VrPad::kNone)) { val = TR("as normal"); dim = true; }
                 add(eRow, btn, col ? 508 : 24, 202 + i * 49, 468, 45, BtnLabel(btn), pickBtn_ == btn, dim,
-                    combo && !layer_ ? val + "  (+menu)" : val);
-                std::string h = std::string(BtnLabel(btn)) + lname;
-                if (dim) h += val + " (set elsewhere).";
-                else h += "now " + val + ". Point here, pull the trigger, then pick a key on the keyboard or a choice below.";
-                if (combo && !layer_) h += " Also part of the menu's open buttons.";
+                    combo && !layer_ ? val + "  " + TR("(+menu)") : val);
+                std::string h;
+                if (dim) h = layer_ ? fmt(TRF("%s with %s: %s (set elsewhere)."), BtnLabel(btn), lkeys.c_str(), val.c_str())
+                                    : fmt(TRF("%s: %s (set elsewhere)."), BtnLabel(btn), val.c_str());
+                else h = layer_ ? fmt(TRF("%s with %s: now %s. Point here, pull the trigger, then pick a key on the keyboard or a "
+                                          "choice below."), BtnLabel(btn), lkeys.c_str(), val.c_str())
+                                : fmt(TRF("%s: now %s. Point here, pull the trigger, then pick a key on the keyboard or a choice "
+                                          "below."), BtnLabel(btn), val.c_str());
+                if (combo && !layer_) h += std::string(" ") + TR("Also part of the menu's open buttons.");
                 el.back().help = h;
             }
         if (picking) {
             static const int kOuts[9] = { VrPad::kMouseL, VrPad::kMouseR, VrPad::kMouseM, VrPad::kWheelUp, VrPad::kWheelDown,
                                           VrPad::kGas, VrPad::kBrake, VrPad::kKeyboard, VrPad::kNone };
-            static const char* const kOutNames[9] = { "Mouse L", "Mouse R", "Mouse M", "Wheel up", "Wheel dn", "Gas", "Brake",
-                                                      "Keyboard", "None" };
-            static const char* const kOutHelp[9] = { "Left mouse click.", "Right mouse click.", "Middle mouse click.",
-                                                     "Mouse wheel up (one step per press).", "Mouse wheel down (one step per press).",
-                                                     "Gas pedal: press harder = more gas.", "Brake: press harder = more brake.",
-                                                     "Shows / hides the VR keyboard.", "Nothing." };
-            for (int i = 0; i < 9; ++i) { add(ePickOut, kOuts[i], 24 + i * 92, 704, 86, 54, kOutNames[i]); el.back().help = kOutHelp[i]; }
-            add(ePickCancel, 0, 852, 704, 124, 54, "Cancel");
+            static const char* const kOutNames[9] = { N_("Mouse L"), N_("Mouse R"), N_("Mouse M"), N_("Wheel up"), N_("Wheel dn"),
+                                                      N_("Gas"), N_("Brake"), N_("pick|Keyboard"), N_("None") };
+            static const char* const kOutHelp[9] = { N_("Left mouse click."), N_("Right mouse click."), N_("Middle mouse click."),
+                                                     N_("Mouse wheel up (one step per press)."),
+                                                     N_("Mouse wheel down (one step per press)."),
+                                                     N_("Gas pedal: press harder = more gas."), N_("Brake: press harder = more brake."),
+                                                     N_("Shows / hides the VR keyboard."), N_("Nothing.") };
+            for (int i = 0; i < 9; ++i) {
+                add(ePickOut, kOuts[i], 24 + i * 92, 704, 86, 54, Lang::TrC(kOutNames[i]));   // ("pick|": a narrow button)
+                el.back().help = Lang::Tr(kOutHelp[i]);
+            }
+            add(ePickCancel, 0, 852, 704, 124, 54, TR("Cancel"));
         } else {
             add(eInfo, 0, 24, 704, 742, 54, !status_.empty() ? status_
-                : layer_ ? "Hold " + LayerKeys(pad_, layer_) + " first, then the button."
-                         : std::string("Point at a button, pull the trigger, pick its key."));
+                : layer_ ? fmt(TRF("Hold %s first, then the button."), LayerKeys(pad_, layer_).c_str())
+                         : std::string(TR("Point at a button, pull the trigger, pick its key.")));
         }
     } else if (tab_ == 1) {
         auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 162 + r * 88, 440, 70, label); };
@@ -794,28 +969,29 @@ void VrMenu::LayoutMenu() {
             add(eInfo, 200 + r, 570, 162 + r * 88, 306, 70, value);
             add(eSet, base + 1, 886, 162 + r * 88, 90, 70, "+");
         };
-        m0 = el.size(); row(0, "Stick that moves the mouse");
-        opts(0, 0, { "Left", "Right", "Off" }, pad_.mouseStick == 1 ? 0 : pad_.mouseStick == 2 ? 1 : 2);
-        tip(m0, "Which stick moves the mouse pointer (for the game's menus and map). Off = no stick mouse.");
-        m0 = el.size(); row(1, "Stick mouse speed");
-        snprintf(b, sizeof(b), "%.0f px/s", (double)pad_.mouseSpeed);
+        m0 = el.size(); row(0, TR("Stick that moves the mouse"));
+        opts(0, 0, { TR("Left"), TR("Right"), TR("Off") }, pad_.mouseStick == 1 ? 0 : pad_.mouseStick == 2 ? 1 : 2);
+        tip(m0, TR("Which stick moves the mouse pointer (for the game's menus and map). Off = no stick mouse."));
+        m0 = el.size(); row(1, TR("Stick mouse speed"));
+        snprintf(b, sizeof(b), TRF("%.0f px/s"), (double)pad_.mouseSpeed);
         plusMinus(1, 10, b);
-        tip(m0, "How fast the pointer moves with the stick pushed all the way, in pixels per second.");
-        m0 = el.size(); row(2, "Stick dead zone");
+        tip(m0, TR("How fast the pointer moves with the stick pushed all the way, in pixels per second."));
+        m0 = el.size(); row(2, TR("Stick dead zone"));
         snprintf(b, sizeof(b), "%.2f", (double)pad_.deadzone);
         plusMinus(2, 20, b);
-        tip(m0, "How far you must push the stick before the pointer moves. More = no creeping pointer.");
-        m0 = el.size(); row(3, "Air mouse button");
-        opts(3, 30, { "Right grip", "Left grip", "Off" }, pad_.airBtn == VrPad::kRGrip ? 0 : pad_.airBtn == VrPad::kLGrip ? 1 : pad_.airBtn < 0 ? 2 : -1);
-        tip(m0, "Hold this button and turn the controller: the pointer follows, like a laser pointer. Off = no air mouse.");
-        m0 = el.size(); row(4, "Air mouse works while");
-        opts(4, 40, { "Button held", "Toggled on" }, pad_.airToggle ? 1 : 0);
-        tip(m0, "Button held: only while you hold the button. Toggled on: one press switches it on, the next press off.");
-        m0 = el.size(); row(5, "Air mouse speed");
-        snprintf(b, sizeof(b), "%.0f px/deg", (double)pad_.airGain);
+        tip(m0, TR("How far you must push the stick before the pointer moves. More = no creeping pointer."));
+        m0 = el.size(); row(3, TR("Air mouse button"));
+        opts(3, 30, { BtnLabel(VrPad::kRGrip), BtnLabel(VrPad::kLGrip), TR("Off") },
+             pad_.airBtn == VrPad::kRGrip ? 0 : pad_.airBtn == VrPad::kLGrip ? 1 : pad_.airBtn < 0 ? 2 : -1);
+        tip(m0, TR("Hold this button and turn the controller: the pointer follows, like a laser pointer. Off = no air mouse."));
+        m0 = el.size(); row(4, TR("Air mouse works while"));
+        opts(4, 40, { TR("Button held"), TR("Toggled on") }, pad_.airToggle ? 1 : 0);
+        tip(m0, TR("Button held: only while you hold the button. Toggled on: one press switches it on, the next press off."));
+        m0 = el.size(); row(5, TR("Air mouse speed"));
+        snprintf(b, sizeof(b), TRF("%.0f px/deg"), (double)pad_.airGain);
         plusMinus(5, 50, b);
-        tip(m0, "How far the pointer moves when you turn the controller, in pixels per degree.");
-        add(eInfo, 0, 24, 704, 742, 54, status_.empty() ? "Changes work at once and are saved." : status_);
+        tip(m0, TR("How far the pointer moves when you turn the controller, in pixels per degree."));
+        add(eInfo, 0, 24, 704, 742, 54, status_.empty() ? TR("Changes work at once and are saved.") : status_);
     } else if (tab_ == 2) {
         auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 156 + r * 76, 440, 64, label); };
         auto plusMinus = [&](int r, int base, const std::string& value, const char* minus, const char* plus) {
@@ -825,59 +1001,73 @@ void VrMenu::LayoutMenu() {
             add(eSet, base + 1, glyph ? 886 : 846, 156 + r * 76, glyph ? 90 : 130, 64, plus);
         };
         const V3 from = lastHeadOk_ ? lastHead_.p : V3{ 0, 0, 0 };
-        m0 = el.size(); row(0, "Menu size");
-        snprintf(b, sizeof(b), "%.2f m wide", pan_[kPanMenu].width);
+        m0 = el.size(); row(0, TR("Menu size"));
+        snprintf(b, sizeof(b), TRF("%.2f m wide"), pan_[kPanMenu].width);
         plusMinus(0, 60, b, "\xE2\x88\x92", "+");
-        tip(m0, "How big this menu is (its width in metres).");
-        m0 = el.size(); row(1, "Menu distance");
-        snprintf(b, sizeof(b), "%.2f m", Len(pan_[kPanMenu].pose.p - from));
-        plusMinus(1, 62, b, "Closer", "Farther");
-        tip(m0, "How far this menu is from your head.");
-        m0 = el.size(); row(2, "Keyboard size");
-        snprintf(b, sizeof(b), "%.2f m wide", pan_[kPanKb].width);
+        tip(m0, TR("How big this menu is (its width in metres)."));
+        m0 = el.size(); row(1, TR("Menu distance"));
+        snprintf(b, sizeof(b), TRF("%.2f m"), Len(pan_[kPanMenu].pose.p - from));
+        plusMinus(1, 62, b, TR("Closer"), TR("Farther"));
+        tip(m0, TR("How far this menu is from your head."));
+        m0 = el.size(); row(2, TR("Keyboard size"));
+        snprintf(b, sizeof(b), TRF("%.2f m wide"), pan_[kPanKb].width);
         plusMinus(2, 70, b, "\xE2\x88\x92", "+");
-        tip(m0, "How big the VR keyboard is (its width in metres).");
-        m0 = el.size(); row(3, "Keyboard distance");
-        if (pan_[kPanKb].show) snprintf(b, sizeof(b), "%.2f m", Len(pan_[kPanKb].pose.p - from));
-        else snprintf(b, sizeof(b), "(hidden)");
-        plusMinus(3, 72, b, "Closer", "Farther");
-        tip(m0, "How far the VR keyboard is from your head.");
-        m0 = el.size(); row(4, "Keyboard");
-        add(eSet, 80, 470, 460, 119, 64, "Show", pan_[kPanKb].show);
-        add(eSet, 81, 599, 460, 119, 64, "Hide", !pan_[kPanKb].show);
-        add(eSet, 82, 738, 460, 114, 64, "Full", !look_.kbCompact);
-        add(eSet, 83, 862, 460, 114, 64, "Compact", look_.kbCompact);
-        tip(m0, "Show / hide the VR keyboard. Full = every key; Compact = only the main keys (narrower).");
-        m0 = el.size(); add(eHere, 0, 24, 540, 952, 64, "Bring the menu and the keyboard in front of me");
-        tip(m0, "Moves the menu and the keyboard to where you look now.");
-        snprintf(b, sizeof(b), " for %.1f s", gate_.hold);
-        add(eInfo, 300, 24, 612, 952, 46, "Menu open / close: hold " + openCombo + b);
-        add(eInfo, 301, 24, 656, 952, 46, "Move: point at a panel, hold the grip, move. Its stick: farther / closer.");
-        add(eInfo, 0, 24, 704, 742, 54, status_.empty() ? "The keyboard stays when the menu closes (its x hides it)." : status_);
+        tip(m0, TR("How big the VR keyboard is (its width in metres)."));
+        m0 = el.size(); row(3, TR("Keyboard distance"));
+        if (pan_[kPanKb].show) snprintf(b, sizeof(b), TRF("%.2f m"), Len(pan_[kPanKb].pose.p - from));
+        else snprintf(b, sizeof(b), "%s", TR("(hidden)"));
+        plusMinus(3, 72, b, TR("Closer"), TR("Farther"));
+        tip(m0, TR("How far the VR keyboard is from your head."));
+        m0 = el.size(); row(4, TR("Keyboard"));
+        add(eSet, 80, 470, 460, 119, 64, TR("Show"), pan_[kPanKb].show);
+        add(eSet, 81, 599, 460, 119, 64, TR("Hide"), !pan_[kPanKb].show);
+        add(eSet, 82, 738, 460, 114, 64, TR("Full"), !look_.kbCompact);
+        add(eSet, 83, 862, 460, 114, 64, TR("Compact"), look_.kbCompact);
+        tip(m0, TR("Show / hide the VR keyboard. Full = every key; Compact = only the main keys (narrower)."));
+        m0 = el.size(); add(eHere, 0, 24, 540, 952, 64, TR("Bring the menu and the keyboard in front of me"));
+        tip(m0, TR("Moves the menu and the keyboard to where you look now."));
+        add(eInfo, 300, 24, 612, 952, 46, fmt(TRF("Menu open / close: hold %s for %.1f s"), openCombo.c_str(), gate_.hold));
+        add(eInfo, 301, 24, 656, 952, 46, TR("Move: point at a panel, hold the grip, move. Its stick: farther / closer."));
+        add(eInfo, 0, 24, 704, 742, 54, status_.empty() ? TR("The keyboard stays when the menu closes (its x hides it).") : status_);
     } else if (tab_ == 3) {
-        auto row = [&](int r, const char* label) { add(eInfo, 100 + r, 24, 162 + r * 88, 440, 70, label); };
-        m0 = el.size(); row(0, "Colours");
+        auto row = [&](int y, int arg, const char* label) { add(eInfo, arg, 24, y, 440, 64, label); };
+        auto arrows = [&](int y, int arg, int base, const std::string& value) {   // [<] value [>]
+            add(eSet, base, 470, y, 90, 64, "\xE2\x80\xB9");
+            add(eInfo, arg, 570, y, 306, 64, value);
+            add(eSet, base + 1, 886, y, 90, 64, "\xE2\x80\xBA");
+        };
+        static const char* const kThemeLabel[kThemeCount] = { N_("Dark"), N_("Blue"), N_("Grey"), N_("Light"), N_("Black"), N_("Green") };
+        m0 = el.size(); row(156, 100, TR("Colours"));
         for (int i = 0; i < kThemeCount; ++i)
-            add(eSet, 100 + i, 470 + (i % 3) * 172, 162 + (i / 3) * 80, 162, 70, kThemeLabel[i], look_.theme == i);
-        tip(m0, "The colours of the menu and the keyboard.");
-        m0 = el.size(); row(2, "Menu see-through");
-        add(eSet, 90, 470, 338, 90, 70, "\xE2\x88\x92");
-        snprintf(b, sizeof(b), "%d %% solid", (int)(look_.menuOpacity * 100.0f + 0.5f));
-        add(eInfo, 202, 570, 338, 306, 70, b);
-        add(eSet, 91, 886, 338, 90, 70, "+");
-        tip(m0, "How solid this menu is. - = more see-through, + = more solid.");
-        m0 = el.size(); row(3, "Keyboard see-through");
-        add(eSet, 92, 470, 426, 90, 70, "\xE2\x88\x92");
-        snprintf(b, sizeof(b), "%d %% solid", (int)(look_.kbOpacity * 100.0f + 0.5f));
-        add(eInfo, 203, 570, 426, 306, 70, b);
-        add(eSet, 93, 886, 426, 90, 70, "+");
-        tip(m0, "How solid the VR keyboard is. - = more see-through, + = more solid.");
-        m0 = el.size(); row(4, "Pointer smoothing");
-        static const char* const kSm[4] = { "Off", "Low", "Medium", "High" };
-        for (int i = 0; i < 4; ++i) add(eSet, 110 + i, 470 + i * 129, 514, 119, 70, kSm[i], look_.smoothing == i);
-        tip(m0, "Calms a shaky hand: the menu pointer and the air mouse. Higher = steadier, but it follows a bit later.");
-        add(eInfo, 302, 24, 596, 952, 56, "Smoothing calms a shaky hand (menu pointer and air mouse).");
-        add(eInfo, 0, 24, 704, 742, 54, status_.empty() ? "- = more see-through, + = more solid." : status_);
+            add(eSet, 100 + i, 470 + (i % 3) * 172, 156 + (i / 3) * 70, 162, 64, Lang::Tr(kThemeLabel[i]), look_.theme == i);
+        tip(m0, TR("The colours of the menu and the keyboard."));
+        m0 = el.size(); row(302, 102, TR("Menu see-through"));
+        add(eSet, 90, 470, 302, 90, 64, "\xE2\x88\x92");
+        snprintf(b, sizeof(b), TRF("%d %% solid"), (int)(look_.menuOpacity * 100.0f + 0.5f));
+        add(eInfo, 202, 570, 302, 306, 64, b);
+        add(eSet, 91, 886, 302, 90, 64, "+");
+        tip(m0, TR("How solid this menu is. - = more see-through, + = more solid."));
+        m0 = el.size(); row(378, 103, TR("Keyboard see-through"));
+        add(eSet, 92, 470, 378, 90, 64, "\xE2\x88\x92");
+        snprintf(b, sizeof(b), TRF("%d %% solid"), (int)(look_.kbOpacity * 100.0f + 0.5f));
+        add(eInfo, 203, 570, 378, 306, 64, b);
+        add(eSet, 93, 886, 378, 90, 64, "+");
+        tip(m0, TR("How solid the VR keyboard is. - = more see-through, + = more solid."));
+        m0 = el.size(); row(454, 104, TR("Pointer smoothing"));
+        static const char* const kSm[4] = { N_("Off"), N_("Low"), N_("Medium"), N_("High") };
+        for (int i = 0; i < 4; ++i) add(eSet, 110 + i, 470 + i * 129, 454, 119, 64, Lang::Tr(kSm[i]), look_.smoothing == i);
+        tip(m0, TR("Calms a shaky hand: the menu pointer and the air mouse. Higher = steadier, but it follows a bit later."));
+        // the language: auto (the game's) or one of them; the keyboard's letters: auto (as the menu) or one of them
+        std::string name = Lang::FontMissing() ? fmt(TRF("%s (no font)"), Lang::Wanted()) : Lang::NativeName(Lang::Wanted());
+        m0 = el.size(); row(530, 105, TR("Language"));
+        arrows(530, 205, 170, look_.lang == "auto" ? fmt(TRF("Auto: %s"), name.c_str()) : name);
+        tip(m0, TR("The menu's language. Auto = the language the game is set to."));
+        name = Lang::NativeName(kbCode_);
+        m0 = el.size(); row(606, 106, TR("Keyboard letters"));
+        arrows(606, 206, 172, look_.kbLang == "auto" ? fmt(TRF("Auto: %s"), name.c_str()) : name);
+        tip(m0, TR("The letters on the VR keyboard, as printed in that country. Auto = as the menu. A key always presses the same "
+                   "key in the game."));
+        add(eInfo, 0, 24, 704, 742, 54, status_.empty() ? TR("- = more see-through, + = more solid.") : status_);
     } else {                                            // Driving (scs_input.h): steering here, gas / brake on any button
         // wheel / point add a row (which grips / which hand): 10 rows, a little closer together
         const bool hands = pad_.drive && (pad_.steerWith == 1 || pad_.steerWith == 2);
@@ -896,93 +1086,91 @@ void VrMenu::LayoutMenu() {
         };
         {                                               // steer with: Stick 155 / Wheel 156 / Point 157 / Off 148 (147 = on)
             m0 = el.size();
-            row(0, "Steer with");
+            row(0, TR("Steer with"));
             const int cur = !pad_.drive ? 3 : pad_.steerWith == 1 ? 1 : pad_.steerWith == 2 ? 2 : 0;
             static const int kArg[4] = { 155, 156, 157, 148 };
-            static const char* const kName[4] = { "Stick", "Wheel", "Point", "Off" };
-            for (int i = 0; i < 4; ++i) add(eSet, kArg[i], 470 + i * 129, Y(0), 119, rh, kName[i], i == cur);
-            tip(m0, "Stick: the stick steers. Wheel: hold the grip(s) and turn your hands like a steering wheel. Point: point "
-                    "a controller left / right (on a panel the wheel holds). Off: no driving.");
+            static const char* const kName[4] = { N_("Stick"), N_("Wheel"), N_("Point"), N_("Off") };
+            for (int i = 0; i < 4; ++i) add(eSet, kArg[i], 470 + i * 129, Y(0), 119, rh, Lang::Tr(kName[i]), i == cur);
+            tip(m0, TR("Stick: the stick steers. Wheel: hold the grip(s) and turn your hands like a steering wheel. Point: point "
+                       "a controller left / right (on a panel the wheel holds). Off: no driving."));
         }
         if (hands) {                                    // the hands: [Stick on / off] [-] angle [+], then grips / hand
             const bool wheel = pad_.steerWith == 1;
-            m0 = el.size(); row(1, wheel ? "Hands turn for full lock" : "Point for full lock");
-            snprintf(b, sizeof(b), "%.0f deg", (double)(wheel ? pad_.steerWheelAngle : pad_.steerPointAngle));
+            m0 = el.size(); row(1, wheel ? TR("Hands turn for full lock") : TR("Point for full lock"));
+            snprintf(b, sizeof(b), TRF("%.0f deg"), (double)(wheel ? pad_.steerWheelAngle : pad_.steerPointAngle));
             add(eSet, 158, 590, Y(1), 80, rh, "\xE2\x88\x92");
             add(eInfo, 201, 680, Y(1), 196, rh, b);
             add(eSet, 159, 886, Y(1), 90, rh, "+");
-            tip(m0, wheel ? "How far you turn your hands (like a wheel) for full lock. Less = quicker, more = calmer."
-                          : "How far you point left / right for full lock. Less = quicker, more = calmer.");
+            tip(m0, wheel ? TR("How far you turn your hands (like a wheel) for full lock. Less = quicker, more = calmer.")
+                          : TR("How far you point left / right for full lock. Less = quicker, more = calmer."));
             m0 = el.size();
-            add(eSet, 160, 470, Y(1), 110, rh, pad_.steerStickToo ? "Stick on" : "Stick off", pad_.steerStickToo);
-            tip(m0, "Stick on: the stick steers too (it wins while you push it). Stick off: only your hands steer, and the "
-                    "stick's left / right are normal buttons again.");
+            add(eSet, 160, 470, Y(1), 110, rh, pad_.steerStickToo ? TR("Stick on") : TR("Stick off"), pad_.steerStickToo);
+            tip(m0, TR("Stick on: the stick steers too (it wins while you push it). Stick off: only your hands steer, and the "
+                       "stick's left / right are normal buttons again."));
             if (wheel) {
-                m0 = el.size(); row(2, "Hold the wheel with");
-                opts(2, 161, { "Both", "Left", "Right", "Either" }, pad_.steerWheelGrip & 3);
-                tip(m0, "Both: both grips together (one grip alone keeps its own job). Left / Right / Either: one grip is "
-                        "enough -- that grip is then only the wheel (no modifier, no air mouse, no key on it).");
+                m0 = el.size(); row(2, TR("Hold the wheel with"));
+                opts(2, 161, { TR("Both"), TR("Left"), TR("Right"), TR("Either") }, pad_.steerWheelGrip & 3);
+                tip(m0, TR("Both: both grips together (one grip alone keeps its own job). Left / Right / Either: one grip is "
+                           "enough -- that grip is then only the wheel (no modifier, no air mouse, no key on it)."));
             } else {
-                m0 = el.size(); row(2, "Hand that points");
-                opts(2, 165, { "Left", "Right" }, pad_.steerPointHand ? 1 : 0);
-                tip(m0, "The controller you point with. The other hand stays free for the keyboard and the menu.");
+                m0 = el.size(); row(2, TR("Hand that points"));
+                opts(2, 165, { TR("Left"), TR("Right") }, pad_.steerPointHand ? 1 : 0);
+                tip(m0, TR("The controller you point with. The other hand stays free for the keyboard and the menu."));
             }
         } else {
-            m0 = el.size(); row(1, "Stick that steers");
-            opts(1, 130, { "Left", "Right", "Off" }, pad_.steerStick == 1 ? 0 : pad_.steerStick == 2 ? 1 : 2);
-            tip(m0, "Which stick steers the truck (left / right). Its up / down stay free for other buttons.");
+            m0 = el.size(); row(1, TR("Stick that steers"));
+            opts(1, 130, { TR("Left"), TR("Right"), TR("Off") }, pad_.steerStick == 1 ? 0 : pad_.steerStick == 2 ? 1 : 2);
+            tip(m0, TR("Which stick steers the truck (left / right). Its up / down stay free for other buttons."));
         }
-        m0 = el.size(); row(2 + o, "Steering dead zone");
+        m0 = el.size(); row(2 + o, TR("Steering dead zone"));
         snprintf(b, sizeof(b), "%.2f", (double)pad_.steerDeadzone);
         plusMinus(2 + o, 133, b);
-        tip(m0, "How far you must push the stick before the wheel turns. More = a calm middle, less = it reacts sooner.");
-        m0 = el.size(); row(3 + o, "Small turns (most of the stick)");
-        if (pad_.steerFine >= pad_.steerFineZone - 0.001f) snprintf(b, sizeof(b), "even (off)");
-        else snprintf(b, sizeof(b), "up to %d %%", (int)(pad_.steerFine * 100.0f + 0.5f));
+        tip(m0, TR("How far you must push the stick before the wheel turns. More = a calm middle, less = it reacts sooner."));
+        m0 = el.size(); row(3 + o, TR("Small turns (most of the stick)"));
+        if (pad_.steerFine >= pad_.steerFineZone - 0.001f) snprintf(b, sizeof(b), "%s", TR("even (off)"));
+        else snprintf(b, sizeof(b), TRF("up to %d %%"), (int)(pad_.steerFine * 100.0f + 0.5f));
         plusMinus(3 + o, 135, b);
-        char hb[200];
-        snprintf(hb, sizeof(hb), "Most of the stick (the first %d %% of a push) makes small, careful turns, up to this much of the wheel."
-                 " Only the last bit, at the edge, turns hard.", (int)(pad_.steerFineZone * 100.0f + 0.5f));
-        tip(m0, hb);
-        m0 = el.size(); row(4 + o, "Full stick turns the wheel");
+        tip(m0, fmt(TRF("Most of the stick (the first %d %% of a push) makes small, careful turns, up to this much of the wheel. "
+                        "Only the last bit, at the edge, turns hard."), (int)(pad_.steerFineZone * 100.0f + 0.5f)));
+        m0 = el.size(); row(4 + o, TR("Full stick turns the wheel"));
         snprintf(b, sizeof(b), "%d %%", (int)(pad_.steerMax * 100.0f + 0.5f));
         plusMinus(4 + o, 137, b);
-        tip(m0, "How far the wheel turns with the stick pushed all the way. 100 % = full lock.");
-        m0 = el.size(); row(5 + o, "Wheel follows the stick");
-        if (pad_.steerFollowTime <= 0.0f) snprintf(b, sizeof(b), "at once");
-        else snprintf(b, sizeof(b), "%.3g s", (double)pad_.steerFollowTime);
+        tip(m0, TR("How far the wheel turns with the stick pushed all the way. 100 % = full lock."));
+        m0 = el.size(); row(5 + o, TR("Wheel follows the stick"));
+        if (pad_.steerFollowTime <= 0.0f) snprintf(b, sizeof(b), "%s", TR("at once"));
+        else snprintf(b, sizeof(b), TRF("%.3g s"), (double)pad_.steerFollowTime);
         plusMinus(5 + o, 143, b);
-        tip(m0, "Smoothing while you hold the stick: how quickly the wheel goes where the stick points. More = smoother, calmer.");
-        m0 = el.size(); row(6 + o, "Let go: back to the middle");
-        if (pad_.steerCenterTime <= 0.0f) snprintf(b, sizeof(b), "at once");
-        else snprintf(b, sizeof(b), "%.3g s", (double)pad_.steerCenterTime);
+        tip(m0, TR("Smoothing while you hold the stick: how quickly the wheel goes where the stick points. More = smoother, calmer."));
+        m0 = el.size(); row(6 + o, TR("Let go: back to the middle"));
+        if (pad_.steerCenterTime <= 0.0f) snprintf(b, sizeof(b), "%s", TR("at once"));
+        else snprintf(b, sizeof(b), TRF("%.3g s"), (double)pad_.steerCenterTime);
         plusMinus(6 + o, 145, b);
-        tip(m0, "Let go of the stick: how the wheel comes back to straight. At once = at the wheel speed below. More = a slow glide.");
-        m0 = el.size(); row(7 + o, "Wheel speed at most");
-        if (pad_.steerRate <= 0.0f) snprintf(b, sizeof(b), "no limit");
-        else snprintf(b, sizeof(b), "%.2g s to full", 1.0 / (double)pad_.steerRate);
+        tip(m0, TR("Let go of the stick: how the wheel comes back to straight. At once = at the wheel speed below. More = a slow glide."));
+        m0 = el.size(); row(7 + o, TR("Wheel speed at most"));
+        if (pad_.steerRate <= 0.0f) snprintf(b, sizeof(b), "%s", TR("no limit"));
+        else snprintf(b, sizeof(b), TRF("%.2g s to full"), 1.0 / (double)pad_.steerRate);
         plusMinus(7 + o, 139, b);
-        tip(m0, "The fastest the wheel turns (full push; a small push turns it slower): seconds from straight to full lock.");
+        tip(m0, TR("The fastest the wheel turns (full push; a small push turns it slower): seconds from straight to full lock."));
         {                                               // speed-sensitive: [On / Off] [-] value [+]
             const int r = 8 + o, y = Y(r);
             m0 = el.size();
-            row(r, "At 90 km/h: steering");
-            add(eSet, 154, 470, y, 110, rh, pad_.steerSpeedSens ? "On" : "Off", pad_.steerSpeedSens);
+            row(r, TR("At 90 km/h: steering"));
+            add(eSet, 154, 470, y, 110, rh, pad_.steerSpeedSens ? TR("On") : TR("Off"), pad_.steerSpeedSens);
             snprintf(b, sizeof(b), "%d %%", (int)(pad_.steerAtSpeed * 100.0f + 0.5f));
             add(eSet, 152, 590, y, 80, rh, "\xE2\x88\x92");
-            add(eInfo, 200 + r, 680, y, 196, rh, pad_.steerSpeedSens ? b : "(off)");
+            add(eInfo, 200 + r, 680, y, 196, rh, pad_.steerSpeedSens ? std::string(b) : std::string(TR("(off)")));
             add(eSet, 153, 886, y, 90, rh, "+");
-            tip(m0, "On: at speed the wheel turns less, for calm highway driving. The % = how much at 90 km/h.");
+            tip(m0, TR("On: at speed the wheel turns less, for calm highway driving. The % = how much at 90 km/h."));
         }
-        add(eInfo, 0, 24, 704, 742, 54, !status_.empty() ? status_ : !pad_.drive ? "Driving off: no steering, gas or brake."
-                                        : pad_.steerWith == 1 ? "Wheel: hold the grip(s) and turn your hands. Let go = straight."
-                                        : pad_.steerWith == 2 ? "Point: point left / right. On a panel the wheel holds."
-                                        : "Most of the stick = small turns. All the way = hard turns.");
+        add(eInfo, 0, 24, 704, 742, 54, !status_.empty() ? status_ : !pad_.drive ? TR("Driving off: no steering, gas or brake.")
+                                        : pad_.steerWith == 1 ? TR("Wheel: hold the grip(s) and turn your hands. Let go = straight.")
+                                        : pad_.steerWith == 2 ? TR("Point: point left / right. On a panel the wheel holds.")
+                                        : TR("Most of the stick = small turns. All the way = hard turns."));
     }
     if (!(tab_ == 0 && picking))                        // every tab: back to the defaults (a second press does it)
-        add(eSet, kResetArg, 776, 704, 200, 54, resetArm_ == tab_ ? "Sure? Reset" : "Reset tab", resetArm_ == tab_);
+        add(eSet, kResetArg, 776, 704, 200, 54, resetArm_ == tab_ ? TR("Sure? Reset") : TR("Reset tab"), resetArm_ == tab_);
     if (!el.empty() && el.back().kind == eSet && el.back().arg == kResetArg)
-        el.back().help = "Puts this tab back to the default settings. Press twice to be sure.";
+        el.back().help = TR("Puts this tab back to the default settings. Press twice to be sure.");
     // the project, the copyright and the licence (as the DLAA mod and VR EyeCapture show them; text only: a link would open a
     // browser on the desktop and take the focus from the game)
     add(eInfo, kFootArg, 24, 764, 952, 30,
@@ -1002,11 +1190,13 @@ void VrMenu::LayoutKb() {
         e.kind = kind; e.arg = arg; e.x = x; e.y = y; e.w = w; e.h = h; e.text = t; e.on = on;
         el.push_back(e);
     };
-    // one flat block, no title bar: - / + / x sit in the empty space above the number pad (compact: only x, above Backspace;
+    // one flat block, no title bar: - / + / padlock / x sit in the empty space above the number pad (compact: padlock + x, above Backspace;
     // its size is set in the Panels tab); move it with the grip anywhere. Picking a key for a button: the whole keyboard gets an accent
     // frame (the menu's bar says which button). kKeys is a real keyboard's layout (gaps of 1 / 0.5 key between the groups);
     // here every gap between groups is only kGap of a key: still visible, less wasted room. 2 px of gap around each key.
+    // The keys of the layout's shape (kb_layout.h: ANSI / ISO / ABNT2 / JIS) with its labels.
     const bool compact = look_.kbCompact;
+    const int geo = 1 << KbLayout::Geometry(kbCode_);
     const double u = kKbUnit, x0 = 8, y0 = 8;
     auto mapX = [&](double kx, double ky) {
         if (kx >= 19) return kx - 1.0 + 2 * kGap;                       // number pad
@@ -1022,17 +1212,24 @@ void VrMenu::LayoutKb() {
         add(kind, arg, (int)(x0 + ux * u + 2), (int)(y0 + uy * u + 2), (int)(kw * u - 4), (int)(kh * u - 4), t, on);
     };
     if (compact) {                                       // only x, in the free top-row corner above Backspace (no - / +:
-        add(eClose, 0, (int)(x0 + 14 * u + 2), (int)(y0 + 2), (int)(u - 4), (int)(u - 4), "\xC3\x97");   //   Panels tab)
+        const double b = 0.75 * u;                       //   Panels tab) -- with the padlock left of it: 3/4 of a key each
+        add(eLock, 0, (int)(x0 + 15 * u - 2 * b + 2), (int)(y0 + 2), (int)(b - 4), (int)(u - 4), "", look_.kbLock);
+        add(eClose, 0, (int)(x0 + 15 * u - b + 2), (int)(y0 + 2), (int)(b - 4), (int)(u - 4), "\xC3\x97");
     } else {
         at(eSmaller, 0, 19, 0, 1, 1, "\xE2\x88\x92");
         at(eBigger, 0, 20, 0, 1, 1, "+");
+        at(eLock, 0, 21, 0, 1, 1, "", look_.kbLock);
         at(eClose, 0, 22, 0, 1, 1, "\xC3\x97");
     }
+    std::string main, small;
     for (int k = 0; k < kKeyCount; ++k) {
         const KeyDef& d = kKeys[k];
+        if (!(d.geo & geo)) continue;
         if (compact && d.x >= 15) continue;              // compact: no navigation / arrows / number pad
         const int m = ModOf(d.name);
-        at(eKey, k, d.x, d.y, d.w, d.h, d.label, m >= 0 && latch_[m]);
+        KeyLabel(d, kbCode_, &main, &small);
+        at(eKey, d.part ? k - 1 : k, d.x, d.y, d.w, d.h, main, m >= 0 && latch_[m]);   // (the Enter's lower half: the upper's arg)
+        el.back().sub = small;
     }
 }
 
@@ -1042,6 +1239,7 @@ void VrMenu::Draw(int p) {                              // the whole panel: a jo
     j.p = p; j.full = true; j.w = pn.pw; j.h = pn.ph; j.theme = look_.theme;
     j.alpha = (int)((p == kPanMenu ? look_.menuOpacity : look_.kbOpacity) * 255.0f + 0.5f);
     j.frame = p == kPanKb && pickBtn_ >= 0;
+    j.face = p == kPanMenu ? Lang::Face() : kbFace_;
     j.el = pn.el;
     elState_[p].assign(pn.el.size(), 0);
     for (size_t i = 0; i < pn.el.size(); ++i) elState_[p][i] = (uint8_t)ElemState(p, pn.el[i]);
@@ -1110,6 +1308,7 @@ bool VrMenu::DrawChanged(int p) {
     if (j.el.empty()) return true;
     j.p = p; j.w = pn.pw; j.h = pn.ph; j.theme = look_.theme;
     j.alpha = (int)((p == kPanMenu ? look_.menuOpacity : look_.kbOpacity) * 255.0f + 0.5f);
+    j.face = p == kPanMenu ? Lang::Face() : kbFace_;
     painter_->Post(std::move(j));
     return true;
 }
@@ -1138,20 +1337,33 @@ void VrMenu::DrawElem(MenuCanvas& c, int theme, const Elem& e, int st) {
     case eRow: {
         c.Round(e.x, e.y, e.w, e.h, 12, prs ? T.press : e.on ? T.on : hov ? T.hover : T.elem);
         c.Text(e.x + 16, e.y, 200, e.h, e.text, 24, false, e.dim ? T.dim : T.text, DT_LEFT);
-        c.Text(e.x + 210, e.y, e.w - 226, e.h, e.sub, 26, true, e.dim ? T.dim : T.text, DT_RIGHT, true);
+        c.Text(e.x + 210, e.y, e.w - 226, e.h, e.sub, 26, true, e.dim ? T.dim : T.text, DT_RIGHT);
         break;
     }
-    case eKey: {
+    case eKey: {                                        // the label; a second legend (e.sub) small at the top left, as printed
         c.Round(e.x, e.y, e.w, e.h, 8, prs ? T.press : e.on ? T.on : hov ? T.hover : T.elem);
-        const bool one = e.text.size() == 1 || (unsigned char)e.text[0] >= 0x80;   // a letter / digit / arrow: bigger
-        c.Text(e.x, e.y, e.w, e.h, e.text, one ? 30 : 21, true, T.text, DT_CENTER);
+        const int n = CodePoints(e.text);              // a letter / digit / arrow / 2 CJK signs: bigger (not F1, Ins)
+        const bool one = n == 1 || ((unsigned char)e.text[0] >= 0x80 && n <= 2);
+        if (e.sub.empty()) {
+            c.Text(e.x, e.y, e.w, e.h, e.text, one ? 30 : 21, true, T.text, DT_CENTER);
+        } else {
+            c.Text(e.x + 4, e.y + 2, e.w - 4, e.h * 4 / 10, e.sub, 17, false, T.dim, DT_LEFT);
+            c.Text(e.x + e.w / 6, e.y + e.h * 3 / 10, e.w - e.w / 6, e.h * 7 / 10, e.text, one ? 27 : 20, true, T.text, DT_CENTER);
+        }
         break;
     }
+    case eLock:                                         // the theme's button; a closed padlock = locked, open = not
+        c.Round(e.x, e.y, e.w, e.h, 12, prs ? T.press : hov ? T.hover : T.elem);
+        c.Padlock(e.x, e.y, e.w, e.h, e.on, T.text);
+        break;
     default: {
         c.Round(e.x, e.y, e.w, e.h, 12, prs ? T.press : e.on ? T.on : hov ? T.hover : T.elem);
-        const bool glyph = e.text == "+" || e.text == "\xE2\x88\x92" || e.text == "\xC3\x97";   // + - x: bigger
-        c.Text(e.x, e.y, e.w, e.h, e.text, glyph ? 40 : e.kind == ePickOut ? 24 : 28,
-               true, T.text, DT_CENTER, true);
+        const bool glyph = e.text == "+" || e.text == "\xE2\x88\x92" || e.text == "\xC3\x97" || e.text == "\xE2\x80\xB9" ||
+                           e.text == "\xE2\x80\xBA";   // + - x < >: bigger
+        const int px = glyph ? 40 : e.kind == ePickOut ? 24 : 28;
+        if (e.kind == ePickOut && !c.FitsLine(e.w, e.text, px, true))   // the narrow pick buttons: 2 lines when one is too long
+            c.TextWrap(e.x + 3, e.y, e.w - 6, e.h, e.text, 22, T.text, true, true);
+        else c.Text(e.x, e.y, e.w, e.h, e.text, px, true, T.text, DT_CENTER);
         break;
     }
     }
@@ -1245,13 +1457,19 @@ void VrMenu::Pick(const VrPad::Out& o) {
     if (pickBtn_ < 0) return;
     if (VrPad::Out* t = VrPad::LayerMap(pad_, pickLayer_)) {   // a layer's entry (None = as normal)
         t[pickBtn_] = o;
-        status_ = "Set: " + LayerKeys(pad_, pickLayer_) + " + " + BtnLabel(pickBtn_) + " = " +
-                  (o.kind == VrPad::kNone ? std::string("as normal") : Pretty(o));
-        LOGI("VR menu: layer %d + %s = %s", pickLayer_, VrPad::BtnNames()[pickBtn_], Pretty(o).c_str());
+        char b[300], raw[64];
+        snprintf(b, sizeof(b), TRF("Set: %s + %s = %s"), LayerKeys(pad_, pickLayer_).c_str(), BtnLabel(pickBtn_),
+                 o.kind == VrPad::kNone ? TR("as normal") : Pretty(o, kbCode_).c_str());
+        status_ = b;
+        VrPad::OutToString(o, raw, sizeof(raw));
+        LOGI("VR menu: layer %d + %s = %s", pickLayer_, VrPad::BtnNames()[pickBtn_], raw);
     } else {
         pad_.map[pickBtn_] = o;
-        status_ = std::string("Set: ") + BtnLabel(pickBtn_) + " = " + Pretty(o);
-        LOGI("VR menu: %s = %s", VrPad::BtnNames()[pickBtn_], Pretty(o).c_str());
+        char b[300], raw[64];
+        snprintf(b, sizeof(b), TRF("Set: %s = %s"), BtnLabel(pickBtn_), Pretty(o, kbCode_).c_str());
+        status_ = b;
+        VrPad::OutToString(o, raw, sizeof(raw));
+        LOGI("VR menu: %s = %s", VrPad::BtnNames()[pickBtn_], raw);
     }
     pickBtn_ = -1;
     for (bool& l : latch_) l = false;
@@ -1261,10 +1479,10 @@ void VrMenu::Pick(const VrPad::Out& o) {
 void VrMenu::SetValue(int arg) {
     auto mul = [](float& v, bool up, float lo, float hi) { v = up ? v * 1.15f : v / 1.15f; v = v < lo ? lo : v > hi ? hi : v; };
     if (arg == kResetArg) {                             // the first press arms, the second resets this tab
-        if (resetArm_ != tab_) { resetArm_ = tab_; status_ = "Press again: this tab goes back to the defaults."; return; }
+        if (resetArm_ != tab_) { resetArm_ = tab_; status_ = TR("Press again: this tab goes back to the defaults."); return; }
         resetArm_ = -1;
         ResetTab();
-        status_ = "Back to the defaults. Saved.";
+        status_ = TR("Back to the defaults. Saved.");
         return;
     }
     switch (arg) {
@@ -1372,6 +1590,8 @@ void VrMenu::SetValue(int arg) {
         break;
     }
     case 110: case 111: case 112: case 113: look_.smoothing = arg - 110; break;
+    case 170: case 171: CycleLang(false, arg == 171 ? 1 : -1); break;   // the language < / >
+    case 172: case 173: CycleLang(true, arg == 173 ? 1 : -1); break;    // the keyboard's letters < / >
     case 60: case 61: case 70: case 71: {
         Panel& pn = pan_[arg < 70 ? kPanMenu : kPanKb];
         pn.width *= (arg & 1) ? 1.12 : 1 / 1.12;
@@ -1384,7 +1604,7 @@ void VrMenu::SetValue(int arg) {
     case 81: ShowKb(false); return;
     default: return;
     }
-    status_ = "Saved.";
+    status_ = TR("Saved.");
     Save();
 }
 
@@ -1417,6 +1637,8 @@ void VrMenu::ResetTab() {
     case 3: {
         const MenuLook l;
         look_.theme = l.theme; look_.menuOpacity = l.menuOpacity; look_.kbOpacity = l.kbOpacity; look_.smoothing = l.smoothing;
+        look_.lang = l.lang; look_.kbLang = l.kbLang;
+        RefreshLang();
         needRedraw_ = true;
         break;
     }
@@ -1443,7 +1665,7 @@ void VrMenu::Activate(int h, const Ref& r, const VrPad::Frame&, VrPad::Sink& sin
     ps.pan = r.pan; ps.kind = r.kind; ps.arg = r.arg;
     Panel& pn = pan_[r.pan];
     static const char* const kKindName[] = { "-", "top bar", "close", "smaller", "bigger", "keyboard button", "tab", "button row",
-                                             "pick", "pick cancel", "setting", "key", "bring here", "text" };
+                                             "pick", "pick cancel", "setting", "key", "bring here", "text", "lock" };
     LOGI("VR menu: %s hand presses %s %s %d", h ? "right" : "left", r.pan == kPanMenu ? "menu" : "keyboard", kKindName[r.kind],
          r.kind == eKey ? (int)VrPad::ScanOfName(kKeys[r.arg].name) : r.arg);
     switch (r.kind) {
@@ -1463,25 +1685,32 @@ void VrMenu::Activate(int h, const Ref& r, const VrPad::Frame&, VrPad::Sink& sin
     case eKbBtn:
         ShowKb(!pan_[kPanKb].show);
         break;
+    case eLock:                                          // the keyboard stays where it is: no grip moves it
+        look_.kbLock = !look_.kbLock;
+        for (int i = 0; i < 2; ++i) if (grab_[i].pan == kPanKb) { grab_[i] = Grab(); SavePlaces(); }
+        LOGI("VR menu: keyboard %s", look_.kbLock ? "locked" : "unlocked");
+        Save();
+        break;
     case eTab: tab_ = r.arg; status_.clear(); break;
     case eRow:
-        if (!LayerReady(pad_, layer_)) { status_ = "Choose that modifier button first (the buttons above)."; break; }
-        if (LayerOnWheel(pad_, layer_)) { status_ = "Steering with the wheel: those grips hold it (Driving tab)."; break; }
-        if ((r.arg == VrPad::kLGrip && (VrPad::WheelGripMask(pad_) & 1)) || (r.arg == VrPad::kRGrip && (VrPad::WheelGripMask(pad_) & 2))) {
-            status_ = std::string(BtnLabel(r.arg)) + " holds the wheel (Driving tab).";
-            break;
+        {
+            char b[300];
+            auto say = [&](const char* f) { snprintf(b, sizeof(b), f, BtnLabel(r.arg)); status_ = b; };
+            if (!LayerReady(pad_, layer_)) { status_ = TR("Choose that modifier button first (the buttons above)."); break; }
+            if (LayerOnWheel(pad_, layer_)) { status_ = TR("Steering with the wheel: those grips hold it (Driving tab)."); break; }
+            if ((r.arg == VrPad::kLGrip && (VrPad::WheelGripMask(pad_) & 1)) || (r.arg == VrPad::kRGrip && (VrPad::WheelGripMask(pad_) & 2))) {
+                say(TRF("%s holds the wheel (Driving tab)."));
+                break;
+            }
+            if (layer_ && VrPad::IsModifier(pad_, r.arg)) { say(r.arg == pad_.modBtn ? TRF("%s is modifier 1.") : TRF("%s is modifier 2.")); break; }
+            if (r.arg == pad_.airBtn) { say(TRF("%s is the air mouse button (Mouse tab).")); break; }
+            if (MenuOnly(pad_, gate_.btns, layer_, r.arg)) { say(TRF("With these modifiers, %s opens the menu.")); break; }
+            if (r.arg >= VrPad::kLUp && pad_.mouseStick == (r.arg >= VrPad::kRUp ? 2 : 1)) {
+                status_ = TR("That stick moves the mouse (Mouse tab).");
+                break;
+            }
+            if (DrivingUses(pad_, r.arg)) { status_ = TR("That stick steers (Driving tab)."); break; }
         }
-        if (layer_ && VrPad::IsModifier(pad_, r.arg)) {
-            status_ = std::string(BtnLabel(r.arg)) + (r.arg == pad_.modBtn ? " is modifier 1." : " is modifier 2.");
-            break;
-        }
-        if (r.arg == pad_.airBtn) { status_ = std::string(BtnLabel(r.arg)) + " is the air mouse button (Mouse tab)."; break; }
-        if (MenuOnly(pad_, gate_.btns, layer_, r.arg)) { status_ = "With these modifiers, " + std::string(BtnLabel(r.arg)) + " opens the menu."; break; }
-        if (r.arg >= VrPad::kLUp && pad_.mouseStick == (r.arg >= VrPad::kRUp ? 2 : 1)) {
-            status_ = "That stick moves the mouse (Mouse tab).";
-            break;
-        }
-        if (DrivingUses(pad_, r.arg)) { status_ = "That stick steers (Driving tab)."; break; }
         pickBtn_ = pickBtn_ == r.arg && pickLayer_ == layer_ ? -1 : r.arg;
         pickLayer_ = layer_;
         for (bool& l : latch_) l = false;
@@ -1594,7 +1823,7 @@ void VrMenu::Update(VrPad::Frame& f, bool live, bool headOk, const Pose& head, d
             if (!AnyShown() || !Hit(f, h, &r, &u, &v)) r = Ref();
             hov_[h] = r;
             const bool grip = gripDown_[h] ? f.grip[h] > VrPad::kReleaseAt : f.grip[h] > VrPad::kPressAt;
-            if (grip && !gripDown_[h] && r.pan >= 0 && g.pan < 0 && !ps.drag) {
+            if (grip && !gripDown_[h] && r.pan >= 0 && g.pan < 0 && !ps.drag && !(r.pan == kPanKb && look_.kbLock)) {
                 g.pan = r.pan;
                 g.off = PMul(PInv(aim_[h]), pan_[r.pan].pose);
                 LOGI("VR menu: %s hand grabs the %s", h ? "right" : "left", r.pan == kPanMenu ? "menu" : "keyboard");
@@ -1623,15 +1852,15 @@ void VrMenu::Update(VrPad::Frame& f, bool live, bool headOk, const Pose& head, d
         j.kv = MenuValues(pad_, place_[kPanMenu], place_[kPanKb], look_);
         painter_->Post(std::move(j));
     }
-    if (painter_->TakeSaveFailed()) status_ = "Could not save config.ini (the change works until the game ends).";
+    if (painter_->TakeSaveFailed()) status_ = TR("Could not save config.ini (the change works until the game ends).");
 }
 
 std::string VrMenu::ContentKey(int p) const {
     char b[200];
     if (p == kPanKb) {                                  // the keyboard: its colours, layout, latched modifiers, the pick frame
-        snprintf(b, sizeof(b), "%d|%.2f|%d|%d|%d%d%d", look_.theme, look_.kbOpacity, look_.kbCompact, pickBtn_ >= 0, latch_[0],
-                 latch_[1], latch_[2]);
-        return b;
+        snprintf(b, sizeof(b), "%d|%.2f|%d|%d|%d%d%d|%d|%u|", look_.theme, look_.kbOpacity, look_.kbCompact, pickBtn_ >= 0, latch_[0],
+                 latch_[1], latch_[2], look_.kbLock, Lang::Gen());
+        return b + kbCode_;
     }
     // the menu: everything its tabs show (not whether it is shown itself)
     snprintf(b, sizeof(b), "%d|%d|%d|%d%d|%.3f,%.3f|%d|%.2f|%.2f|%d|%d|", pan_[1].show, tab_, pickBtn_, pickLayer_, layer_, pan_[0].width,
@@ -1640,7 +1869,8 @@ std::string VrMenu::ContentKey(int p) const {
     snprintf(dr, sizeof(dr), "|%d%d|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|", pad_.drive ? 1 : 0, pad_.steerStick,
              pad_.steerDeadzone, pad_.steerFine + 10.0f * pad_.steerFineZone, pad_.steerMax, pad_.steerFollowTime, pad_.steerCenterTime, pad_.steerRate,
              pad_.steerSpeedSens ? pad_.steerAtSpeed : -pad_.steerAtSpeed);
-    return std::string(b) + std::to_string(resetArm_) + "|" + status_ + dr + DescribePad(pad_) + "|" + HoverHelp();
+    return std::string(b) + std::to_string(resetArm_) + "|" + status_ + dr + DescribePad(pad_) + "|" + HoverHelp() + "|" +
+           std::to_string(Lang::Gen()) + kbCode_ + look_.lang + look_.kbLang;
 }
 
 const std::string& VrMenu::HoverHelp() const {

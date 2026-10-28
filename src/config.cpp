@@ -1,6 +1,7 @@
 // config -- see config.h.
 #include "config.h"
 #include <windows.h>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cwctype>
@@ -170,6 +171,14 @@ Config ParseConfig(const std::string& text) {
             continue;
         }
         if (key == "keyboard_show") { c.look.kbShow = lv == "1" || lv == "on" || lv == "yes"; continue; }
+        if (key == "language" || key == "keyboard_language") {   // auto or a game language code ("de_de")
+            const bool ok = lv == "auto" || (lv.size() == 5 && lv[2] == '_' && isalpha((unsigned char)lv[0]) &&
+                                             isalpha((unsigned char)lv[1]) && isalpha((unsigned char)lv[3]) && isalpha((unsigned char)lv[4]));
+            if (ok) (key == "language" ? c.look.lang : c.look.kbLang) = lv;
+            else bad("auto or a language code such as de_de");
+            continue;
+        }
+        if (key == "keyboard_lock") { c.look.kbLock = lv == "1" || lv == "on" || lv == "yes"; continue; }
         if (key == "vr_menu") { c.menu = lv != "0" && lv != "off" && lv != "no"; continue; }
         if (key == "menu_hold") { if (Num(val, 0.3, 5, &d)) c.menuHold = (float)d; else bad("a number of seconds (0.3 .. 5)"); continue; }
         if (key == "menu_combo") {
@@ -363,6 +372,9 @@ std::vector<std::pair<std::string, std::string>> MenuValues(const VrPad::Config&
     kv.push_back({ "keyboard_opacity", b });
     kv.push_back({ "keyboard_show", look.kbShow ? "1" : "0" });
     kv.push_back({ "keyboard_layout", look.kbCompact ? "compact" : "full" });
+    kv.push_back({ "keyboard_lock", look.kbLock ? "1" : "0" });
+    kv.push_back({ "language", look.lang });
+    kv.push_back({ "keyboard_language", look.kbLang });
     kv.push_back({ "pointer_smoothing", SmoothNames()[look.smoothing < 0 || look.smoothing > 3 ? 2 : look.smoothing] });
     return kv;
 }

@@ -25,7 +25,10 @@ inline const char* const* SmoothNames() {            // config.ini pointer_smoot
     return k;
 }
 struct MenuLook { int theme = 0; float menuOpacity = 0.95f, kbOpacity = 0.95f; bool kbShow = false; int smoothing = 2;
-                  bool kbCompact = false; };   // keyboard_layout = full / compact (the main keys only)
+                  bool kbCompact = false;      // keyboard_layout = full / compact (the main keys only)
+                  bool kbLock = false;         // keyboard_lock = 1: the keyboard's lock is on (no grab / drag moves it)
+                  std::string lang = "auto";   // language = auto (the game's) or a game language code (lang.h)
+                  std::string kbLang = "auto"; };   // keyboard_language = auto (as the menu) or a code: its key labels
 
 struct Config {
     bool                      enabled = true;      // enabled = 0: the layer passes everything through

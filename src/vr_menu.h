@@ -15,7 +15,8 @@
 //   * Keyboard panel: a full-size keyboard (main block, F-keys, arrows / navigation, number pad) as one flat block (no title
 //     bar: its - / + / x are above the number pad), or COMPACT (Panels tab / keyboard_layout): the main block only (Esc /
 //     F-keys down to Enter, Shift, Ctrl) with only its x, above Backspace (its size: Panels tab). Switching keeps the key size (the
-//     panel's width in metres follows its pixel width). A key goes down on the
+//     panel's width in metres follows its pixel width). The padlock left of its x locks it where it is (keyboard_lock): no
+//     grip moves it then (the padlock shows closed); Bring here / Reset still do. A key goes down on the
 //     trigger and up when it is let go. Shift / Ctrl / Alt latch: they go with the next key. While a button is being set, the
 //     keyboard picks its key instead (with the latched modifiers: shift+f).
 //   * Move: point at a panel and hold the GRIP (or the trigger on its top bar) and move the controller: it hangs on the
@@ -35,6 +36,9 @@
 //     (the whole panel when what it shows changed -- ContentKey per panel -- else only the elements whose hover / press look
 //     changed); its xrEndFrame only copies the changed area to the swapchain (overlay.h). Both panels are drawn once when the
 //     game starts, so opening the menu draws nothing.
+//   * Languages (lang.h, kb_layout.h): every text in the game's language (Look tab / config.ini language = auto or a code), the
+//     keyboard's key labels and key shapes as that country's keyboards have them (keyboard_language = auto: as the menu). The
+//     language is looked up again at every open (cheap: only what game.log.txt added). The keys still send scan codes.
 //   * Every change is written to config.ini at once (menu_place / keyboard_place in the room's LOCAL space: a recenter moves
 //     them with the room).
 // Pure logic + GDI drawing into memory: no OpenXR / D3D here (tests/vr_menu_test.cpp drives it with made-up frames).
@@ -122,12 +126,19 @@ public:
     // tests / log: a short state line
     std::string Describe() const;
     // element kinds (public for the tests)
-    enum Kind { eNone, eBar, eClose, eSmaller, eBigger, eKbBtn, eTab, eRow, ePickOut, ePickCancel, eSet, eKey, eHere, eInfo };
+    enum Kind { eNone, eBar, eClose, eSmaller, eBigger, eKbBtn, eTab, eRow, ePickOut, ePickCancel, eSet, eKey, eHere, eInfo, eLock };
     static constexpr int kFootArg = 400;          // eInfo arg of the bottom line (project, copyright, licence)
     static constexpr int kHelpArg = 401;          // eInfo arg of the hint line while it shows a pointed-at element's help
     static constexpr int kResetArg = 150;         // eSet arg of every tab's Reset button (tests)
     void Open(bool headOk, const Pose& head);     // as the combo does (tests)
-    static int KeyIndex(const char* name);        // tests: the eKey arg of a keyboard key ("f1", "shift"); -1 = none
+    static int KeyIndex(const char* name);        // tests: the eKey arg of a keyboard key ("f1", "j"); -1 = none
+    const std::string& KbCode() const { return kbCode_; }   // the keyboard layout in use ("de_de")
+    void SetLanguage(const std::string& lang, const std::string& kbLang);   // tests: as the Look tab's rows (then redrawn)
+    // tests: every text drawn since the last call that did not fit its box even at the smallest font ("..." shown)
+    static std::vector<std::string> TakeClipped();
+    // tests: text s fits a w x h box in the menu's font at px (shrinking as the menu does; wrap = the 2-line help)
+    static bool FitsForTest(const std::string& s, int w, int h, int px, bool wrap);
+    void SelectTab(int t) { tab_ = t; needRedraw_ = true; }   // tests (the pictures of every tab in every language)
     void Close();                                 // the menu (the keyboard stays as it is)
 
 private:
@@ -159,6 +170,8 @@ private:
     static constexpr double kMenuWidth = 0.6, kKbWidth = 0.8;   // default panel widths (metres; the full keyboard)
     void Save();
     void SavePlaces();
+    void RefreshLang();                           // the menu's language + the keyboard layout (and their fonts); redraws on a change
+    void CycleLang(bool kb, int step);            // the Look tab's language rows (< / >)
 
     VrPad::Config pad_;
     ComboGate     gate_;
@@ -197,6 +210,9 @@ private:
     std::vector<uint32_t> cursorPx_;
     bool          saveDue_ = false;
     std::string   status_;                // the bar's last message ("Saved", "Set: A = enter")
+    std::string   kbCode_ = "en_us";      // the keyboard layout in use (kb_layout.h)
+    std::wstring  kbFace_ = L"Segoe UI";  // ... and the GDI face that has its characters
+    uint32_t      langGen_ = 0;           // Lang::Gen() at the last layout
 };
 
 }  // namespace ck

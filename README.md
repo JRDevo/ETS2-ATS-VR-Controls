@@ -22,11 +22,13 @@ No steering wheel, no gamepad, no keyboard, no mouse, no extra hardware.
   both for more buttons). Pick the keys in a menu in the headset.
 - **A mouse in your hand:** a stick or the controller's aim moves the pointer, a button clicks. For the game's menus and the map.
 - **A full keyboard in the headset:** point and pull the trigger. For the few things that need typing.
+- **In your language:** the menu speaks **all 43 languages of ETS2 and ATS** (it follows the game's language), and the
+  keyboard has the keys of your country's keyboard (QWERTZ, AZERTY, Cyrillic, Japanese, Korean ...). [Languages](#languages)
 
 Start the game in VR, put the headset on, and play. You never need to reach for the desk.
 
 > [!NOTE]
-> **Status:** v0.2.0: controller buttons as keys and mouse in **four layers**, **a VR menu and a full keyboard in the
+> **Status:** v0.3.0: the menu and the keyboard in **all 43 game languages** (with your country's keyboard). Also: controller buttons as keys and mouse in **four layers**, **a VR menu and a full keyboard in the
 > headset**, and **driving with the controllers** -- steer with the **stick**, a **wheel held with one or both hands**, or
 > by **pointing**; gas and brake on the triggers. Planned: the keyboard pinned to the cab, and single buttons you place
 > anywhere (for example over a cab switch) that press a key.
@@ -56,7 +58,11 @@ Start the game in VR, put the headset on, and play. You never need to reach for 
 
 ![The white pointer dot on the G key of the keyboard](docs/images/keyboard-pointer.png)
 
-**Menu:** [Screenshots](#screenshots) · [Which VR mode?](#which-vr-mode) · [What it does](#what-it-does) · [Default buttons](#default-buttons) · [Driving](#driving-with-one-controller) · [VR menu](#the-vr-menu) · [Install](#install) · [Privacy](#what-runs-when--privacy) · [Settings](#settings) · [Problems](#problems) · [Report a problem](#reporting-a-problem-what-to-upload) · [Build](#build-from-source) · [License](#license)
+| In your language: the German keyboard (QWERTZ, the tall Enter) | The Japanese keyboard (JIS: kana, ¥, 変換) | The menu in Russian |
+|---|---|---|
+| ![The VR keyboard with German labels](docs/images/keyboard-de.png) | ![The VR keyboard with Japanese JIS labels](docs/images/keyboard-ja.png) | ![The Buttons tab in Russian](docs/images/menu-ru.png) |
+
+**Menu:** [Screenshots](#screenshots) · [Which VR mode?](#which-vr-mode) · [What it does](#what-it-does) · [Default buttons](#default-buttons) · [Driving](#driving-with-one-controller) · [VR menu](#the-vr-menu) · [Languages](#languages) · [Install](#install) · [Privacy](#what-runs-when--privacy) · [Settings](#settings) · [Problems](#problems) · [Report a problem](#reporting-a-problem-what-to-upload) · [Build](#build-from-source) · [License](#license)
 
 <a name="which-vr-mode"></a>
 <details>
@@ -290,8 +296,9 @@ a laser pointer. A **white dot** appears where you point, and the key under it l
   off, and which grips hold the wheel (Both / Left / Right / Either) or which hand points (Left / Right); for the stick
   the stick that steers, the dead zone, small turns, how far the wheel turns, how quickly it follows the stick and comes
   back, its top speed; and speed-sensitive steering. Gas and brake: any button, Buttons tab. See [Driving](#driving-with-one-controller).
-- **Look** tab: colours (Dark, Blue, Grey, Light, Black, Green), how see-through the menu and the keyboard are, and
-  **pointer smoothing** (Off / Low / Medium / High): calms a shaky hand, for the menu pointer and the air mouse.
+- **Look** tab: colours (Dark, Blue, Grey, Light, Black, Green), how see-through the menu and the keyboard are,
+  **pointer smoothing** (Off / Low / Medium / High): calms a shaky hand, for the menu pointer and the air mouse;
+  **Language** (Auto = the game's language) and **Keyboard letters** (Auto = as the menu). See [Languages](#languages).
 - **Reset tab** (bottom right of every tab): puts that tab's settings back to the defaults. Press it twice (the first
   press asks "Sure?"). Only that tab changes. On the Panels tab it also brings the menu (and the keyboard, if it is shown) in front of you.
 - **Keyboard** (button at the top of the menu): a full keyboard with F-keys, arrows and number pad. A key goes down when
@@ -302,6 +309,8 @@ a laser pointer. A **white dot** appears where you point, and the key under it l
   only an x (above Backspace) to hide it: about 30 % narrower. Its size: Panels tab > Keyboard size.
 - **Move** a panel: point at it, **hold the grip** and move the controller. While you hold it, push that controller's stick
   up / down to move it farther / closer. **Size**: the - and + at the top.
+- **Lock** the keyboard: the padlock next to its x. Locked (closed padlock), no grip moves it, so the
+  air mouse cannot grab it by mistake. Press it again to unlock. Saved as `keyboard_lock` in `config.ini`.
 
 Every change works at once and is saved in `config.ini`. The menu uses no keyboard key, so it never clashes with the
 ETS2 / ATS DLAA mod's menu (`Delete`). The menu and keyboard float in the room: after a recenter they move with it.
@@ -309,11 +318,39 @@ ETS2 / ATS DLAA mod's menu (`Delete`). The menu and keyboard float in the room: 
 
 </details>
 
+<a name="languages"></a>
+
+> [!NOTE]
+> **The menu speaks your language: all 43 languages of ETS2 and ATS, as a best effort.** The translations were
+> created by **Claude** (AI) and reviewed by other AI models. An AI can never be as accurate as a native speaker, so
+> some texts may still be wrong. If you have a change or a suggestion, please
+> [open a new translation issue](../../issues/new?template=translation.yml): it helps every player of your language.
+
+<details>
+<summary><h2>Languages — help wanted</h2></summary>
+
+- **The menu** uses **the game's language** by itself: set ETS2 / ATS to Polish and the menu is Polish. The **Look** tab's
+  **Language** row (or `language =` in `config.ini`) picks another one; `Auto` goes back to the game's.
+- **The keyboard** shows the keys of **your country's keyboard**: German QWERTZ with Ü Ö Ä, French AZERTY, Russian and the
+  other Cyrillic letters next to the Latin ones, Greek, Georgian, Japanese (kana and the JIS keys), Korean (Hangul),
+  Traditional Chinese (Zhuyin), and the right key shape (the tall Enter of European keyboards, the extra keys of Brazil and
+  Japan). Each key still presses the same key in the game, so your key bindings keep working. **Keyboard letters** row
+  (or `keyboard_language =`): `Auto` = as the menu, or any other language: an English menu with a German keyboard works.
+- **Fonts:** Windows has them for every language. A PC without the fonts of a language shows the menu in English (the
+  Language row says `(no font)`): see [`lang/README.md`](lang/README.md#fonts).
+- **Found a wrong text or key?** [Report a translation problem](../../issues/new?template=translation.yml): the language,
+  what is wrong and what it should say. Please write the explanation in English, so that everybody can follow it; only
+  the menu text itself is in your language.
+- **The translations area: [`lang/README.md`](lang/README.md).** The list of languages and keyboards, how a language is
+  chosen, what to change in a language file, and how to test your fix in the headset before you send it.
+
+</details>
+
 <a name="install"></a>
 <details>
 <summary><h2>Install</h2></summary>
 
-1. Download `ETS2-ATS-VR-Controls-v0.2.0.zip` from the [Releases](../../releases) page. Close the game.
+1. Download `ETS2-ATS-VR-Controls-v0.3.0.zip` from the [Releases](../../releases) page. Close the game.
 2. Unzip the folder to a place where it can stay (for example `C:\ETS2 ATS VR Controls`).
 3. Right-click `install.ps1` > **Run with PowerShell**. Click **Yes** in the Windows admin prompt.
    (Admin is needed: ETS2 / ATS only load VR add-ons that are registered for all users.)
@@ -396,7 +433,11 @@ in Notepad (the VR menu's changes work at once).
 
 Button names: `ltrigger rtrigger lgrip rgrip x y a b lstick rstick menu lup ldown lleft lright rup rdown rleft rright`.
 Values: a key (`h`, `f1`, `space`, `[`), up to 3 keys with `+` (`shift+f`), `mouse_left`, `mouse_right`, `mouse_middle`,
-`wheel_up`, `wheel_down`, `gas`, `brake` (driving), `keyboard` (shows / hides the VR keyboard) or `none`.
+`wheel_up`, `wheel_down`, `gas`, `brake` (driving), `keyboard` (shows / hides the VR keyboard) or `none`. Keys only
+some countries' keyboards have: `oem102` (the key next to the left Shift on European keyboards), `intl1` (next to the
+right Shift: Brazil, Japan), `intl3` (Japan's ¥), `kana`, `henkan`, `muhenkan`.
+
+`language` / `keyboard_language`: `auto` or a language code (`de_de`, `fr_fr`, `ja_jp` ...): [Languages](#languages).
 
 
 </details>

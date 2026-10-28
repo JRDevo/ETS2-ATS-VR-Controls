@@ -42,6 +42,12 @@ Read `README.md` and the header comments of `src/pad_input.h`, `src/layer.cpp`, 
   either: one hand moves round a rim) / point (steer_point_hand); steer_stick_too; a grip that holds the wheel is ONLY the
   wheel (Mapper::WheelHands). Four button layers: modifier (rgrip) + modifier2 (lgrip). README screenshots come from
   vr_menu_test (build\menu_test\shots\*.bmp -> docs\images\*.png; keyboard-pointer gets the dot from shot_pointer.txt).
+- v0.3.0 languages (2026-10-28; the DLAA mod's phase-74 system, E:\ETS2-DLAA-Injector\src\lang.*, here UTF-8): src/lang.h
+  (TR / TRF / N_, lang/*.po packed into the DLL by scripts/lang_tool.py; auto = the game's game.log.txt / config.cfg), and
+  src/kb_layout.h (the keyboard's labels + shape ANSI / ISO / ABNT2 / JIS per language from src/kb_layouts.inc, made by
+  tools/kbd_dump.cpp from Windows' own KBD*.DLL tables; never LoadKeyboardLayout). New menu text: TR("...") then
+  `lang_tool.py extract` + `update`, translate all 41 .po; vr_menu_test fails when any text does not fit its box.
+  Review files: `lang_tool.py review translation_review`.
 - User: Quest 3 via Virtual Desktop (VDXR). Also installed: the DLAA mod (dinput8.dll, hooks OpenXR at the runtime too),
   VR EyeCapture (implicit layer), VectorXR.
 

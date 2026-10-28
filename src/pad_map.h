@@ -83,6 +83,10 @@ inline uint16_t ScanOfName(const char* s) {
         { "numminus", 0x4A }, { "nummul", 0x37 }, { "numdiv", 0x35 | kExt }, { "numenter", 0x1C | kExt },
         { "scrolllock", 0x46 }, { "printscreen", 0x37 | kExt }, { "prtsc", 0x37 | kExt },
         { "pause", 0x13 | kVk },  // (VK_PAUSE: see kVk)
+        // keys only some countries' keyboards have (the VR keyboard shows them in those layouts; kb_layout.h): the extra key
+        // next to the left Shift (ISO: \ < >), next to the right Shift (Brazil ABNT2 / Japan: / ?, \ ろ), Japan's ¥ key and
+        // its input method keys
+        { "oem102", 0x56 }, { "intl1", 0x73 }, { "intl3", 0x7D }, { "kana", 0x70 }, { "henkan", 0x79 }, { "muhenkan", 0x7B },
     };
     for (const Named& k : kNamed) if (!_stricmp(s, k.name)) return k.code;
     return 0;
@@ -130,6 +134,7 @@ inline const char* NameOfScan(uint16_t code) {
         "f11", "f12", "space", "enter", "esc", "tab", "backspace", "up", "down", "left", "right", "insert", "delete", "home", "end",
         "pageup", "pagedown", "shift", "rshift", "ctrl", "rctrl", "alt", "ralt", "capslock", "num0", "num1", "num2", "num3", "num4",
         "num5", "num6", "num7", "num8", "num9", "numdot", "numplus", "numminus", "nummul", "numdiv", "numenter", "scrolllock", "printscreen", "pause",
+        "oem102", "intl1", "intl3", "kana", "henkan", "muhenkan",
         "-", "=", "[", "]", ";", "'", "`", "\\", ",", ".", "/" };
     for (const char* n : kAll) if (ScanOfName(n) == code) return n;
     return nullptr;

@@ -13,6 +13,8 @@
 #include <string>
 #include <vector>
 #include "config.h"
+#include "kb_layout.h"
+#include "lang.h"
 #include "vr_menu.h"
 
 static int g_checks = 0, g_fails = 0;
@@ -75,6 +77,7 @@ int main(int argc, char** argv) {
     const std::string dirA = argv[1];
     const std::wstring dir(dirA.begin(), dirA.end());
     CreateDirectoryW(dir.c_str(), nullptr);
+    Lang::UsePackForTest("en_us");                       // English, and never the real game's files (this PC's game language)
 
     printf("(1) combo gate\n");
     {
@@ -287,6 +290,41 @@ int main(int argc, char** argv) {
         f = Aim(1, turned, 0.0f);
         upd(f);
         CHECK(!m.HandOnPanel(1) || m.Pan(VrMenu::kPanKb).show, "let go");
+    }
+    // the keyboard's padlock: locked, the grip on it moves nothing (still no air mouse); saved; unlocked, the grip moves it again
+    {
+        CHECK(click(1, VrMenu::kPanKb, VrMenu::eLock, 0) && m.Look().kbLock, "padlock: the keyboard is locked");
+        V3 at;
+        m.ElemCentre(VrMenu::kPanKb, VrMenu::eKey, VrMenu::KeyIndex("j"), &at);
+        const V3 before = m.Pan(VrMenu::kPanKb).pose.p;
+        VrPad::Frame f = Aim(1, at, 0.0f);
+        upd(f);
+        f = Aim(1, at, 0.0f);
+        f.grip[1] = 1.0f;
+        upd(f);
+        CHECK(f.grip[1] == 0.0f, "locked: the grip on the keyboard is still the menu's (no air mouse)");
+        const V3 turned = QRot(QYawPitch(-15.0 * 3.14159265358979 / 180.0, 0), at);
+        for (int i = 0; i < 5; ++i) { f = Aim(1, turned, 0.0f); f.grip[1] = 1.0f; f.sy[1] = 1.0f; upd(f); }
+        const V3 after = m.Pan(VrMenu::kPanKb).pose.p;
+        CHECK(Len(after - before) < 1e-9, "locked: a grip + move + stick does not move the keyboard");
+        f = Aim(1, turned, 0.0f);
+        upd(f);
+        m.Flush();
+        CHECK(ParseConfig(ReadFile(cfgPath)).look.kbLock, "keyboard_lock = 1 saved");
+        WriteBmp(dir + L"\\keyboard_locked.bmp", m, VrMenu::kPanKb);
+        CHECK(click(1, VrMenu::kPanKb, VrMenu::eLock, 0) && !m.Look().kbLock, "padlock again: unlocked");
+        f = Aim(1, at, 0.0f);
+        upd(f);
+        f = Aim(1, at, 0.0f);
+        f.grip[1] = 1.0f;
+        upd(f);
+        for (int i = 0; i < 5; ++i) { f = Aim(1, turned, 0.0f); f.grip[1] = 1.0f; upd(f); }
+        CHECK(m.Pan(VrMenu::kPanKb).pose.p.x > before.x + 0.1, "unlocked: the grip moves it again");
+        for (int i = 0; i < 5; ++i) { f = Aim(1, at, 0.0f); f.grip[1] = 1.0f; upd(f); }   // (back where it was for the next test)
+        f = Aim(1, at, 0.0f);
+        upd(f);
+        m.Flush();
+        CHECK(!ParseConfig(ReadFile(cfgPath)).look.kbLock, "keyboard_lock = 0 saved");
     }
     // a twist of the wrist while holding = the held keyboard twists too (it used to stay level); the twist is saved
     {
@@ -719,6 +757,71 @@ int main(int argc, char** argv) {
         press(VrMenu::kPanMenu, VrMenu::eSet, VrMenu::kResetArg);
         CHECK(ms.Look().theme == 0 && ms.Look().kbOpacity == 0.95f && ms.Look().menuOpacity == 0.95f && ms.Look().smoothing == 2,
               "Look tab reset: dark, 95 %%, medium smoothing");
+    }
+    printf("(4) languages\n");
+    {
+        // every packed language: every tab and the keyboard drawn in it; no text may be cut off ("...") even at the smallest font,
+        // nor a help line (2 lines) or a pick button. Pictures: <work folder>\lang\<code>_*.bmp of a few (VRC_LANG_SHOTS=1: all)
+        const std::wstring ldir = dir + L"\\lang";
+        CreateDirectoryW(ldir.c_str(), nullptr);
+        char env[8] = "";
+        const bool allShots = GetEnvironmentVariableA("VRC_LANG_SHOTS", env, sizeof(env)) && env[0] == '1';
+        VrMenu ml(ParseConfig("pointer_smoothing = off\n"), std::wstring());
+        Rec sk;
+        double t = 100.0;
+        Pose hd;
+        auto frame = [&]() { VrPad::Frame f; f.hand[0] = f.hand[1] = true; ml.Update(f, true, true, hd, t, sk); t += 0.011; };
+        auto wide = [](const std::string& a) { return std::wstring(a.begin(), a.end()); };
+        ml.Open(true, hd);
+        ml.ToggleKeyboard();
+        frame();
+        ml.Flush();
+        VrMenu::TakeClipped();
+        int clipped = 0, langs = 0;
+        static const char* const kTabName[5] = { "buttons", "mouse", "panels", "look", "driving" };
+        for (int i = 1; i < Lang::Count(); ++i) {
+            const std::string code = Lang::CodeAt(i);
+            ml.SetLanguage(code, "auto");
+            CHECK(code == Lang::Active() && !Lang::FontMissing(), "%s: active, with its font (%s)", code.c_str(), Lang::Active());
+            CHECK(ml.KbCode() == KbLayout::For(code), "%s: its keyboard layout (%s)", code.c_str(), ml.KbCode().c_str());
+            const bool shots = allShots || code == "de_de" || code == "ja_jp" || code == "ru_ru" || code == "fr_fr" ||
+                               code == "pt_br" || code == "ko_kr";
+            for (int tb = 0; tb < 5; ++tb) {
+                ml.SelectTab(tb);
+                frame();
+                if (shots) WriteBmp(ldir + L"\\" + wide(code) + L"_" + wide(kTabName[tb]) + L".bmp", ml, VrMenu::kPanMenu);
+                ml.Flush();
+                for (const VrMenu::Elem& e : ml.Pan(VrMenu::kPanMenu).el)
+                    if (!e.help.empty() && !VrMenu::FitsForTest(e.help, 738, 54, 24, true)) {
+                        ++clipped;
+                        printf("   %s: help too long: %s\n", code.c_str(), e.help.c_str());
+                    }
+            }
+            if (shots) WriteBmp(ldir + L"\\" + wide(code) + L"_keyboard.bmp", ml, VrMenu::kPanKb);
+            static const char* const kPick[] = { "Mouse L", "Mouse R", "Mouse M", "Wheel up", "Wheel dn", "Gas", "Brake", "pick|Keyboard", "None" };
+            for (const char* p : kPick)
+                if (!VrMenu::FitsForTest(Lang::TrC(p), 86, 54, 22, true)) {
+                    ++clipped;
+                    printf("   %s: pick button too long: %s\n", code.c_str(), Lang::TrC(p));
+                }
+            if (!VrMenu::FitsForTest(Lang::Tr("Cancel"), 124, 54, 28, false)) { ++clipped; printf("   %s: Cancel too long\n", code.c_str()); }
+            ml.Flush();
+            for (const std::string& c : VrMenu::TakeClipped()) { ++clipped; printf("   %s: cut off: %s\n", code.c_str(), c.c_str()); }
+            ++langs;
+        }
+        printf("   %d languages drawn\n", langs);
+        CHECK(clipped == 0, "every text of every language fits (%d cut off)", clipped);
+        // a keyboard language of its own: German letters (QWERTZ, the ISO shape with the extra key) under an English menu
+        ml.SetLanguage("en_us", "de_de");
+        frame();
+        ml.Flush();
+        CHECK(ml.KbCode() == "de_de" && !strcmp(Lang::Active(), "en_us"), "keyboard_language de_de with an English menu");
+        CHECK(VrMenu::KeyIndex("oem102") >= 0, "the ISO key exists");
+        WriteBmp(ldir + L"\\en_us_menu_de_keyboard.bmp", ml, VrMenu::kPanKb);
+        ml.SelectTab(3);
+        frame();
+        WriteBmp(ldir + L"\\en_us_look.bmp", ml, VrMenu::kPanMenu);
+        Lang::UsePackForTest("en_us");
     }
     printf("%d checks, %d failed\n", g_checks, g_fails);
     return g_fails ? 1 : 0;

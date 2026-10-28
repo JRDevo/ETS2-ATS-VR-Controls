@@ -9,3 +9,4 @@ CMakeSettings.json
 /ets2_ats_vr_controls.dll
 /ets2_ats_vr_controls.pdb
 /XR_APILAYER_JRDEVO_ets2_ats_vr_controls.json
+__pycache__/

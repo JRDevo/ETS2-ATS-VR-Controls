@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(ets2_ats_vr_controls VERSION 0.2.0 LANGUAGES C CXX)
+project(ets2_ats_vr_controls VERSION 0.3.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -44,17 +44,39 @@ add_library(ets2_ats_vr_controls SHARED
     src/log.cpp
     src/vr_menu.cpp
     src/overlay.cpp
-    src/scs_input.cpp)
+    src/scs_input.cpp
+    src/lang.cpp
+    src/kb_layout.cpp)
 target_include_directories(ets2_ats_vr_controls PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_definitions(ets2_ats_vr_controls PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX
     VRC_VERSION="${PROJECT_VERSION}" VRC_LAYER_NAME="${VRC_LAYER_NAME}")
 target_compile_options(ets2_ats_vr_controls PRIVATE ${VRC_WARN_FLAGS})
-target_link_libraries(ets2_ats_vr_controls PRIVATE OpenXR::headers user32 gdi32)
+target_link_libraries(ets2_ats_vr_controls PRIVATE OpenXR::headers user32 gdi32 shell32 ole32)
 ck_add_version_info(ets2_ats_vr_controls "ETS2 ATS VR Controls (OpenXR API layer)" "ets2_ats_vr_controls.dll")
 set(VRC_LAYER_DLL "ets2_ats_vr_controls.dll")
 configure_file(${CMAKE_SOURCE_DIR}/src/${VRC_LAYER_NAME}.json.in ${CMAKE_BINARY_DIR}/${VRC_LAYER_NAME}.json @ONLY)
 add_custom_command(TARGET ets2_ats_vr_controls POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/${VRC_LAYER_NAME}.json $<TARGET_FILE_DIR:ets2_ats_vr_controls>/${VRC_LAYER_NAME}.json)
+
+# --- the menu's translations: lang/*.po -> one packed table (a hash of each English text + its translation) as RCDATA LANGPACK
+# in the DLL and in vr_menu_test (scripts/lang_tool.py pack; src/lang.h). Needs Python 3; without it the menu is English only.
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    file(GLOB _lang_po CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/lang/*.po")
+    set(_lang_bin "${CMAKE_CURRENT_BINARY_DIR}/lang/lang_pack.bin")
+    set(_lang_rc  "${CMAKE_CURRENT_BINARY_DIR}/lang/lang_pack.rc")
+    add_custom_command(
+        OUTPUT  "${_lang_bin}" "${_lang_rc}"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/lang_tool.py" pack "${_lang_bin}" "${_lang_rc}"
+        DEPENDS ${_lang_po} "${CMAKE_CURRENT_SOURCE_DIR}/lang/template.pot" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/lang_tool.py"
+        COMMENT "Packing the menu translations (lang/*.po)")
+    add_custom_target(lang_pack DEPENDS "${_lang_bin}" "${_lang_rc}")
+    target_sources(ets2_ats_vr_controls PRIVATE "${_lang_rc}")
+    set_source_files_properties("${_lang_rc}" PROPERTIES GENERATED TRUE OBJECT_DEPENDS "${_lang_bin}")
+    add_dependencies(ets2_ats_vr_controls lang_pack)
+else()
+    message(WARNING "No Python 3: the VR menu is built English only (no lang/*.po packed)")
+endif()
 
 # --- tests
 # unit test of the button mapping (no OpenXR)
@@ -75,11 +97,21 @@ target_compile_options(config_test PRIVATE ${VRC_WARN_FLAGS})
 target_compile_definitions(config_test PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
 # unit test of the VR menu + keyboard (made-up frames, no OpenXR; writes a config.ini and the panel pictures into a folder)
-add_executable(vr_menu_test tests/vr_menu_test.cpp src/vr_menu.cpp src/config.cpp src/log.cpp)
+add_executable(vr_menu_test tests/vr_menu_test.cpp src/vr_menu.cpp src/config.cpp src/log.cpp src/lang.cpp src/kb_layout.cpp)
 target_include_directories(vr_menu_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_options(vr_menu_test PRIVATE ${VRC_WARN_FLAGS})
 target_compile_definitions(vr_menu_test PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(vr_menu_test PRIVATE user32 gdi32)
+target_link_libraries(vr_menu_test PRIVATE user32 gdi32 shell32 ole32)
+if(Python3_Interpreter_FOUND)                     # (the packed translations: every language's pictures and fit check)
+    target_sources(vr_menu_test PRIVATE "${_lang_rc}")
+    add_dependencies(vr_menu_test lang_pack)
+endif()
+
+# the VR keyboard's key labels per language from the Windows layouts: run by hand (kbd_dump.exe src\kb_layouts.inc)
+add_executable(kbd_dump tools/kbd_dump.cpp)
+target_compile_options(kbd_dump PRIVATE ${VRC_WARN_FLAGS})
+target_compile_definitions(kbd_dump PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(kbd_dump PRIVATE advapi32)
 
 # end to end: a fake game (the real OpenXR loader) -> the layer -> a mock runtime with scripted controller input
 add_library(mock_runtime SHARED tests/mock_runtime.cpp)

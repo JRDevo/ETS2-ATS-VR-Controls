@@ -1,0 +1,103 @@
+name: Translation problem
+description: A wrong, clumsy, cut-off or missing text in the VR menu or a wrong key on the VR keyboard in your language
+title: "[Translation] "
+labels: ["translation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping! The menu translations were created by Claude (AI) and reviewed by other AI models. An AI can
+        never be as accurate as a native speaker, so this is a best effort: your change or suggestion makes the menu better
+        for everyone who speaks your language.
+        **Please write your explanation in English**, so that everybody can read it and help (a translation tool is fine).
+        The menu text itself (what it says now, what it should say) is of course in your language.
+        How the translations work and how to test a fix in the headset: [lang/README.md](https://github.com/JRDevo/ETS2-ATS-VR-Controls/blob/master/lang/README.md).
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      description: The language the menu (or the keyboard) shows.
+      options:
+        - bg_bg – Български
+        - ca_es – Català
+        - cs_cz – Česky
+        - da_dk – Dansk
+        - de_de – Deutsch
+        - el_gr – Ελληνικά
+        - es_es – Español
+        - es_la – Español (Am. Latina)
+        - et_ee – Eesti
+        - eu_es – Euskara
+        - fi_fi – Suomi
+        - fr_ca – Français (Québec)
+        - fr_fr – Français (France)
+        - gl_es – Galego
+        - hr_hr – Hrvatski
+        - hu_hu – Magyar
+        - it_it – Italiano
+        - ja_jp – 日本語
+        - ka_ge – ქართული
+        - ko_kr – 한국어
+        - lt_lt – Lietuviškai
+        - lv_lv – Latviešu
+        - mk_mk – Македонски
+        - nl_nl – Nederlands
+        - no_no – Norsk (bokmål)
+        - pl_pl – Polski
+        - pl_si – Ślōnskŏ gŏdka
+        - pt_br – Português (Brasil)
+        - pt_pt – Português (Portugal)
+        - ro_ro – Română
+        - ru_ru – Русский
+        - sk_sk – Slovenčina
+        - sl_sl – Slovenščina
+        - sr_sp – Srpski (latinica)
+        - sr_sr – Српски (ћирилица)
+        - sv_se – Svenska
+        - tr_tr – Türkçe
+        - uk_uk – Українська
+        - vi_vn – Tiếng Việt
+        - zh_cn – 简体中文
+        - zh_tw – 繁體中文
+        - English
+    validations:
+      required: true
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What is wrong?
+      description: |
+        Where (the tab and the row, the help line at the bottom, or the key on the VR keyboard), the text it shows now,
+        and why it is wrong (wrong meaning, sounds unnatural, cut off with "...", still in English, a key that is not on
+        keyboards in your country).
+      placeholder: |
+        Mouse tab, row "Air mouse button": it says "...". In Polish a player would say "..." because ...
+    validations:
+      required: true
+  - type: textarea
+    id: better
+    attributes:
+      label: What should it say?
+      description: Your text. Keep it short (the menu boxes are small) and keep %s, %d, %.2f ... as they are.
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Picture (optional)
+      description: |
+        A picture of the spot helps. In the headset: your headset's own screenshot or a photo through the lens, or the
+        game window on the desktop. Drag the picture into this box.
+      placeholder: Drop the picture here.
+  - type: textarea
+    id: file
+    attributes:
+      label: Your edited file (optional)
+      description: If you fixed many lines, attach your edited <code>.po file here (rename it to .txt if GitHub refuses .po).
+  - type: checkboxes
+    id: tested
+    attributes:
+      label: Tested in the headset? (optional)
+      description: Your file at lang\<code>.po next to ets2_ats_vr_controls.dll is used at the next menu open.
+      options:
+        - label: I tested my text in the headset and it fits
