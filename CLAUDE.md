@@ -48,6 +48,9 @@ Read `README.md` and the header comments of `src/pad_input.h`, `src/layer.cpp`, 
   tools/kbd_dump.cpp from Windows' own KBD*.DLL tables; never LoadKeyboardLayout). New menu text: TR("...") then
   `lang_tool.py extract` + `update`, translate all 41 .po; vr_menu_test fails when any text does not fit its box.
   Review files: `lang_tool.py review translation_review`.
+- Short README per language (2026-10-29, for searches in each language): docs/readme/README.<code>.md = translations of
+  docs/readme/TEMPLATE.md (no versions in it; a template change = the same change in all 41), linked from the line under
+  README.md's banner. The full guide stays English.
 - User: Quest 3 via Virtual Desktop (VDXR). Also installed: the DLAA mod (dinput8.dll, hooks OpenXR at the runtime too),
   VR EyeCapture (implicit layer), VectorXR.
 
