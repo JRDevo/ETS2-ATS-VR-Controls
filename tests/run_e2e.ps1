@@ -344,13 +344,26 @@ if (-not $Only -or $Only -eq 'driveglide') {
         if ($i -gt $pi -and $st[$i] -gt $st[$i - 1]) { $down = $false }
         $d = [math]::Abs($st[$i] - $st[$i - 1]); if ($d -gt $jump) { $jump = $d }
     }
-    Write-Host ("  {0} steering values, first {1}, peak {2}, last {3}, biggest step {4:0.000}" -f $st.Count, $st[0], $peak, $st[-1], $jump)
+    # the speed the game saw: its steering values with their times (fake_game: "scs steering <v> at <t>"), over spans of at
+    # least 0.1 s -- a step's size depends on the frame time (a slow CI frame = a bigger step at the same speed), the speed not
+    $gs = @($r.game -split "`r?`n" | Where-Object { $_ -match '^scs steering (\S+) at (\S+)$' } | ForEach-Object {
+        [pscustomobject]@{ v = [double]::Parse($Matches[1], [Globalization.CultureInfo]::InvariantCulture)
+                           t = [double]::Parse($Matches[2], [Globalization.CultureInfo]::InvariantCulture) } })
+    $speed = 0
+    for ($i = 0; $i -lt $gs.Count; $i++) {
+        for ($j = $i + 1; $j -lt $gs.Count; $j++) {
+            $dt = $gs[$j].t - $gs[$i].t
+            if ($dt -ge 0.1) { $sp = [math]::Abs($gs[$j].v - $gs[$i].v) / $dt; if ($sp -gt $speed) { $speed = $sp }; break }
+        }
+    }
+    Write-Host ("  {0} steering values, first {1}, peak {2}, last {3}, biggest step {4:0.000}, fastest {5:0.00} turns / s" -f $st.Count, $st[0], $peak, $st[-1], $jump, $speed)
     Check 'driveglide' ($r.exit -eq 0) "game exit 0 -- $($r.exit)"
     Check 'driveglide' ($st.Count -gt 50 -and $st[0] -gt 0 -and $st[0] -lt 0.07) 'starts small (no jump to full)'
     Check 'driveglide' ($up -and $down -and $peak -gt 0.5 -and $peak -le 0.95) "rises to the peak, then only comes back (peak $peak)"
-    Check 'driveglide' ($jump -le 0.061) "no jumps: at most 0.6 turns / s * 0.1 s per frame (biggest $jump)"
-    # (let go: straight at the limit, 0.5 turns / s -- even steps, the last one up to 0.05 at the fake game's frame times)
-    Check 'driveglide' ($st[-2] -le 0.061 -and $st[-1] -eq 0) "back to exactly straight by itself (the last step from $($st[-2]))"
+    # (turning in: steerRate 0.5 turns / s; let go: steerBackRate 2; + 25 % for the game's and the layer's frames not being
+    # the same moments. One step: at most 2 turns / s * the 0.1 s a step is bounded to)
+    Check 'driveglide' ($gs.Count -gt 50 -and $speed -gt 0 -and $speed -le 2.5 -and $jump -le 0.2) "no jumps: at most 2.5 turns / s over 0.1 s (fastest $speed), one step at most 0.2 (biggest $jump)"
+    Check 'driveglide' ($st[-1] -eq 0) "back to exactly straight by itself (last $($st[-1]))"
 }
 
 # ---- drive

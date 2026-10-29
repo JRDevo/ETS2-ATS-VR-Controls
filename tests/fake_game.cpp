@@ -270,7 +270,7 @@ int main(int argc, char** argv) {
                 flags = 0;
                 if (e.input_index < 8 && e.value_float != scsLast[e.input_index]) {   // (printed only when it changed)
                     scsLast[e.input_index] = e.value_float;
-                    printf("scs %s %.3f at %.2f\n", g_scsNames[e.input_index] ? g_scsNames[e.input_index] : "?",
+                    printf("scs %s %.3f at %.3f\n", g_scsNames[e.input_index] ? g_scsNames[e.input_index] : "?",
                            (double)e.value_float, Now() - t0);
                 }
             }
