@@ -3,7 +3,7 @@
 
 > [!CAUTION]
 > **Овај мод преузимајте само са https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases.** Не постоје сајт, Discord,
-> Nexus ни Steam Workshop. Сваки други сајт, mirror или „инсталер“ који га нуди није мој: немојте га покретати.
+> Nexus ни Steam Workshop. Сваки други сајт, огледало или „инсталер“ који га нуди није мој: немојте га покретати.
 
 ![ETS2 / ATS VR Controls](../images/banner.png)
 

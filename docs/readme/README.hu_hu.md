@@ -32,7 +32,7 @@ kormány, nincs gamepad, nincs billentyűzet, nincs egér.
 4. Indítsd el a játékot VR-ban.
 
 A játék minden indításkor megjeleníti: „Request to use advanced SDK features detected” (kérés speciális SDK-funkciók
-használatára). Ez ez a mod (a vezetéshez): mutass az OK-ra, és kattints.
+használatára). Ezt ez a mod okozza (a vezetéshez): mutass az OK-ra, és kattints.
 
 **A VR-menü:** tartsd nyomva **mindkét gripet + a bal stick lenyomását** 1 másodpercig. Itt állítod be az összes gombot, az egeret, a
 kormányzást, a színeket és a nyelvet.

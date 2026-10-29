@@ -12,7 +12,7 @@ gamepad-ik, teklaturik eta saguik gabe.
 
 - **Gidatu kontroladoreekin:** biratu stick-arekin, esku batez edo bietaz heltzen duzun bolantearekin, edo seinalatuz. Gatiluak
   gasa eta balazta dira.
-- **Edozein tekla botoi batean:** keinuak, tuta, argiak ... lau geruzatan (eduki sakatuta grip bat botoi gehiago izateko).
+- **Edozein tekla botoi batean:** keinukariak, tuta, argiak ... lau geruzatan (eduki sakatuta grip bat botoi gehiago izateko).
 - **Sagu bat eskuan:** jokoaren menuetarako eta maparako.
 - **Teklatu oso bat betaurrekoetan**, zure herriko teklatuaren teklekin.
 - **VR menua zure hizkuntzan:** jokoaren hizkuntza berez jarraitzen du.
@@ -27,7 +27,7 @@ gamepad-ik, teklaturik eta saguik gabe.
 
 1. Deskargatu azken `ETS2-ATS-VR-Controls-....zip` fitxategia
    [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases) orritik. Itxi jokoa.
-2. Deskonprimatu ahal den lekuan gera dadin karpeta batean (adibidez `C:\ETS2 ATS VR Controls`).
+2. Deskonprimatu betiko geratuko den karpeta batean (adibidez `C:\ETS2 ATS VR Controls`).
 3. Egin klik eskuineko botoiarekin `install.ps1` fitxategian > **Exekutatu PowerShell-ekin**. Sakatu **Bai** Windows-eko administratzaile-mezuan.
 4. Hasi jokoa VR-n.
 

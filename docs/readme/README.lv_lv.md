@@ -12,7 +12,7 @@ stūres, nekāda spēļu kontrollera, nekādas tastatūras, nekādas peles.
 
 - **Braukšana ar kontrolieriem:** stūrējiet ar stiku, ar stūri, ko turat vienā vai abās rokās, vai vienkārši norādot. Mēlītes
   ir gāze un bremze.
-- **Jebkurš taustiņš uz pogas:** pagriezieni, signāls, gaismas ... četros slāņos (turiet gripu, lai iegūtu vairāk pogu).
+- **Jebkurš taustiņš uz pogas:** pagriezienu rādītāji, signāls, gaismas ... četros slāņos (turiet gripu, lai iegūtu vairāk pogu).
 - **Pele jūsu rokā:** spēles izvēlnēm un kartei.
 - **Pilna tastatūra austiņās** ar jūsu valsts tastatūras taustiņiem.
 - **VR izvēlne jūsu valodā:** tā pati seko spēles valodai.

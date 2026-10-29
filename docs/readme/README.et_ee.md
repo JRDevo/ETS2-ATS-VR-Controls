@@ -12,7 +12,7 @@ rooli, mängupulti, klaviatuuri ega hiirt.
 
 - **Sõida kontrolleritega:** roolid kangiga, rooliga, mida hoiad ühe või kahe käega, või osutades. Päästikud
   on gaas ja pidur.
-- **Iga klahv nupul:** suunatuled, signaal, tuled ... neljas kihis (hoia gripi all, et saada rohkem nuppe).
+- **Iga klahv nupul:** suunatuled, signaal, tuled ... neljas kihis (hoia grip-nuppu all, et saada rohkem nuppe).
 - **Hiir käes:** mängu menüüde ja kaardi jaoks.
 - **Täisklaviatuur peakomplektis** sinu riigi klaviatuuri klahvidega.
 - **VR-menüü sinu keeles:** see järgib mängu keelt ise.
@@ -34,7 +34,7 @@ rooli, mängupulti, klaviatuuri ega hiirt.
 Igal käivitusel näitab mäng teadet „Request to use advanced SDK features detected“ (tuvastati taotlus kasutada SDK täiustatud funktsioone). See on see mod (sõitmiseks): osuta
 nupule OK ja klõpsa.
 
-**VR-menüü:** hoia **mõlemat gripi** + **vasaku kangi klõpsu** 1 sekundi vältel all. Seal seadistad iga nupu, hiire,
+**VR-menüü:** hoia **mõlemat grip-nuppu** + **vasaku kangi klõpsu** 1 sekundi vältel all. Seal seadistad iga nupu, hiire,
 roolimise, värvid ja keele.
 
 Eemaldamine: käivita `uninstall.ps1` samamoodi, siis kustuta kaust.

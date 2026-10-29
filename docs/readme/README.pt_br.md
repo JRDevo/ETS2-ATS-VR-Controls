@@ -11,7 +11,7 @@ Jogue **Euro Truck Simulator 2** e **American Truck Simulator** em VR com **apen
 volante, sem gamepad, sem teclado, sem mouse.
 
 - **Dirija com os controles:** esterce com o stick, com um volante que você segura com uma ou as duas mãos, ou apontando. Os
-  gatilhos são acelerar e freio.
+  gatilhos são o acelerador e o freio.
 - **Qualquer tecla em um botão:** setas, buzina, luzes ... em quatro camadas (segure um grip para ter mais botões).
 - **Um mouse na sua mão:** para os menus do jogo e o mapa.
 - **Um teclado completo no headset**, com as teclas do teclado do seu país.
