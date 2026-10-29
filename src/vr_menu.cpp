@@ -166,6 +166,7 @@ public:
         if (dc_) SetBkMode(dc_, TRANSPARENT);
     }
     ~MenuCanvas() {
+        if (dc_) SelectObject(dc_, GetStockObject(SYSTEM_FONT));   // (a font still selected would not be deleted)
         if (dc_ && old_) SelectObject(dc_, old_);
         for (int i = 0; i < 2; ++i) for (auto& f : fonts_[i]) if (f.second) DeleteObject(f.second);
         if (bmp_) DeleteObject(bmp_);
@@ -187,7 +188,8 @@ public:
     void SetFace(const std::wstring& face) {
         if (face.empty() || face == face_) return;
         face_ = face;
-        if (old_) SelectObject(dc_, old_);              // (a font still selected would not be deleted)
+        // (a font still selected would not be deleted; a stock font, never old_: that is the bitmap, and the picture would freeze)
+        SelectObject(dc_, GetStockObject(SYSTEM_FONT));
         for (int i = 0; i < 2; ++i) { for (auto& f : fonts_[i]) if (f.second) DeleteObject(f.second); fonts_[i].clear(); }
     }
     // a smaller font (down to 60 %) when the text is wider than the box minus 12 px, before "..." is used (a translation may be
@@ -880,6 +882,15 @@ void VrMenu::LayoutMenu() {
         add(eTab, t, 24 + t * 193, 84, 181, 56, Lang::Tr(kTabs[t]), tab_ == t);
         tip(m0, Lang::Tr(kTabHelp[t]));
     }
+    // the language's code (EN, DE, KO ...) in the top bar = the Look tab: a way back to the Language row from a menu in a
+    // language one cannot read (after the real tabs: a search for the Look tab finds that one first)
+    const bool english = !strncmp(Lang::Active(), "en", 2);
+    if (!picking) {
+        std::string code(Lang::Active(), 2);
+        for (char& ch : code) ch = (char)toupper((unsigned char)ch);
+        m0 = el.size(); add(eTab, 3, 516, 11, 74, 50, code, false);
+        tip(m0, english ? std::string(TR("Language")) : std::string(TR("Language")) + " (Language)");
+    }
     if (tab_ == 0) {
         static const int kLeft[10] = { VrPad::kLTrig, VrPad::kLGrip, VrPad::kX, VrPad::kY, VrPad::kLStick, VrPad::kMenu,
                                        VrPad::kLUp, VrPad::kLDown, VrPad::kLLeft, VrPad::kLRight };
@@ -1059,7 +1070,9 @@ void VrMenu::LayoutMenu() {
         tip(m0, TR("Calms a shaky hand: the menu pointer and the air mouse. Higher = steadier, but it follows a bit later."));
         // the language: auto (the game's) or one of them; the keyboard's letters: auto (as the menu) or one of them
         std::string name = Lang::FontMissing() ? fmt(TRF("%s (no font)"), Lang::Wanted()) : Lang::NativeName(Lang::Wanted());
-        m0 = el.size(); row(530, 105, TR("Language"));
+        // (+ the English word in another language: findable by anyone who cannot read the menu's language)
+        const std::string langLabel = english ? std::string(TR("Language")) : std::string(TR("Language")) + " (Language)";
+        m0 = el.size(); row(530, 105, langLabel.c_str());
         arrows(530, 205, 170, look_.lang == "auto" ? fmt(TRF("Auto: %s"), name.c_str()) : name);
         tip(m0, TR("The menu's language. Auto = the language the game is set to."));
         name = Lang::NativeName(kbCode_);

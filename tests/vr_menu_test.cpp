@@ -778,6 +778,7 @@ int main(int argc, char** argv) {
         ml.Flush();
         VrMenu::TakeClipped();
         int clipped = 0, langs = 0;
+        std::vector<uint32_t> lastPic;
         static const char* const kTabName[5] = { "buttons", "mouse", "panels", "look", "driving" };
         for (int i = 1; i < Lang::Count(); ++i) {
             const std::string code = Lang::CodeAt(i);
@@ -789,6 +790,12 @@ int main(int argc, char** argv) {
             for (int tb = 0; tb < 5; ++tb) {
                 ml.SelectTab(tb);
                 frame();
+                ml.Flush();
+                // a new tab (or language) is a new picture: the canvas still draws after a font face change (Italian -> Japanese
+                // once froze the panel on the last picture)
+                const std::vector<uint32_t>& px = ml.FullPicture(VrMenu::kPanMenu);
+                CHECK(px != lastPic, "%s %s: the panel picture changed", code.c_str(), kTabName[tb]);
+                lastPic = px;
                 if (shots) WriteBmp(ldir + L"\\" + wide(code) + L"_" + wide(kTabName[tb]) + L".bmp", ml, VrMenu::kPanMenu);
                 ml.Flush();
                 for (const VrMenu::Elem& e : ml.Pan(VrMenu::kPanMenu).el)
@@ -807,6 +814,25 @@ int main(int argc, char** argv) {
             if (!VrMenu::FitsForTest(Lang::Tr("Cancel"), 124, 54, 28, false)) { ++clipped; printf("   %s: Cancel too long\n", code.c_str()); }
             ml.Flush();
             for (const std::string& c : VrMenu::TakeClipped()) { ++clipped; printf("   %s: cut off: %s\n", code.c_str(), c.c_str()); }
+            // a way back from a language one cannot read: the top bar's language code = the Look tab, and the Language row
+            // also says "Language" in English
+            {
+                std::string up = code.substr(0, 2);
+                for (char& ch : up) ch = (char)toupper((unsigned char)ch);
+                int bar = 0;
+                for (const VrMenu::Elem& e : ml.Pan(VrMenu::kPanMenu).el)
+                    if (e.kind == VrMenu::eTab && e.arg == 3 && e.y < 72 && e.text == up) ++bar;
+                CHECK(bar == 1, "%s: the top bar's language button %s", code.c_str(), up.c_str());
+                ml.SelectTab(3);
+                frame();
+                bool row = false;
+                for (const VrMenu::Elem& e : ml.Pan(VrMenu::kPanMenu).el)
+                    if (e.kind == VrMenu::eInfo && e.arg == 105) row = e.text.find("(Language)") != std::string::npos;
+                CHECK(row == (code.compare(0, 2, "en") != 0), "%s: the Language row in English too (not for English)", code.c_str());
+                ml.Flush();
+                VrMenu::TakeClipped();                  // (the Look tab was checked for cut-off texts above)
+                lastPic = ml.FullPicture(VrMenu::kPanMenu);
+            }
             ++langs;
         }
         printf("   %d languages drawn\n", langs);

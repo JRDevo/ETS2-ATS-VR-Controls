@@ -1,0 +1,66 @@
+name: Feature request
+description: An idea for the mod (a button mapping, a menu setting, a keyboard key, steering, a VR panel idea)
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! Ideas are welcome. Say what it would do for **you** in the game, not only how to build it.
+
+        **Please write in English**, so that everybody can read your idea and join in. A translation tool
+        (DeepL, Google Translate) is fine.
+
+        If a feature does not seem to work, that is a **Bug report** (with a log), not a feature request.
+  - type: textarea
+    id: what
+    attributes:
+      label: What should the mod do?
+      description: A short description of the feature. One or two sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why? What would it do for you in the game?
+      description: The problem it solves or the thing it improves (comfort, fewer trips to the keyboard, your controllers, steering).
+    validations:
+      required: true
+  - type: dropdown
+    id: often
+    attributes:
+      label: How often would you use it?
+      options:
+        - Every drive
+        - Now and then
+        - Once, to set up
+  - type: checkboxes
+    id: where
+    attributes:
+      label: Where would it live?
+      description: Tick all that fit.
+      options:
+        - label: The VR menu (a tab, or a new row on one)
+        - label: The on-screen keyboard
+        - label: A controller button / combo
+        - label: A `config.ini` key only
+        - label: Don't know
+  - type: dropdown
+    id: game
+    attributes:
+      label: Game
+      options:
+        - Euro Truck Simulator 2
+        - American Truck Simulator
+        - Both
+  - type: input
+    id: setup
+    attributes:
+      label: Your setup
+      description: VR headset, how it connects, controllers, mod version.
+      placeholder: "Example: Quest 3 via Virtual Desktop, Touch controllers, v0.2.0"
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Links, screenshots, or a log (`log = 1`) if it shows the thing you want changed.

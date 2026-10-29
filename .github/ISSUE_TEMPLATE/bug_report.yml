@@ -1,0 +1,96 @@
+name: Bug report
+description: Something doesn't work (a button sends nothing, the VR menu does not open, the pointer / keyboard misbehaves, steering, a crash)
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! The mod is a free community project, and reports like yours make it better for everyone.
+
+        **Please write in English**, so that everybody can read your issue and help. Not everyone understands your
+        language, but most people read English. A translation tool (DeepL, Google Translate) is fine.
+
+        **Before you write, make the log (it takes a minute):**
+        1. In `config.ini` (next to `ets2_ats_vr_controls.dll`, where you ran `install.ps1`), change `log = 0` to `log = 1`
+           and `log_inputs = 0` to `log_inputs = 1`.
+        2. Start the game in VR and do what goes wrong (1 to 2 minutes).
+        3. **Quit the game.** Then attach the files below.
+
+        More help: [Reporting a problem (what to upload)](https://github.com/JRDevo/ETS2-ATS-VR-Controls#reporting-a-problem-what-to-upload).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens?
+      description: What you did (which button, which menu tab), what you expected, and what happened instead.
+      placeholder: "Example: I press B on the right controller. It should send Space, but nothing happens in the game."
+    validations:
+      required: true
+  - type: dropdown
+    id: game
+    attributes:
+      label: Game
+      options:
+        - Euro Truck Simulator 2
+        - American Truck Simulator
+        - Both
+    validations:
+      required: true
+  - type: input
+    id: game_version
+    attributes:
+      label: Game version
+      placeholder: "Example: 1.56"
+  - type: input
+    id: headset
+    attributes:
+      label: VR headset and how it connects
+      placeholder: "Example: Quest 3 via Virtual Desktop (VDXR)"
+    validations:
+      required: true
+  - type: dropdown
+    id: controllers
+    attributes:
+      label: Controllers
+      options:
+        - Oculus / Meta Touch
+        - Valve Index
+        - HTC Vive wands
+        - Windows Mixed Reality
+        - HP Reverb G2
+        - Other (write it under "What happens?")
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Mod version
+      description: The top line of the log says it.
+      placeholder: "Example: v0.2.0"
+    validations:
+      required: true
+  - type: input
+    id: addons
+    attributes:
+      label: Other VR add-ons
+      description: OpenXR Toolkit, VR EyeCapture, the DLAA mod, OpenKneeboard, VectorXR, ... Write "none" if there are none.
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Files (drag them into this box)
+      description: |
+        **Required:** `logs\ets2_ats_vr_controls.log` (made with `log = 1`) and `config.ini`, both in the mod's folder.
+        Attach them as files; please do not paste the text. A screenshot or short video helps too.
+        No `ets2_ats_vr_controls.log` at all, although `log = 1`? Write that here: then the mod did not load, and that is useful to know.
+      placeholder: Drop ets2_ats_vr_controls.log and config.ini here.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you send
+      options:
+        - label: I set `log = 1` (and `log_inputs = 1`) and quit the game before I took the log.
+          required: true
