@@ -206,6 +206,9 @@ private:
     double        scale_[kPanCount] = {};           // Output: the shrink step in use (0 = none yet)
     int           scaleOf_[kPanCount] = {};         // ... for this picture width
     std::string   content_[kPanCount];              // ContentKey at the last full draw
+    mutable VrPad::Config descOf_{};              // ContentKey: DescribePad(pad_) only when pad_ changed (not every frame)
+    mutable std::string desc_;
+    mutable bool  descSet_ = false;
     std::vector<uint8_t> elState_[kPanCount];       // ElemState of each element as drawn
     std::vector<uint32_t> cursorPx_;
     bool          saveDue_ = false;

@@ -254,7 +254,7 @@ XrResult XRAPI_CALL Hook_EndFrame(XrSession session, const XrFrameEndInfo* fe) {
     InstanceData* id = FindSession(session);
     if (!id || !id->EndFrame) return XR_ERROR_HANDLE_INVALID;
     if (id->pad && fe) {
-        std::vector<const XrCompositionLayerBaseHeader*> layers;
+        thread_local std::vector<const XrCompositionLayerBaseHeader*> layers;   // (kept: no heap allocation per frame)
         XrFrameEndInfo mine{};
         bool ours = false;
         const double t = g_measure ? NowS() : 0.0;

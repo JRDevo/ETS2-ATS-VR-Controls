@@ -10,6 +10,7 @@
 #include <initializer_list>
 #include <atomic>
 #include <thread>
+#include <type_traits>
 #include <utility>
 #include "kb_layout.h"
 #include "lang.h"
@@ -1882,7 +1883,13 @@ std::string VrMenu::ContentKey(int p) const {
     snprintf(dr, sizeof(dr), "|%d%d|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|", pad_.drive ? 1 : 0, pad_.steerStick,
              pad_.steerDeadzone, pad_.steerFine + 10.0f * pad_.steerFineZone, pad_.steerMax, pad_.steerFollowTime, pad_.steerCenterTime, pad_.steerRate,
              pad_.steerSpeedSens ? pad_.steerAtSpeed : -pad_.steerAtSpeed);
-    return std::string(b) + std::to_string(resetArm_) + "|" + status_ + dr + DescribePad(pad_) + "|" + HoverHelp() + "|" +
+    static_assert(std::is_trivially_copyable<VrPad::Config>::value, "pad_ is compared byte by byte");
+    if (!descSet_ || memcmp(&descOf_, &pad_, sizeof(pad_))) {   // (it runs every frame of an open menu; the text only on a change)
+        memcpy(&descOf_, &pad_, sizeof(pad_));
+        desc_ = DescribePad(pad_);
+        descSet_ = true;
+    }
+    return std::string(b) + std::to_string(resetArm_) + "|" + status_ + dr + desc_ + "|" + HoverHelp() + "|" +
            std::to_string(Lang::Gen()) + kbCode_ + look_.lang + look_.kbLang;
 }
 

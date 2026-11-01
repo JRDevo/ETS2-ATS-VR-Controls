@@ -384,7 +384,8 @@ XrResult PadInput::Sync(XrSession s, const XrActionsSyncInfo* si) {
         lk.unlock();
         return d_.SyncActions(s, si);
     }
-    std::vector<XrActiveActionSet> act(si->activeActionSets, si->activeActionSets + (si->activeActionSets ? si->countActiveActionSets : 0));
+    thread_local std::vector<XrActiveActionSet> act;   // (every game sync: kept, so no heap allocation per frame)
+    act.assign(si->activeActionSets, si->activeActionSets + (si->activeActionSets ? si->countActiveActionSets : 0));
     act.push_back({set_, XR_NULL_PATH});
     lk.unlock();
     XrActionsSyncInfo s2 = *si;
@@ -573,7 +574,8 @@ void PadInput::BeginFrame(XrSession s) {
         bool synced = fresh;
         Part px(meas, &split_[0]);
         if (!fresh) {
-            std::vector<XrActiveActionSet> act;
+            thread_local std::vector<XrActiveActionSet> act;
+            act.clear();
             if (!sd.self) act = sd.gameActive;
             act.push_back({set_, XR_NULL_PATH});
             XrActionsSyncInfo si{XR_TYPE_ACTIONS_SYNC_INFO};
@@ -636,7 +638,9 @@ bool PadInput::EndFrame(XrSession s, const XrFrameEndInfo* in, XrFrameEndInfo* o
     XrSpace space = XR_NULL_HANDLE;
     QuadIn panel[VrMenu::kPanCount];
     bool want[VrMenu::kPanCount] = {}, show[VrMenu::kPanCount] = {}, ready[VrMenu::kPanCount] = {};
-    std::vector<QuadIn> quads, warmQ;
+    thread_local std::vector<QuadIn> quads, warmQ;     // (kept from frame to frame: no heap allocation per frame)
+    quads.clear();
+    warmQ.clear();
     int warmSlot = -1;
     {
         std::lock_guard<std::mutex> lk(m_);
@@ -687,7 +691,7 @@ bool PadInput::EndFrame(XrSession s, const XrFrameEndInfo* in, XrFrameEndInfo* o
         auto it = sessions_.find(s);
         if (it == sessions_.end() || it->second.ov.get() != ov) return false;
     }
-    std::vector<const XrCompositionLayerBaseHeader*> ours;
+    thread_local std::vector<const XrCompositionLayerBaseHeader*> ours;   // (Overlay::Frame clears it)
     {
         std::unique_lock<std::mutex> pl = menu_->LockPictures();
         for (int p = 0; p < VrMenu::kPanCount; ++p) {

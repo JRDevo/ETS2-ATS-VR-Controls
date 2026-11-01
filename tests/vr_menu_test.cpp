@@ -182,6 +182,14 @@ int main(int argc, char** argv) {
     const VrMenu::Panel& mp = m.Pan(VrMenu::kPanMenu);
     CHECK(mp.pose.p.z < -0.6 && mp.pose.p.z > -0.9 && std::fabs(mp.pose.p.x) < 0.01, "in front of the head (%.2f %.2f %.2f)", mp.pose.p.x, mp.pose.p.y, mp.pose.p.z);
     CHECK(m.FullPicture(VrMenu::kPanMenu).size() == (size_t)mp.pw * mp.ph, "the menu picture is drawn (by the painter thread)");
+    {                                                  // the menu's cost in a frame while it is open and nothing changes (shown only)
+        LARGE_INTEGER fq, t0, t1;
+        QueryPerformanceFrequency(&fq);
+        QueryPerformanceCounter(&t0);
+        for (int i = 0; i < 5000; ++i) { VrPad::Frame f = idle; upd(f); }
+        QueryPerformanceCounter(&t1);
+        printf("   menu open, nothing changes: %.2f us per frame (Update)\n", 1e6 * (double)(t1.QuadPart - t0.QuadPart) / fq.QuadPart / 5000.0);
+    }
     // press = aim at the element, trigger down one frame, up the next; returns the frame the menu saw (trigger taken out?)
     auto click = [&](int h, int pan, int kind, int arg, bool* taken = nullptr) {
         V3 at;
