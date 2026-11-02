@@ -242,7 +242,7 @@ nothing, and the steering stick's left / right send their keys again. **On** bri
 It is smooth, like a gamepad: not on / off keys. How: ETS2 and ATS have their own door for input add-ons (the SCS input
 SDK). This mod is also such an add-on, so the game gets the stick and the triggers directly. **No driver**, no fake gamepad,
 no file in the game folder, and **nothing to set in the game's options** (it works next to your wheel, keyboard or gamepad
-settings). `install.ps1` tells the game where the mod is (see [What install.ps1 does](#what-installps1-does-and-why-there-is-one)).
+settings). The setup (or `install.ps1`) tells the game where the mod is (see [What install.ps1 does](#what-installps1-does-and-why-there-is-one)).
 
 - **The game shows a note at every start**: "Request to use advanced SDK features detected". That is this mod. Point at
   **OK** and click (A or the right trigger). SCS shows it for every add-on that uses their SDK; as far as we know, a mod
@@ -250,7 +250,7 @@ settings). `install.ps1` tells the game where the mod is (see [What install.ps1 
 
   ![The game's note at start: Request to use advanced SDK features detected](docs/images/sdk-popup.png)
 - `steer = off` and no gas / brake buttons: nothing drives, but the game still loads the add-on (so the VR menu can change
-  it at once). To remove it completely, run `uninstall.ps1`.
+  it at once). To remove it completely, uninstall the mod (see [Install](#install)).
 - It works in every OpenXR mode and headset (Virtual Desktop, Link, SteamVR, Windows MR): the driving part does not depend
   on the headset at all.
 
@@ -352,13 +352,33 @@ ETS2 / ATS DLAA mod's menu (`Delete`). The menu and keyboard float in the room: 
 <details>
 <summary><h2>Install</h2></summary>
 
-1. Download `ETS2-ATS-VR-Controls-v0.3.0.zip` from the [Releases](../../releases) page. Close the game.
+**With the setup (easiest):**
+
+1. Download `ETS2-ATS-VR-Controls-Setup-v<version>.exe` from the [Releases](../../releases) page. Close the game.
+2. Run it. Click **Yes** in the Windows admin prompt, then **Next** to the end.
+   (Admin is needed: ETS2 / ATS only load VR add-ons that are registered for all users.)
+3. Start the game in VR.
+
+- The mod goes to `C:\Program Files\ETS2 ATS VR Controls`.
+- Your settings go to `C:\ProgramData\ETS2 ATS VR Controls\config.ini`. The log goes to its `logs` folder.
+  Start menu > **ETS2 ATS VR Controls settings and logs** opens that folder.
+  (Why not next to the DLL? Windows does not let a normal user write in Program Files. The VR menu must save your
+  settings, so they live in ProgramData. The DLL stays in Program Files, so no program can change it.)
+- An update: run the new setup. It keeps your `config.ini`.
+- Had the zip version before? The setup removes the zip's registry entries (the mod would load twice). Copy your old
+  `config.ini` into `C:\ProgramData\ETS2 ATS VR Controls` to keep your buttons, then delete the old folder.
+
+**Uninstall:** Windows **Settings > Apps > Installed apps > ETS2 ATS VR Controls > Uninstall**. Close the game first.
+It removes the files and all registry entries. It asks if it should also delete your settings and logs.
+
+**With the zip (no setup):**
+
+1. Download `ETS2-ATS-VR-Controls-v<version>.zip` from the [Releases](../../releases) page. Close the game.
 2. Unzip the folder to a place where it can stay (for example `C:\ETS2 ATS VR Controls`).
 3. Right-click `install.ps1` > **Run with PowerShell**. Click **Yes** in the Windows admin prompt.
-   (Admin is needed: ETS2 / ATS only load VR add-ons that are registered for all users.)
-4. Start the game in VR.
+4. Start the game in VR. `config.ini` and `logs` are in that folder.
 
-Uninstall: run `uninstall.ps1` the same way. Then you can delete the folder.
+Uninstall: run `uninstall.ps1` the same way. Then you can delete the folder. Use the setup or the zip, not both.
 
 <a name="what-installps1-does-and-why-there-is-one"></a>
 <details>
@@ -393,7 +413,8 @@ must stay where you unzipped it: the registry points to it.
    in `config.ini`).
 
 `uninstall.ps1` removes these registry entries again (also with one admin prompt). Your files and `config.ini` stay; delete
-the folder yourself if you like. You can check the entries yourself with `regedit` at the paths above.
+the folder yourself if you like. The setup writes the same three values (the paths then point into
+`C:\Program Files\ETS2 ATS VR Controls`), and its uninstaller removes them. You can check the entries yourself with `regedit` at the paths above.
 
 **"Run with PowerShell" is not there, or Windows blocks the script?** Open PowerShell in the mod folder and run:
 
@@ -448,14 +469,15 @@ right Shift: Brazil, Japan), `intl3` (Japan's ¥), `kana`, `henkan`, `muhenkan`.
 <details>
 <summary><h2>Problems</h2></summary>
 
-The log is `logs\ets2_ats_vr_controls.log` next to the DLL. It says which controller the VR system uses, which buttons are mapped,
+The log is `logs\ets2_ats_vr_controls.log` in the settings folder: `C:\ProgramData\ETS2 ATS VR Controls` (setup), or
+the mod folder (zip). It says which controller the VR system uses, which buttons are mapped,
 and every problem. The log is **off by default** (no file, nothing measured: the lightest). Set `log = 1` in `config.ini`
 to write it, and also `log_inputs = 1` to see every key the layer sends.
 
 <a name="reporting-a-problem-what-to-upload"></a>
 ### Reporting a problem (what to upload)
 
-1. In `config.ini` (next to `ets2_ats_vr_controls.dll`) set `log = 1` (and `log_inputs = 1` if a button does the wrong thing).
+1. In `config.ini` (`C:\ProgramData\ETS2 ATS VR Controls` with the setup, the mod folder with the zip) set `log = 1` (and `log_inputs = 1` if a button does the wrong thing).
 2. Start the game in VR and do what goes wrong for 1 to 2 minutes.
 3. Quit the game.
 4. Open a [bug report](../../issues/new/choose) and drag `logs\ets2_ats_vr_controls.log` and `config.ini` into it.
@@ -475,6 +497,10 @@ cmake --build build --config Release
 powershell -ExecutionPolicy Bypass -File tests\run_unit.ps1
 powershell -ExecutionPolicy Bypass -File tests\run_e2e.ps1
 ```
+
+The setup: install [Inno Setup 6](https://jrsoftware.org/isinfo.php), then
+`powershell -ExecutionPolicy Bypass -File scripts\build_setup.ps1` makes `build\setup\ETS2-ATS-VR-Controls-Setup-v<version>.exe`
+(from `installer\ets2_ats_vr_controls.iss`; it ships `config.ini` as committed in git).
 
 `tests\run_e2e.ps1` runs a fake game through the real OpenXR loader, this layer and a fake VR runtime with scripted button
 presses. No headset is needed, and no real key presses are sent.

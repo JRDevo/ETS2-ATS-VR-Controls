@@ -120,7 +120,8 @@ msgstr "Taste für die Luftmaus"
 
 ## Test your changes in the headset
 
-1. Make a folder `lang` next to `ets2_ats_vr_controls.dll` (the folder where you ran `install.ps1`).
+1. Make a folder `lang` next to `ets2_ats_vr_controls.dll` (the folder where you ran `install.ps1`; with the setup:
+   `C:\Program Files\ETS2 ATS VR Controls`, Windows asks for admin rights there).
 2. Put your edited file there, for example `lang\de_de.po`.
 3. Open the VR menu. Your file wins over the built-in texts, line by line. Each time you open the menu, the mod reads
    the file again: edit, close the menu, open it again, look.

@@ -20,6 +20,14 @@ Read `README.md` and the header comments of `src/pad_input.h`, `src/layer.cpp`, 
   loader then loads the layer twice).
 - Never run `scripts\install.ps1` / `uninstall.ps1` without asking (UAC + HKLM). Refresh the root DLL only when no game runs.
 - VR tests: install only; the user launches the game from the headset.
+- Setup (2026-11-02): `installer\ets2_ats_vr_controls.iss` (Inno Setup 6, RemoteUSB's pattern), built by `scripts\build_setup.ps1`
+  -> `build\setup\ETS2-ATS-VR-Controls-Setup-v<ver>.exe` (ships HEAD:config.ini; CI builds it too). DLL + json in Program Files
+  (read-only for users: the layer loads into every OpenXR program), config.ini + logs in `%ProgramData%\ETS2 ATS VR Controls`
+  (users-modify; the DLL uses it when no config.ini is next to it: config.cpp ConfigPath). Never run the setup / its uninstaller
+  on this PC without asking (UAC + HKLM; it also removes the repo-root registration).
+- Release steps: version in CMakeLists.txt; Release build; tests; `scripts\build_setup.ps1`; the zip in dist\ (as before:
+  dll, json, config.ini as committed, install.ps1, uninstall.ps1, README, LICENSE, THIRD_PARTY); release notes in dist\;
+  privacy-check; push; GitHub release with BOTH the setup .exe and the zip.
 
 ## Git
 - **Nothing personal on the internet (the user's rule):** before every push, tag, release or upload follow the user-level

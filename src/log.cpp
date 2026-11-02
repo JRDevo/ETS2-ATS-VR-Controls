@@ -67,6 +67,14 @@ void LogInit(const std::wstring& dllDir, const std::wstring& exeName) {
     wchar_t env[MAX_PATH];
     bool ok = GetEnvironmentVariableW(L"VRC_LOG_DIR", env, MAX_PATH) > 0 && OpenIn(env);   // tests
     if (!ok) ok = OpenIn(dllDir + L"\\logs");
+    if (!ok) {                                         // setup.exe: Program Files is read-only, the settings folder is not
+        PWSTR pd = nullptr;
+        if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_ProgramData, 0, nullptr, &pd))) {
+            const std::wstring d = std::wstring(pd) + L"\\ETS2 ATS VR Controls";
+            if (GetFileAttributesW(d.c_str()) != INVALID_FILE_ATTRIBUTES) ok = OpenIn(d + L"\\logs");
+        }
+        CoTaskMemFree(pd);
+    }
     if (!ok) {
         PWSTR la = nullptr;
         if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &la))) {

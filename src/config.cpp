@@ -1,6 +1,7 @@
 // config -- see config.h.
 #include "config.h"
 #include <windows.h>
+#include <shlobj.h>
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
@@ -276,9 +277,23 @@ Config ParseConfig(const std::string& text) {
     return c;
 }
 
-Config LoadConfig(const std::wstring& dllDir) {
+std::wstring ConfigPath(const std::wstring& dllDir) {
     wchar_t env[MAX_PATH];
-    std::wstring path = GetEnvironmentVariableW(L"VRC_CONFIG", env, MAX_PATH) > 0 ? std::wstring(env) : dllDir + L"\\config.ini";
+    if (GetEnvironmentVariableW(L"VRC_CONFIG", env, MAX_PATH) > 0) return env;
+    const std::wstring next = dllDir + L"\\config.ini";
+    if (GetFileAttributesW(next.c_str()) != INVALID_FILE_ATTRIBUTES) return next;
+    std::wstring path = next;                          // setup.exe: the DLL in Program Files (read-only for users), the
+    PWSTR pd = nullptr;                                // settings in ProgramData (writable for users)
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_ProgramData, 0, nullptr, &pd))) {
+        const std::wstring d = std::wstring(pd) + L"\\ETS2 ATS VR Controls";
+        if (GetFileAttributesW(d.c_str()) != INVALID_FILE_ATTRIBUTES) path = d + L"\\config.ini";
+    }
+    CoTaskMemFree(pd);
+    return path;
+}
+
+Config LoadConfig(const std::wstring& dllDir) {
+    const std::wstring path = ConfigPath(dllDir);
     std::string text;
     FILE* f = nullptr;
     if (_wfopen_s(&f, path.c_str(), L"rb") == 0 && f) {

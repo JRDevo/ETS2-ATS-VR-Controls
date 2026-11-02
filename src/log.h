@@ -1,4 +1,5 @@
-// log -- one plain text file, <dll folder>\logs\ets2_ats_vr_controls.log (else %LOCALAPPDATA%\ETS2 ATS VR Controls\logs\...). New file
+// log -- one plain text file, <dll folder>\logs\ets2_ats_vr_controls.log (else %ProgramData%\ETS2 ATS VR Controls\logs\... when
+// setup.exe made that folder, else %LOCALAPPDATA%\ETS2 ATS VR Controls\logs\...). New file
 // per game start (the old one is kept as .old.log). Thread safe. Lines: "[hh:mm:ss.mmm] [exe] I message".
 #pragma once
 #include <string>

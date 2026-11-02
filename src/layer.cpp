@@ -427,7 +427,7 @@ XrResult XRAPI_CALL Layer_CreateApiLayerInstance(const XrInstanceCreateInfo* inf
         RESOLVE_O(EnumerateSwapchainImages); RESOLVE_O(AcquireSwapchainImage); RESOLVE_O(WaitSwapchainImage);
         RESOLVE_O(ReleaseSwapchainImage);
 #undef RESOLVE_O
-        id->pad = std::make_unique<PadInput>(*instance, d, g_cfg, g_cfg.loadedFrom.empty() ? g_dllDir + L"\\config.ini" : g_cfg.loadedFrom, od);
+        id->pad = std::make_unique<PadInput>(*instance, d, g_cfg, g_cfg.loadedFrom.empty() ? ConfigPath(g_dllDir) : g_cfg.loadedFrom, od);
         if (!id->pad->Enabled()) id->pad.reset();
         LOGI("instance %p created: app '%s' (engine '%s') -- %s", (void*)*instance, info ? info->applicationInfo.applicationName : "?",
              info ? info->applicationInfo.engineName : "?",

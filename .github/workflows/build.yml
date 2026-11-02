@@ -1,6 +1,6 @@
 # Release build of ets2_ats_vr_controls.dll + the tests on a Windows runner (Visual Studio 2022). The OpenXR SDK is fetched
 # at configure time. Unit tests are CPU only; the end-to-end test runs the fake game -> real OpenXR loader -> this layer ->
-# the mock runtime (D3D11 on WARP), no headset and no real input.
+# the mock runtime (D3D11 on WARP), no headset and no real input. Then the setup .exe (scripts\build_setup.ps1, never run here).
 name: build
 
 on:
@@ -35,6 +35,12 @@ jobs:
         shell: powershell
         run: powershell -ExecutionPolicy Bypass -File tests\run_e2e.ps1 -Register   # (the runner is elevated: see the script)
 
+      - name: Setup (Inno Setup 6)
+        shell: powershell
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+          powershell -ExecutionPolicy Bypass -File scripts\build_setup.ps1
+
       - name: Upload the layer
         uses: actions/upload-artifact@v4
         with:
@@ -42,3 +48,9 @@ jobs:
           path: |
             build/Release/ets2_ats_vr_controls.dll
             build/Release/XR_APILAYER_JRDEVO_ets2_ats_vr_controls.json
+
+      - name: Upload the setup
+        uses: actions/upload-artifact@v4
+        with:
+          name: ets2_ats_vr_controls_setup
+          path: build/setup/ETS2-ATS-VR-Controls-Setup-v*.exe

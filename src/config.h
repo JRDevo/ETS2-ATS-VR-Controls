@@ -1,4 +1,6 @@
 // config -- config.ini next to ets2_ats_vr_controls.dll (or the file named by the VRC_CONFIG environment variable, for tests).
+// No config.ini next to the DLL but a folder %ProgramData%\ETS2 ATS VR Controls (setup.exe makes it, writable for users;
+// Program Files is not): the config.ini in there.
 // key = value lines, '#' or ';' starts a comment line. Read once per game start. Unknown keys and bad values are logged and
 // ignored (the default stays). See config.ini in the repo for every key.
 #pragma once
@@ -48,6 +50,7 @@ struct Config {
 
 // Parse `text` (the whole file) on top of the defaults.
 Config ParseConfig(const std::string& text);
+std::wstring ConfigPath(const std::wstring& dllDir);           // the config.ini this DLL uses (it may not exist yet)
 Config LoadConfig(const std::wstring& dllDir);
 bool   AppAllowed(const Config& c, const std::wstring& exeName);   // exeName = file name only, any case
 std::string DescribePad(const VrPad::Config& p);                     // one line per mapped button, for the log
