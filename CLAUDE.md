@@ -24,7 +24,8 @@ Read `README.md` and the header comments of `src/pad_input.h`, `src/layer.cpp`, 
   -> `build\setup\ETS2-ATS-VR-Controls-Setup-v<ver>.exe` (ships HEAD:config.ini; CI builds it too). DLL + json in Program Files
   (read-only for users: the layer loads into every OpenXR program), config.ini + logs in `%ProgramData%\ETS2 ATS VR Controls`
   (users-modify; the DLL uses it when no config.ini is next to it: config.cpp ConfigPath). Never run the setup / its uninstaller
-  on this PC without asking (UAC + HKLM; it also removes the repo-root registration).
+  on this PC without asking (UAC + HKLM; it also removes the repo-root registration). Icon: installer\ets2_ats_vr_controls.ico
+  (from docs\images\logo.png). The uninstaller removes everything but asks for config.ini (default keep).
 - Release steps: version in CMakeLists.txt; Release build; tests; `scripts\build_setup.ps1`; the zip in dist\ (as before:
   dll, json, config.ini as committed, install.ps1, uninstall.ps1, README, LICENSE, THIRD_PARTY); release notes in dist\;
   privacy-check; push; GitHub release with BOTH the setup .exe and the zip.

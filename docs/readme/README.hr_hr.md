@@ -25,11 +25,12 @@ volana, bez gamepada, bez tipkovnice, bez miša.
 
 ## Instalacija
 
-1. Preuzmite najnoviji `ETS2-ATS-VR-Controls-....zip` sa stranice
+1. Preuzmite najnoviji `ETS2-ATS-VR-Controls-Setup-....exe` sa stranice
    [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases). Zatvorite igru.
-2. Raspakirajte ga u mapu u kojoj može ostati (na primjer `C:\ETS2 ATS VR Controls`).
-3. Desni klik na `install.ps1` > **Pokreni pomoću PowerShella**. Kliknite **Da** u Windowsovu upitu za administratora.
-4. Pokrenite igru u VR-u.
+2. Pokrenite ga. Kliknite **Da** u Windowsovu upitu za administratora, zatim do kraja **Dalje**. Mod se instalira u
+   `C:\Program Files\ETS2 ATS VR Controls` (možete odabrati drugu mapu). Vaše postavke (`config.ini`) i zapisnici idu u
+   `C:\ProgramData\ETS2 ATS VR Controls`.
+3. Pokrenite igru u VR-u.
 
 Pri svakom pokretanju igra prikazuje „Request to use advanced SDK features detected” (zahtjev za korištenje naprednih
 SDK značajki). To je ovaj mod (za vožnju): uperite u OK i kliknite.
@@ -37,7 +38,10 @@ SDK značajki). To je ovaj mod (za vožnju): uperite u OK i kliknite.
 **VR izbornik:** držite **oba gripa + klik lijeve palice** 1 sekundu. Tamo postavljate svaku tipku, miša,
 upravljanje, boje i jezik.
 
-Deinstalacija: pokrenite `uninstall.ps1` na isti način, a zatim izbrišite mapu.
+Deinstalacija: Windows **Postavke > Aplikacije > Instalirane aplikacije > ETS2 ATS VR Controls > Deinstaliraj**. Uklanja mod, njegove
+unose u registru i zapisnike. Pita treba li izbrisati i vaše postavke (Ne = zadržite ih za kasniju instalaciju).
+
+Bez instalacijskog programa: `.zip` na istoj stranici sadrži `install.ps1` i `uninstall.ps1` (pogledajte potpuni vodič).
 
 ## Više
 

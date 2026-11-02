@@ -25,11 +25,12 @@ vô lăng, tay cầm chơi game, bàn phím hay chuột.
 
 ## Cài đặt
 
-1. Tải `ETS2-ATS-VR-Controls-....zip` mới nhất từ trang
+1. Tải `ETS2-ATS-VR-Controls-Setup-....exe` mới nhất từ trang
    [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases). Đóng game.
-2. Giải nén vào một thư mục có thể để lâu dài (ví dụ `C:\ETS2 ATS VR Controls`).
-3. Nhấp chuột phải vào `install.ps1` > **Run with PowerShell**. Nhấp **Có** ở hộp thoại quyền quản trị của Windows.
-4. Khởi động game trong VR.
+2. Chạy nó. Nhấp **Có** ở hộp thoại quyền quản trị của Windows, rồi nhấp **Tiếp** cho đến hết. Mod được cài vào
+   `C:\Program Files\ETS2 ATS VR Controls` (bạn có thể chọn thư mục khác). Cài đặt của bạn (`config.ini`) và nhật ký được lưu vào
+   `C:\ProgramData\ETS2 ATS VR Controls`.
+3. Khởi động game trong VR.
 
 Mỗi lần khởi động, game hiện "Request to use advanced SDK features detected" (yêu cầu dùng các tính năng SDK nâng cao).
 Đó là mod này (để lái xe): chỉ vào OK rồi bấm.
@@ -37,7 +38,10 @@ Mỗi lần khởi động, game hiện "Request to use advanced SDK features de
 **Menu VR:** giữ **cả hai grip + nhấn cần trái** trong 1 giây. Tại đó bạn đặt mọi nút, chuột, cách lái, màu sắc
 và ngôn ngữ.
 
-Gỡ cài đặt: chạy `uninstall.ps1` theo cách tương tự, rồi xóa thư mục.
+Gỡ cài đặt: Windows **Cài đặt > Ứng dụng > Ứng dụng đã cài đặt > ETS2 ATS VR Controls > Gỡ cài đặt**. Nó xóa mod, các mục đăng ký
+của mod và nhật ký. Nó hỏi có xóa luôn cài đặt của bạn không (Không = giữ lại để cài đặt sau này).
+
+Không dùng trình cài đặt: tệp `.zip` trên cùng trang có `install.ps1` và `uninstall.ps1` (xem hướng dẫn đầy đủ).
 
 ## Thêm
 

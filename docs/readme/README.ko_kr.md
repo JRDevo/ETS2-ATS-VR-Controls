@@ -25,11 +25,12 @@
 
 ## 설치
 
-1. [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases) 페이지에서 최신 `ETS2-ATS-VR-Controls-....zip`을 다운로드합니다.
+1. [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases) 페이지에서 최신 `ETS2-ATS-VR-Controls-Setup-....exe`를 다운로드합니다.
    게임을 종료하세요.
-2. 계속 둘 수 있는 폴더(예: `C:\ETS2 ATS VR Controls`)에 압축을 풉니다.
-3. `install.ps1`을 마우스 오른쪽 버튼으로 클릭 > **PowerShell에서 실행**. Windows 관리자 확인 창에서 **예**를 클릭합니다.
-4. VR에서 게임을 시작합니다.
+2. 그것을 실행하세요. Windows 관리자 확인 창에서 **예**를 클릭한 다음 끝까지 **다음**을 클릭합니다. 모드는
+   `C:\Program Files\ETS2 ATS VR Controls`에 설치됩니다(다른 폴더를 선택할 수 있습니다). 설정(`config.ini`)과 로그는
+   `C:\ProgramData\ETS2 ATS VR Controls`에 저장됩니다.
+3. VR에서 게임을 시작합니다.
 
 게임을 시작할 때마다 "Request to use advanced SDK features detected"(고급 SDK 기능 사용 요청 감지됨)가 표시됩니다.
 이것이 (운전을 위한) 이 모드입니다. OK를 가리키고 클릭하세요.
@@ -37,7 +38,10 @@
 **VR 메뉴:** **양쪽 그립 + 왼쪽 스틱 누름**을 1초 동안 누르세요. 여기서 모든 버튼, 마우스,
 조향, 색상, 언어를 설정합니다.
 
-제거: 같은 방법으로 `uninstall.ps1`을 실행한 다음 폴더를 삭제하세요.
+제거: Windows **설정 > 앱 > 설치된 앱 > ETS2 ATS VR Controls > 제거**. 모드와 해당 레지스트리 항목, 로그를 제거합니다. 설정도
+삭제할지 묻습니다(아니요 = 나중에 다시 설치할 때를 위해 보관).
+
+설치 프로그램 없이: 같은 페이지의 `.zip`에 `install.ps1`과 `uninstall.ps1`이 들어 있습니다(전체 가이드 참조).
 
 ## 더 보기
 

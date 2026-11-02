@@ -25,11 +25,12 @@ stūres, nekāda spēļu kontrollera, nekādas tastatūras, nekādas peles.
 
 ## Uzstādīšana
 
-1. Lejupielādējiet jaunāko `ETS2-ATS-VR-Controls-....zip` no
+1. Lejupielādējiet jaunāko `ETS2-ATS-VR-Controls-Setup-....exe` no
    [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases) lapas. Aizveriet spēli.
-2. Izpakojiet to mapē, kur tā var palikt (piemēram, `C:\ETS2 ATS VR Controls`).
-3. Ar peles labo pogu uz `install.ps1` > **Run with PowerShell**. Windows administratora uzvednē noklikšķiniet uz **Jā**.
-4. Startējiet spēli VR.
+2. Palaidiet to. Windows administratora uzvednē noklikšķiniet uz **Jā**, pēc tam līdz galam uz **Tālāk**. Mods tiek instalēts mapē
+   `C:\Program Files\ETS2 ATS VR Controls` (varat izvēlēties citu mapi). Jūsu iestatījumi (`config.ini`) un žurnāli nonāk mapē
+   `C:\ProgramData\ETS2 ATS VR Controls`.
+3. Startējiet spēli VR.
 
 Katrā startā spēle parāda „Request to use advanced SDK features detected”. Tas ir šis mods (braukšanai): norādiet uz
 OK un noklikšķiniet.
@@ -37,7 +38,10 @@ OK un noklikšķiniet.
 **VR izvēlne:** turiet **abus gripus + kreisā stika spiedienu** 1 sekundi. Tur iestatāt katru pogu, peli,
 stūrēšanu, krāsas un valodu.
 
-Atinstalēšana: tāpat palaidiet `uninstall.ps1`, pēc tam izdzēsiet mapi.
+Atinstalēšana: Windows **Settings > Apps > Installed apps > ETS2 ATS VR Controls > Uninstall**. Tas noņem modu, tā reģistra ierakstus
+un žurnālus. Tas jautā, vai dzēst arī jūsu iestatījumus (No = saglabājiet tos vēlākai instalēšanai).
+
+Bez instalētāja: `.zip` tajā pašā lapā satur `install.ps1` un `uninstall.ps1` (skatiet pilno rokasgrāmatu).
 
 ## Vairāk
 

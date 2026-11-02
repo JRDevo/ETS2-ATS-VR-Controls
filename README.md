@@ -5,7 +5,8 @@
 >
 > - There is **no website** for this mod. There **never will be** one. No Discord, no Patreon, no Nexus, no Steam Workshop, no app store.
 > - **DO NOT DOWNLOAD THIS MOD FROM ANYWHERE ELSE.** Any other site, mirror, "launcher", "installer", video link or forum attachment that
->   offers it is not mine and may carry anything. If it did not come from this GitHub page, do not run it.
+>   offers it is not mine and may carry anything. If it did not come from this GitHub page, do not run it. The only real setup
+>   is `ETS2-ATS-VR-Controls-Setup-v<version>.exe` on this page's Releases.
 > - Updates, release notes, the button and settings reference and the troubleshooting guide live here and only here. If someone tells you
 >   to get the mod somewhere else, they are wrong.
 
@@ -359,7 +360,8 @@ ETS2 / ATS DLAA mod's menu (`Delete`). The menu and keyboard float in the room: 
    (Admin is needed: ETS2 / ATS only load VR add-ons that are registered for all users.)
 3. Start the game in VR.
 
-- The mod goes to `C:\Program Files\ETS2 ATS VR Controls`.
+- The mod goes to `C:\Program Files\ETS2 ATS VR Controls`. You can choose another folder in the setup (the first time
+  only: an update keeps the folder).
 - Your settings go to `C:\ProgramData\ETS2 ATS VR Controls\config.ini`. The log goes to its `logs` folder.
   Start menu > **ETS2 ATS VR Controls settings and logs** opens that folder.
   (Why not next to the DLL? Windows does not let a normal user write in Program Files. The VR menu must save your
@@ -369,7 +371,16 @@ ETS2 / ATS DLAA mod's menu (`Delete`). The menu and keyboard float in the room: 
   `config.ini` into `C:\ProgramData\ETS2 ATS VR Controls` to keep your buttons, then delete the old folder.
 
 **Uninstall:** Windows **Settings > Apps > Installed apps > ETS2 ATS VR Controls > Uninstall**. Close the game first.
-It removes the files and all registry entries. It asks if it should also delete your settings and logs.
+It removes:
+
+- the mod's files and its folder,
+- all its registry entries (the OpenXR entry, the two game plugin entries, an emptied `Plugins` key, any old per-user
+  entry),
+- the Start menu entry and the "Installed apps" entry,
+- all its logs.
+
+Then it asks: "Also delete your settings (config.ini)?" **No** (the default) keeps `config.ini`, so a later install has
+your buttons again. **Yes** deletes it and the `C:\ProgramData\ETS2 ATS VR Controls` folder.
 
 **With the zip (no setup):**
 

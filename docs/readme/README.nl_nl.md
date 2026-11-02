@@ -25,11 +25,12 @@ stuurwiel, geen gamepad, geen toetsenbord, geen muis.
 
 ## Installeren
 
-1. Download de nieuwste `ETS2-ATS-VR-Controls-....zip` van de pagina
+1. Download de nieuwste `ETS2-ATS-VR-Controls-Setup-....exe` van de pagina
    [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases). Sluit het spel.
-2. Pak hem uit in een map waar hij kan blijven (bijvoorbeeld `C:\ETS2 ATS VR Controls`).
-3. Klik met rechts op `install.ps1` > **Uitvoeren met PowerShell**. Klik op **Ja** in het beheerdersvenster van Windows.
-4. Start het spel in VR.
+2. Voer hem uit. Klik op **Ja** in het beheerdersvenster van Windows en daarna tot het einde op **Volgende**. De mod komt in
+   `C:\Program Files\ETS2 ATS VR Controls` (je kunt een andere map kiezen). Je instellingen (`config.ini`) en de logs komen in
+   `C:\ProgramData\ETS2 ATS VR Controls`.
+3. Start het spel in VR.
 
 Bij elke start toont het spel "Request to use advanced SDK features detected". Dat is deze mod (voor het rijden): wijs naar
 OK en klik.
@@ -37,7 +38,10 @@ OK en klik.
 **Het VR-menu:** houd **beide grips + de klik op de linkerstick** 1 seconde vast. Daar stel je elke knop, de muis,
 het sturen, de kleuren en de taal in.
 
-Verwijderen: voer `uninstall.ps1` op dezelfde manier uit en verwijder dan de map.
+Verwijderen: Windows **Instellingen > Apps > Geïnstalleerde apps > ETS2 ATS VR Controls > Verwijderen**. Dit verwijdert de mod, de
+registervermeldingen en de logs. Er wordt gevraagd of ook je instellingen moeten worden verwijderd (Nee = bewaar ze voor een latere installatie).
+
+Zonder het installatieprogramma: de `.zip` op dezelfde pagina bevat `install.ps1` en `uninstall.ps1` (zie de volledige handleiding).
 
 ## Meer
 

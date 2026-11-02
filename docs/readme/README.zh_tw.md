@@ -24,18 +24,22 @@
 
 ## 安裝
 
-1. 從 [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases) 頁面下載最新的 `ETS2-ATS-VR-Controls-....zip`。
+1. 從 [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases) 頁面下載最新的 `ETS2-ATS-VR-Controls-Setup-....exe`。
    關閉遊戲。
-2. 解壓縮到一個可以長期保留的資料夾（例如 `C:\ETS2 ATS VR Controls`）。
-3. 在 `install.ps1` 上按右鍵 > **使用 PowerShell 執行**。在 Windows 的系統管理員權限提示中按一下 **是**。
-4. 在 VR 中啟動遊戲。
+2. 執行它。在 Windows 的系統管理員權限提示中按一下 **是**，然後一路按 **下一步**。此 mod 會安裝到
+   `C:\Program Files\ETS2 ATS VR Controls`（可以選擇其他資料夾）。你的設定（`config.ini`）和記錄會儲存到
+   `C:\ProgramData\ETS2 ATS VR Controls`。
+3. 在 VR 中啟動遊戲。
 
 每次啟動時，遊戲都會顯示「Request to use advanced SDK features detected」（偵測到使用進階 SDK 功能的要求）。這就是此 mod
 （用於駕駛）：指向 OK 並按下。
 
 **VR 選單：** 同時按住**兩個握把 + 左搖桿按下** 1 秒。在這裡可以設定每個按鍵、滑鼠、轉向、顏色和語言。
 
-解除安裝：以同樣的方式執行 `uninstall.ps1`，然後刪除該資料夾。
+解除安裝：Windows **設定 > 應用程式 > 已安裝的應用程式 > ETS2 ATS VR Controls > 解除安裝**。它會移除此 mod、它的登錄項目和記錄。它會詢問
+是否也刪除你的設定（否 = 保留以供日後安裝）。
+
+不使用安裝程式：同一頁面上的 `.zip` 包含 `install.ps1` 和 `uninstall.ps1`（見完整指南）。
 
 ## 更多
 

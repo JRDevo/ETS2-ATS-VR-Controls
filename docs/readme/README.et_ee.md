@@ -26,10 +26,11 @@ rooli, mängupulti, klaviatuuri ega hiirt.
 ## Paigaldus
 
 1. Laadi leheküljelt [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases) alla uusim
-   `ETS2-ATS-VR-Controls-....zip`. Sulge mäng.
-2. Paki see lahti kausta, kus see võib jääda (näiteks `C:\ETS2 ATS VR Controls`).
-3. Paremklõps failil `install.ps1` > **Käivita PowerShellis**. Klõpsa Windowsi administraatoriviibal **Jah**.
-4. Käivita mäng VR-is.
+   `ETS2-ATS-VR-Controls-Setup-....exe`. Sulge mäng.
+2. Käivita see. Klõpsa Windowsi administraatoriviibal **Jah**, seejärel lõpuni **Edasi**. Mod paigaldatakse kausta
+   `C:\Program Files\ETS2 ATS VR Controls` (võid valida teise kausta). Sinu sätted (`config.ini`) ja logid lähevad kausta
+   `C:\ProgramData\ETS2 ATS VR Controls`.
+3. Käivita mäng VR-is.
 
 Igal käivitusel näitab mäng teadet „Request to use advanced SDK features detected“ (tuvastati taotlus kasutada SDK täiustatud funktsioone). See on see mod (sõitmiseks): osuta
 nupule OK ja klõpsa.
@@ -37,7 +38,10 @@ nupule OK ja klõpsa.
 **VR-menüü:** hoia **mõlemat grip-nuppu** + **vasaku kangi klõpsu** 1 sekundi vältel all. Seal seadistad iga nupu, hiire,
 roolimise, värvid ja keele.
 
-Eemaldamine: käivita `uninstall.ps1` samamoodi, siis kustuta kaust.
+Eemaldamine: Windows **Settings > Apps > Installed apps > ETS2 ATS VR Controls > Uninstall**. See eemaldab modi, selle
+registrikirjed ja logid. See küsib, kas kustutada ka sinu sätted (No = säilita need hilisemaks paigalduseks).
+
+Ilma paigaldajata: samal lehel olev `.zip` sisaldab faile `install.ps1` ja `uninstall.ps1` (vt täielikku juhendit).
 
 ## Veel
 

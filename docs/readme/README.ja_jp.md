@@ -25,11 +25,12 @@
 
 ## インストール
 
-1. [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases) ページから最新の `ETS2-ATS-VR-Controls-....zip` をダウンロードします。
+1. [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases) ページから最新の `ETS2-ATS-VR-Controls-Setup-....exe` をダウンロードします。
    ゲームを終了してください。
-2. ずっと置いておけるフォルダー（例: `C:\ETS2 ATS VR Controls`）に展開します。
-3. `install.ps1` を右クリック > **PowerShell で実行**。Windows の管理者確認で **はい** をクリックします。
-4. ゲームを VR で起動します。
+2. それを実行します。Windows の管理者確認で **はい** をクリックし、最後まで **次へ** をクリックします。Mod は
+   `C:\Program Files\ETS2 ATS VR Controls`（別のフォルダーも選べます）に入ります。設定（`config.ini`）とログは
+   `C:\ProgramData\ETS2 ATS VR Controls` に入ります。
+3. ゲームを VR で起動します。
 
 起動のたびに、ゲームに "Request to use advanced SDK features detected"（高度な SDK 機能の使用要求を検出）と表示されます。
 これは（運転のための）この Mod です。OK を指してクリックしてください。
@@ -37,7 +38,10 @@
 **VR メニュー:** **両方のグリップ + 左スティック押込**を 1 秒間押し続けます。ここで、すべてのボタン、マウス、
 操舵、色、言語を設定できます。
 
-アンインストール: 同じ方法で `uninstall.ps1` を実行し、フォルダーを削除します。
+アンインストール: Windows の **設定 > アプリ > インストールされているアプリ > ETS2 ATS VR Controls > アンインストール**。Mod、そのレジストリ
+エントリ、ログを削除します。設定も削除するか尋ねられます（いいえ = 後で再インストールするために残します）。
+
+セットアップを使わない場合: 同じページの `.zip` に `install.ps1` と `uninstall.ps1` が入っています（詳しくは完全ガイドを参照）。
 
 ## その他
 

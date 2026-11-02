@@ -25,11 +25,12 @@ Direksiyon, oyun kolu, klavye ve fare gerekmez.
 
 ## Kurulum
 
-1. [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases) sayfasından en yeni `ETS2-ATS-VR-Controls-....zip`
+1. [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases) sayfasından en yeni `ETS2-ATS-VR-Controls-Setup-....exe`
    dosyasını indirin. Oyunu kapatın.
-2. Kalabileceği bir klasöre çıkarın (örneğin `C:\ETS2 ATS VR Controls`).
-3. `install.ps1` dosyasına sağ tıklayın > **PowerShell ile çalıştır**. Windows yönetici isteminde **Evet**'e tıklayın.
-4. Oyunu VR'da başlatın.
+2. Çalıştırın. Windows yönetici isteminde **Evet**'e, ardından sonuna kadar **İleri**'ye tıklayın. Mod şuraya kurulur:
+   `C:\Program Files\ETS2 ATS VR Controls` (başka bir klasör seçebilirsiniz). Ayarlarınız (`config.ini`) ve günlükler şuraya gider:
+   `C:\ProgramData\ETS2 ATS VR Controls`.
+3. Oyunu VR'da başlatın.
 
 Oyun her açılışta "Request to use advanced SDK features detected" (gelişmiş SDK özelliklerini kullanma isteği algılandı)
 iletisini gösterir. Bu, bu moddur (sürüş için): OK'e nişan alıp tıklayın.
@@ -37,7 +38,10 @@ iletisini gösterir. Bu, bu moddur (sürüş için): OK'e nişan alıp tıklayı
 **VR menüsü:** **iki grip + sol çubuk tıklaması** tuşlarını 1 saniye basılı tutun. Orada tüm düğmeleri, fareyi, direksiyonu,
 renkleri ve dili ayarlarsınız.
 
-Kaldırma: `uninstall.ps1` dosyasını aynı şekilde çalıştırın, sonra klasörü silin.
+Kaldırma: Windows **Ayarlar > Uygulamalar > Yüklü uygulamalar > ETS2 ATS VR Controls > Kaldır**. Modu, kayıt defteri girdilerini ve
+günlükleri kaldırır. Ayarlarınızın da silinip silinmeyeceğini sorar (Hayır = sonraki bir kurulum için saklayın).
+
+Kurulum programı olmadan: aynı sayfadaki `.zip` dosyası `install.ps1` ve `uninstall.ps1` içerir (tam kılavuza bakın).
 
 ## Daha fazlası
 

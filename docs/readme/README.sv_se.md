@@ -26,11 +26,12 @@ ratt, ingen handkontroll, inget tangentbord, ingen mus.
 
 ## Installation
 
-1. Ladda ner den senaste `ETS2-ATS-VR-Controls-....zip` från sidan
+1. Ladda ner den senaste `ETS2-ATS-VR-Controls-Setup-....exe` från sidan
    [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases). Stäng spelet.
-2. Packa upp den i en mapp där den kan ligga kvar (till exempel `C:\ETS2 ATS VR Controls`).
-3. Högerklicka på `install.ps1` > **Kör med PowerShell**. Klicka på **Ja** i Windows administratörsfråga.
-4. Starta spelet i VR.
+2. Kör den. Klicka på **Ja** i Windows administratörsfråga och sedan på **Nästa** hela vägen. Modden hamnar i
+   `C:\Program Files\ETS2 ATS VR Controls` (du kan välja en annan mapp). Dina inställningar (`config.ini`) och loggarna hamnar i
+   `C:\ProgramData\ETS2 ATS VR Controls`.
+3. Starta spelet i VR.
 
 Vid varje start visar spelet "Request to use advanced SDK features detected" (begäran om att använda avancerade
 SDK-funktioner). Det är den här modden (för körningen): peka på OK och klicka.
@@ -38,7 +39,10 @@ SDK-funktioner). Det är den här modden (för körningen): peka på OK och klic
 **VR-menyn:** håll **båda greppen + klicket på vänster spak** i 1 sekund. Där ställer du in alla knappar, musen,
 styrningen, färgerna och språket.
 
-Avinstallera: kör `uninstall.ps1` på samma sätt och radera sedan mappen.
+Avinstallera: Windows **Inställningar > Appar > Installerade appar > ETS2 ATS VR Controls > Avinstallera**. Det tar bort modden, dess
+registerposter och loggarna. Det frågar om även dina inställningar ska raderas (Nej = behåll dem till en senare installation).
+
+Utan installationsprogrammet: `.zip`-filen på samma sida innehåller `install.ps1` och `uninstall.ps1` (se den fullständiga guiden).
 
 ## Mer
 

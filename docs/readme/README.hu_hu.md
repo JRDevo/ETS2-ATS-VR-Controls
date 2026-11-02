@@ -25,11 +25,12 @@ kormány, nincs gamepad, nincs billentyűzet, nincs egér.
 
 ## Telepítés
 
-1. Töltsd le a legújabb `ETS2-ATS-VR-Controls-....zip` fájlt a
+1. Töltsd le a legújabb `ETS2-ATS-VR-Controls-Setup-....exe` fájlt a
    [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases) oldalról. Zárd be a játékot.
-2. Csomagold ki egy olyan mappába, ahol maradhat (például `C:\ETS2 ATS VR Controls`).
-3. Kattints jobb gombbal az `install.ps1` fájlra > **Futtatás a PowerShell-lel**. A Windows rendszergazdai kérdésénél kattints az **Igen** gombra.
-4. Indítsd el a játékot VR-ban.
+2. Futtasd. A Windows rendszergazdai kérdésénél kattints az **Igen** gombra, majd a végéig a **Tovább** gombra. A mod ide kerül:
+   `C:\Program Files\ETS2 ATS VR Controls` (választhatsz másik mappát). A beállításaid (`config.ini`) és a naplók ide kerülnek:
+   `C:\ProgramData\ETS2 ATS VR Controls`.
+3. Indítsd el a játékot VR-ban.
 
 A játék minden indításkor megjeleníti: „Request to use advanced SDK features detected” (kérés speciális SDK-funkciók
 használatára). Ezt ez a mod okozza (a vezetéshez): mutass az OK-ra, és kattints.
@@ -37,7 +38,10 @@ használatára). Ezt ez a mod okozza (a vezetéshez): mutass az OK-ra, és katti
 **A VR-menü:** tartsd nyomva **mindkét gripet + a bal stick lenyomását** 1 másodpercig. Itt állítod be az összes gombot, az egeret, a
 kormányzást, a színeket és a nyelvet.
 
-Eltávolítás: futtasd ugyanígy az `uninstall.ps1` fájlt, majd töröld a mappát.
+Eltávolítás: Windows **Beállítások > Alkalmazások > Telepített alkalmazások > ETS2 ATS VR Controls > Eltávolítás**. Eltávolítja a modot,
+a beállításjegyzék-bejegyzéseit és a naplókat. Megkérdezi, hogy törölje-e a beállításaidat is (Nem = tartsd meg őket egy későbbi telepítéshez).
+
+A telepítő nélkül: az ugyanazon az oldalon lévő `.zip` tartalmazza az `install.ps1` és `uninstall.ps1` fájlokat (lásd a teljes útmutatót).
 
 ## Továbbiak
 

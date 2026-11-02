@@ -25,11 +25,12 @@ ohjauspyörää, ei peliohjainta, ei näppäimistöä, ei hiirtä.
 
 ## Asennus
 
-1. Lataa uusin `ETS2-ATS-VR-Controls-....zip` [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases)-sivulta.
+1. Lataa uusin `ETS2-ATS-VR-Controls-Setup-....exe` [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases)-sivulta.
    Sulje peli.
-2. Pura se kansioon, jossa se voi pysyä (esimerkiksi `C:\ETS2 ATS VR Controls`).
-3. Napsauta `install.ps1` hiiren kakkospainikkeella > **Suorita PowerShellillä**. Napsauta Windowsin järjestelmänvalvojan kehotteessa **Kyllä**.
-4. Käynnistä peli VR:ssä.
+2. Suorita se. Napsauta Windowsin järjestelmänvalvojan kehotteessa **Kyllä** ja sitten loppuun asti **Seuraava**. Modi asennetaan kansioon
+   `C:\Program Files\ETS2 ATS VR Controls` (voit valita toisen kansion). Asetuksesi (`config.ini`) ja lokit menevät kansioon
+   `C:\ProgramData\ETS2 ATS VR Controls`.
+3. Käynnistä peli VR:ssä.
 
 Joka käynnistyksellä peli näyttää ilmoituksen "Request to use advanced SDK features detected" (pyyntö käyttää
 kehittyneitä SDK-ominaisuuksia). Se on tämä modi (ajamista varten): osoita OK:ta ja napsauta.
@@ -37,7 +38,10 @@ kehittyneitä SDK-ominaisuuksia). Se on tämä modi (ajamista varten): osoita OK
 **VR-valikko:** pidä **molempia gripejä + vasenta tatin painallusta** 1 sekunnin ajan. Siellä määrität jokaisen painikkeen, hiiren,
 ohjauksen, värit ja kielen.
 
-Asennuksen poisto: suorita `uninstall.ps1` samalla tavalla ja poista sitten kansio.
+Asennuksen poisto: Windows **Asetukset > Sovellukset > Asennetut sovellukset > ETS2 ATS VR Controls > Poista asennus**. Se poistaa modin,
+sen rekisterimerkinnät ja lokit. Se kysyy, poistetaanko myös asetuksesi (Ei = säilytä ne myöhempää asennusta varten).
+
+Ilman asennusohjelmaa: samalla sivulla oleva `.zip` sisältää tiedostot `install.ps1` ja `uninstall.ps1` (katso täydellinen opas).
 
 ## Lisää
 

@@ -25,11 +25,12 @@ kierownicy, bez gamepada, bez klawiatury, bez myszy.
 
 ## Instalacyjŏ
 
-1. Ściōngej nojnowszy `ETS2-ATS-VR-Controls-....zip` ze zajty
+1. Ściōngej nojnowszy `ETS2-ATS-VR-Controls-Setup-....exe` ze zajty
    [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases). Zawrzij grã.
-2. Rozpakuj go do folderu, kaj może ôstać (na bajszpil `C:\ETS2 ATS VR Controls`).
-3. Kliknij `install.ps1` prawym knefelkiym > **Run with PowerShell**. W ôknie administratora Windows kliknij **Tak**.
-4. Zacznij grã w VR.
+2. Sztartnij go. W ôknie administratora Windows kliknij **Tak**, a potym do kōńca **Dalij**. Mod idzie do
+   `C:\Program Files\ETS2 ATS VR Controls` (możesz ôbrać inkszy folder). Twoje sztalowania (`config.ini`) i dzienniki idōm do
+   `C:\ProgramData\ETS2 ATS VR Controls`.
+3. Zacznij grã w VR.
 
 Przi kożdym sztarcie gra pokazuje „Request to use advanced SDK features detected”. To je tyn mod (do jazdy): pokŏż na
 OK i kliknij.
@@ -37,7 +38,10 @@ OK i kliknij.
 **Menu VR:** trzimej **ôba chwyty + kliknyńcie lewyj gałki** przez 1 sekundã. Tam ustawisz kożdŏ knefla, mysz,
 kerowanie, farby i gŏdkã.
 
-Ôdinstalowanie: uruchom tak samo `uninstall.ps1`, potym wymaż folder.
+Ôdinstalowanie: Windows **Settings > Apps > Installed apps > ETS2 ATS VR Controls > Uninstall**. Wyciepuje mod, jego wpisy w registrze
+i dzienniki. Pyto, eli wymazać tyż twoje sztalowania (No = ôstow je na niyskorzij).
+
+Bez instalatora: `.zip` na tyj samyj zajcie mo `install.ps1` i `uninstall.ps1` (ôbocz połny przewodnik).
 
 ## Wiyncyj
 

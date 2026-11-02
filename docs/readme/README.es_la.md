@@ -25,11 +25,12 @@ volante, sin gamepad, sin teclado, sin mouse.
 
 ## Instalación
 
-1. Descarga el último `ETS2-ATS-VR-Controls-....zip` de la página
+1. Descarga el último `ETS2-ATS-VR-Controls-Setup-....exe` de la página
    [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases). Cierra el juego.
-2. Descomprímelo en una carpeta donde pueda quedarse (por ejemplo `C:\ETS2 ATS VR Controls`).
-3. Clic derecho en `install.ps1` > **Ejecutar con PowerShell**. Pulsa **Sí** en el aviso de administrador de Windows.
-4. Inicia el juego en VR.
+2. Ejecútalo. Pulsa **Sí** en el aviso de administrador de Windows y luego **Siguiente** hasta el final. El mod va a
+   `C:\Program Files\ETS2 ATS VR Controls` (puedes elegir otra carpeta). Tu configuración (`config.ini`) y los registros van
+   a `C:\ProgramData\ETS2 ATS VR Controls`.
+3. Inicia el juego en VR.
 
 En cada inicio el juego muestra «Request to use advanced SDK features detected» (se detectó una solicitud para usar funciones avanzadas del SDK). Ese es este mod (para manejar): apunta a
 OK y haz clic.
@@ -37,7 +38,10 @@ OK y haz clic.
 **El menú VR:** mantén **los dos grips + el clic del stick izquierdo** durante 1 segundo. Ahí configuras cada botón, el mouse,
 la dirección, los colores y el idioma.
 
-Desinstalar: ejecuta `uninstall.ps1` del mismo modo y luego borra la carpeta.
+Desinstalar: Windows **Configuración > Aplicaciones > Aplicaciones instaladas > ETS2 ATS VR Controls > Desinstalar**. Elimina el mod,
+sus entradas del registro y los registros. Pregunta si también debe borrar tu configuración (No = consérvala para una instalación posterior).
+
+Sin el instalador: el `.zip` de la misma página tiene `install.ps1` y `uninstall.ps1` (consulta la guía completa).
 
 ## Más
 

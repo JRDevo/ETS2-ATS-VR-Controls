@@ -25,11 +25,12 @@ gamepad-ik, teklaturik eta saguik gabe.
 
 ## Instalazioa
 
-1. Deskargatu azken `ETS2-ATS-VR-Controls-....zip` fitxategia
+1. Deskargatu azken `ETS2-ATS-VR-Controls-Setup-....exe` fitxategia
    [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases) orritik. Itxi jokoa.
-2. Deskonprimatu betiko geratuko den karpeta batean (adibidez `C:\ETS2 ATS VR Controls`).
-3. Egin klik eskuineko botoiarekin `install.ps1` fitxategian > **Exekutatu PowerShell-ekin**. Sakatu **Bai** Windows-eko administratzaile-mezuan.
-4. Hasi jokoa VR-n.
+2. Exekutatu ezazu. Sakatu **Bai** Windows-eko administratzaile-mezuan, eta gero **Hurrengoa** amaieraraino. Moda hona doa:
+   `C:\Program Files\ETS2 ATS VR Controls` (beste karpeta bat hauta dezakezu). Zure ezarpenak (`config.ini`) eta erregistroak
+   hona doaz: `C:\ProgramData\ETS2 ATS VR Controls`.
+3. Hasi jokoa VR-n.
 
 Hasiera bakoitzean jokoak "Request to use advanced SDK features detected" erakusten du (SDK-ren eginbide aurreratuak erabiltzeko eskaera detektatu da). Hori mod hau da (gidatzeko): seinalatu
 OK eta egin klik.
@@ -37,7 +38,10 @@ OK eta egin klik.
 **VR menua:** eduki sakatuta **bi grip-ak + ezkerreko stick-aren klika** segundo batez. Han ezartzen duzu botoi bakoitza, sagua,
 gidatzea, koloreak eta hizkuntza.
 
-Desinstalatzeko: exekutatu `uninstall.ps1` modu berean, eta ezabatu karpeta.
+Desinstalatzeko: Windows **Settings > Apps > Installed apps > ETS2 ATS VR Controls > Uninstall**. Moda, bere erregistro-sarrerak
+eta erregistroak kentzen ditu. Galdetzen du ea zure ezarpenak ere ezabatu behar dituen (No = gorde itzazu geroko instalazio baterako).
+
+Instalatzailerik gabe: orri bereko `.zip` fitxategiak `install.ps1` eta `uninstall.ps1` ditu (ikus gida osoa).
 
 ## Gehiago
 

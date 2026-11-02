@@ -25,11 +25,12 @@ vairo, jokio žaidimų pulto, jokios klaviatūros, jokios pelės.
 
 ## Diegimas
 
-1. Atsisiųskite naujausią `ETS2-ATS-VR-Controls-....zip` iš
+1. Atsisiųskite naujausią `ETS2-ATS-VR-Controls-Setup-....exe` iš
    [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases) puslapio. Uždarykite žaidimą.
-2. Išpakuokite į aplanką, kuriame jis gali likti (pavyzdžiui, `C:\ETS2 ATS VR Controls`).
-3. Dešiniuoju pelės mygtuku spustelėkite `install.ps1` > **Run with PowerShell**. „Windows“ administratoriaus lange spustelėkite **Taip**.
-4. Paleiskite žaidimą VR režimu.
+2. Paleiskite jį. „Windows“ administratoriaus lange spustelėkite **Taip**, tada iki galo – **Toliau**. Modas įdiegiamas į
+   `C:\Program Files\ETS2 ATS VR Controls` (galite pasirinkti kitą aplanką). Jūsų nustatymai (`config.ini`) ir žurnalai patenka į
+   `C:\ProgramData\ETS2 ATS VR Controls`.
+3. Paleiskite žaidimą VR režimu.
 
 Kiekvieną kartą paleidus žaidimas parodo „Request to use advanced SDK features detected“. Tai šis modas (vairavimui): nukreipkite į
 OK ir spustelėkite.
@@ -37,7 +38,10 @@ OK ir spustelėkite.
 **VR meniu:** 1 sekundę laikykite **abu gripus + kairiojo stiko paspaudimą**. Čia nustatysite kiekvieną mygtuką, pelę,
 vairavimą, spalvas ir kalbą.
 
-Pašalinimas: tokiu pat būdu paleiskite `uninstall.ps1`, tada ištrinkite aplanką.
+Pašalinimas: Windows **Settings > Apps > Installed apps > ETS2 ATS VR Controls > Uninstall**. Pašalina modą, jo registro įrašus ir
+žurnalus. Paklausia, ar ištrinti ir jūsų nustatymus (No = palikite juos vėlesniam diegimui).
+
+Be diegimo programos: tame pačiame puslapyje esantis `.zip` turi `install.ps1` ir `uninstall.ps1` (žr. visą vadovą).
 
 ## Daugiau
 

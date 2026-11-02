@@ -25,11 +25,12 @@ volant, žádný gamepad, žádná klávesnice, žádná myš.
 
 ## Instalace
 
-1. Stáhněte nejnovější `ETS2-ATS-VR-Controls-....zip` ze stránky
+1. Stáhněte nejnovější `ETS2-ATS-VR-Controls-Setup-....exe` ze stránky
    [Releases](https://github.com/JRDevo/ETS2-ATS-VR-Controls/releases). Zavřete hru.
-2. Rozbalte ho do složky, kde může zůstat (například `C:\ETS2 ATS VR Controls`).
-3. Klikněte pravým tlačítkem na `install.ps1` > **Spustit v prostředí PowerShell**. V okně správce Windows klikněte na **Ano**.
-4. Spusťte hru ve VR.
+2. Spusťte ho. V okně správce Windows klikněte na **Ano** a pak až do konce na **Další**. Mod se nainstaluje do
+   `C:\Program Files\ETS2 ATS VR Controls` (můžete zvolit jinou složku). Vaše nastavení (`config.ini`) a protokoly se uloží
+   do `C:\ProgramData\ETS2 ATS VR Controls`.
+3. Spusťte hru ve VR.
 
 Při každém spuštění hra zobrazí „Request to use advanced SDK features detected“ (zjištěn požadavek na použití pokročilých funkcí SDK). To je tento mod (kvůli řízení): zamiřte na
 OK a klikněte.
@@ -37,7 +38,10 @@ OK a klikněte.
 **VR nabídka:** podržte **oba gripy + klik levé páčky** na 1 sekundu. Tam nastavíte každé tlačítko, myš,
 řízení, barvy a jazyk.
 
-Odinstalace: spusťte stejným způsobem `uninstall.ps1` a pak smažte složku.
+Odinstalace: Windows **Nastavení > Aplikace > Nainstalované aplikace > ETS2 ATS VR Controls > Odinstalovat**. Odebere mod, jeho
+položky v registru a protokoly. Zeptá se, zda má odstranit i vaše nastavení (Ne = ponechte je pro pozdější instalaci).
+
+Bez instalátoru: `.zip` na téže stránce obsahuje `install.ps1` a `uninstall.ps1` (viz úplný návod).
 
 ## Více
 
