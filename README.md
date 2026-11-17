@@ -31,7 +31,7 @@ No steering wheel, no gamepad, no keyboard, no mouse, no extra hardware.
 Start the game in VR, put the headset on, and play. You never need to reach for the desk.
 
 > [!NOTE]
-> **Status:** v0.3.0: the menu and the keyboard in **all 43 game languages** (with your country's keyboard). Also: controller buttons as keys and mouse in **four layers**, **a VR menu and a full keyboard in the
+> **Status:** v0.4.0: a **Windows setup** with an uninstaller (Settings > Apps). The menu and the keyboard in **all 43 game languages** (with your country's keyboard). Also: controller buttons as keys and mouse in **four layers**, **a VR menu and a full keyboard in the
 > headset**, and **driving with the controllers** -- steer with the **stick**, a **wheel held with one or both hands**, or
 > by **pointing**; gas and brake on the triggers. Planned: the keyboard pinned to the cab, and single buttons you place
 > anywhere (for example over a cab switch) that press a key.
@@ -367,8 +367,8 @@ ETS2 / ATS DLAA mod's menu (`Delete`). The menu and keyboard float in the room: 
   (Why not next to the DLL? Windows does not let a normal user write in Program Files. The VR menu must save your
   settings, so they live in ProgramData. The DLL stays in Program Files, so no program can change it.)
 - An update: run the new setup. It keeps your `config.ini`.
-- Had the zip version before? The setup removes the zip's registry entries (the mod would load twice). Copy your old
-  `config.ini` into `C:\ProgramData\ETS2 ATS VR Controls` to keep your buttons, then delete the old folder.
+- Had the zip version before? The setup removes the zip's registry entries (the mod would load twice) and brings your
+  old `config.ini` along to `C:\ProgramData\ETS2 ATS VR Controls`. Then delete the old folder.
 
 **Uninstall:** Windows **Settings > Apps > Installed apps > ETS2 ATS VR Controls > Uninstall**. Close the game first.
 It removes:
@@ -390,6 +390,29 @@ your buttons again. **Yes** deletes it and the `C:\ProgramData\ETS2 ATS VR Contr
 4. Start the game in VR. `config.ini` and `logs` are in that folder.
 
 Uninstall: run `uninstall.ps1` the same way. Then you can delete the folder. Use the setup or the zip, not both.
+
+<a name="rights-you-need"></a>
+**Rights you need (read this if the install does not work):**
+
+- **Install, update and uninstall need Windows administrator rights.** You see one Windows prompt (UAC): click **Yes**.
+  On a standard (non-admin) account, Windows asks for an administrator's password. Without admin rights the install
+  cannot work. The UAC prompt dims the PC screen: if you start the setup from the headset or another device, look at the
+  PC monitor.
+- **Why:** ETS2 / ATS only load VR add-ons that are registered for **all users**, in `HKEY_LOCAL_MACHINE`. A normal user
+  cannot write there. The install must be able to **write these registry keys** (it makes the two `Plugins` keys when
+  they are missing):
+  - `HKEY_LOCAL_MACHINE\SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit`
+  - `HKEY_LOCAL_MACHINE\SOFTWARE\SCS Software\Euro Truck Simulator 2\Plugins`
+  - `HKEY_LOCAL_MACHINE\SOFTWARE\SCS Software\American Truck Simulator\Plugins`
+- **Files:** the setup also writes `C:\Program Files\ETS2 ATS VR Controls` (admin only) and makes
+  `C:\ProgramData\ETS2 ATS VR Controls`, which every user may change (your settings and logs). With the zip, the mod folder
+  must be **writable for you** (the VR menu saves `config.ini` there, and the logs go there). So do not unzip it into
+  `C:\Program Files` or a folder that is read-only or synced (OneDrive).
+- **Playing needs no admin rights.** Do not start the game "as administrator": it is not needed.
+- **It still fails?** Antivirus or a work / school PC policy can block registry writes. Use the setup (it shows an error
+  when it cannot write), or run `install.ps1`: its window now stays open and shows the error. You can check the three
+  entries yourself with `regedit` at the paths above. If there is no log at all after a game start, the game did not find
+  these entries.
 
 <a name="what-installps1-does-and-why-there-is-one"></a>
 <details>

@@ -277,19 +277,28 @@ Config ParseConfig(const std::string& text) {
     return c;
 }
 
+namespace {
+bool PlainDir(const std::wstring& d) {                 // exists, a folder, and not a junction / symlink (a user-made link could
+    const DWORD a = GetFileAttributesW(d.c_str());     // send an elevated OpenXR program's writes somewhere else)
+    return a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_DIRECTORY) && !(a & FILE_ATTRIBUTE_REPARSE_POINT);
+}
+}  // namespace
+
+std::wstring SetupSettingsDir(const std::wstring& dllDir) {
+    if (GetFileAttributesW((dllDir + L"\\" + kSetupMarker).c_str()) == INVALID_FILE_ATTRIBUTES) return std::wstring();
+    std::wstring d;                                    // setup.exe: the DLL in Program Files (read-only for users), the
+    PWSTR pd = nullptr;                                // settings in ProgramData (writable for users)
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_ProgramData, 0, nullptr, &pd))) d = std::wstring(pd) + L"\\ETS2 ATS VR Controls";
+    CoTaskMemFree(pd);
+    return (!d.empty() && PlainDir(d)) ? d : std::wstring();
+}
+
 std::wstring ConfigPath(const std::wstring& dllDir) {
     wchar_t env[MAX_PATH];
     if (GetEnvironmentVariableW(L"VRC_CONFIG", env, MAX_PATH) > 0) return env;
-    const std::wstring next = dllDir + L"\\config.ini";
-    if (GetFileAttributesW(next.c_str()) != INVALID_FILE_ATTRIBUTES) return next;
-    std::wstring path = next;                          // setup.exe: the DLL in Program Files (read-only for users), the
-    PWSTR pd = nullptr;                                // settings in ProgramData (writable for users)
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_ProgramData, 0, nullptr, &pd))) {
-        const std::wstring d = std::wstring(pd) + L"\\ETS2 ATS VR Controls";
-        if (GetFileAttributesW(d.c_str()) != INVALID_FILE_ATTRIBUTES) path = d + L"\\config.ini";
-    }
-    CoTaskMemFree(pd);
-    return path;
+    const std::wstring d = SetupSettingsDir(dllDir);   // a setup install: always its settings folder (an old zip's config.ini
+    if (!d.empty()) return d + L"\\config.ini";        // in the same folder is read-only there; the setup brought it over)
+    return dllDir + L"\\config.ini";                   // (a zip / repo install never picks up what a removed setup left)
 }
 
 Config LoadConfig(const std::wstring& dllDir) {
@@ -439,6 +448,7 @@ bool SaveConfigValues(const std::wstring& path, const std::vector<std::pair<std:
     std::string out;
     for (const std::string& l : lines) out += l + (crlf ? "\r\n" : "\n");
     const std::wstring tmp = path + L".tmp";
+    DeleteFileW(tmp.c_str());                          // (a left-over or a link: removed, never written through)
     FILE* w = nullptr;
     if (_wfopen_s(&w, tmp.c_str(), L"wb") || !w) return false;
     const bool ok = fwrite(out.data(), 1, out.size(), w) == out.size();

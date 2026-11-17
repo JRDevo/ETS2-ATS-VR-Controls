@@ -12,7 +12,7 @@ body:
         language, but most people read English. A translation tool (DeepL, Google Translate) is fine.
 
         **Before you write, make the log (it takes a minute):**
-        1. In `config.ini` (next to `ets2_ats_vr_controls.dll`, where you ran `install.ps1`), change `log = 0` to `log = 1`
+        1. In `config.ini` (setup: `C:\ProgramData\ETS2 ATS VR Controls`; zip: next to `ets2_ats_vr_controls.dll`), change `log = 0` to `log = 1`
            and `log_inputs = 0` to `log_inputs = 1`.
         2. Start the game in VR and do what goes wrong (1 to 2 minutes).
         3. **Quit the game.** Then attach the files below.
@@ -81,7 +81,7 @@ body:
     attributes:
       label: Files (drag them into this box)
       description: |
-        **Required:** `logs\ets2_ats_vr_controls.log` (made with `log = 1`) and `config.ini`, both in the mod's folder.
+        **Required:** `logs\ets2_ats_vr_controls.log` (made with `log = 1`) and `config.ini`, both in `C:\ProgramData\ETS2 ATS VR Controls` (setup) or the mod's folder (zip).
         Attach them as files; please do not paste the text. A screenshot or short video helps too.
         No `ets2_ats_vr_controls.log` at all, although `log = 1`? Write that here: then the mod did not load, and that is useful to know.
       placeholder: Drop ets2_ats_vr_controls.log and config.ini here.

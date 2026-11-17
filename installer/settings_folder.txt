@@ -1,0 +1,7 @@
+ETS2 ATS VR Controls -- installed by the setup.
+
+Your settings (config.ini) and the logs folder are in:
+  C:\ProgramData\ETS2 ATS VR Controls
+(Start menu: "ETS2 ATS VR Controls settings and logs".)
+
+This file tells the mod to use that folder. Do not delete it.

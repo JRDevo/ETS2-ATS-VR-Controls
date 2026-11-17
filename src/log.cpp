@@ -2,6 +2,7 @@
 // (below-normal priority, detached: never joined at unload) writes the buffer to the file 4 times a second, an error line at
 // once -- no disk write inside a game frame (Fable audit: a per-line fflush cost milliseconds in xrBeginFrame).
 #include "log.h"
+#include "config.h"
 #include <windows.h>
 #include <shlobj.h>
 #include <condition_variable>
@@ -30,6 +31,8 @@ bool OpenIn(const std::wstring& dir) {
     const std::wstring p = dir + L"\\ets2_ats_vr_controls.log";
     const std::wstring old = dir + L"\\ets2_ats_vr_controls.old.log";
     MoveFileExW(p.c_str(), old.c_str(), MOVEFILE_REPLACE_EXISTING);
+    const DWORD a = GetFileAttributesW(p.c_str());     // (still there and a link: never open through it -- the setup's
+    if (a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_REPARSE_POINT)) return false;   //  folder is users-modify)
     FILE* f = nullptr;
     if (_wfopen_s(&f, p.c_str(), L"wb") != 0 || !f) return false;
     St().f = f;
@@ -66,15 +69,15 @@ void LogInit(const std::wstring& dllDir, const std::wstring& exeName) {
     for (wchar_t c : exeName) s.exe += (c < 128) ? (char)c : '?';
     wchar_t env[MAX_PATH];
     bool ok = GetEnvironmentVariableW(L"VRC_LOG_DIR", env, MAX_PATH) > 0 && OpenIn(env);   // tests
-    if (!ok) ok = OpenIn(dllDir + L"\\logs");
-    if (!ok) {                                         // setup.exe: Program Files is read-only, the settings folder is not
-        PWSTR pd = nullptr;
-        if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_ProgramData, 0, nullptr, &pd))) {
-            const std::wstring d = std::wstring(pd) + L"\\ETS2 ATS VR Controls";
-            if (GetFileAttributesW(d.c_str()) != INVALID_FILE_ATTRIBUTES) ok = OpenIn(d + L"\\logs");
+    if (!ok) {                                         // setup.exe: its settings folder first (Program Files is read-only, and
+        const std::wstring d = SetupSettingsDir(dllDir);   // a user-picked writable folder must not hide the log either)
+        if (!d.empty()) {
+            const std::wstring l = d + L"\\logs";
+            const DWORD a = GetFileAttributesW(l.c_str());  // (a junction there: never write through it)
+            if (a == INVALID_FILE_ATTRIBUTES || !(a & FILE_ATTRIBUTE_REPARSE_POINT)) ok = OpenIn(l);
         }
-        CoTaskMemFree(pd);
     }
+    if (!ok) ok = OpenIn(dllDir + L"\\logs");
     if (!ok) {
         PWSTR la = nullptr;
         if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &la))) {

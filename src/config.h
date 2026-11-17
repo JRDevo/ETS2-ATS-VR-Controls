@@ -51,6 +51,10 @@ struct Config {
 // Parse `text` (the whole file) on top of the defaults.
 Config ParseConfig(const std::string& text);
 std::wstring ConfigPath(const std::wstring& dllDir);           // the config.ini this DLL uses (it may not exist yet)
+// setup.exe puts kSetupMarker next to the DLL: then the settings + logs folder is %ProgramData%\ETS2 ATS VR Controls (when it
+// exists and is a plain folder, not a junction). "" = not a setup install, or no usable folder.
+inline constexpr wchar_t kSetupMarker[] = L"settings_folder.txt";
+std::wstring SetupSettingsDir(const std::wstring& dllDir);
 Config LoadConfig(const std::wstring& dllDir);
 bool   AppAllowed(const Config& c, const std::wstring& exeName);   // exeName = file name only, any case
 std::string DescribePad(const VrPad::Config& p);                     // one line per mapped button, for the log

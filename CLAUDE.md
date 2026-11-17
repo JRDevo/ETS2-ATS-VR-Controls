@@ -23,7 +23,9 @@ Read `README.md` and the header comments of `src/pad_input.h`, `src/layer.cpp`, 
 - Setup (2026-11-02): `installer\ets2_ats_vr_controls.iss` (Inno Setup 6, RemoteUSB's pattern), built by `scripts\build_setup.ps1`
   -> `build\setup\ETS2-ATS-VR-Controls-Setup-v<ver>.exe` (ships HEAD:config.ini; CI builds it too). DLL + json in Program Files
   (read-only for users: the layer loads into every OpenXR program), config.ini + logs in `%ProgramData%\ETS2 ATS VR Controls`
-  (users-modify; the DLL uses it when no config.ini is next to it: config.cpp ConfigPath). Never run the setup / its uninstaller
+  (users-modify). The setup puts `settings_folder.txt` next to the DLL: only then does the DLL use ProgramData for
+  config.ini + logs (config.cpp SetupSettingsDir; never through a junction). v0.4.0 (2026-11-17): the setup brings an old
+  zip install's config.ini along; install.ps1 waits for Enter (issue #1: the window only flashed). Never run the setup / its uninstaller
   on this PC without asking (UAC + HKLM; it also removes the repo-root registration). Icon: installer\ets2_ats_vr_controls.ico
   (from docs\images\logo.png). The uninstaller removes everything but asks for config.ini (default keep).
 - Release steps: version in CMakeLists.txt; Release build; tests; `scripts\build_setup.ps1`; the zip in dist\ (as before:

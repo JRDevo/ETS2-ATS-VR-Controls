@@ -13,14 +13,17 @@
     older value pointing at another copy of the DLL is removed (one plugin loaded twice is undefined). Nothing goes into the
     game folder.
     Elevates itself (one UAC prompt) unless it already runs as administrator. Refuses while ETS2 / ATS run (the DLL is in use).
-      powershell -ExecutionPolicy Bypass -File scripts\install.ps1 [-NoCopy]
+    Waits for Enter at the end (right-click > Run with PowerShell closes the window at once: a user saw only a flash, issue #1);
+    -NoPause: do not wait.
+      powershell -ExecutionPolicy Bypass -File scripts\install.ps1 [-NoCopy] [-NoPause]
 #>
-param([switch]$NoCopy, [switch]$Elevated)
+param([switch]$NoCopy, [switch]$Elevated, [switch]$NoPause)
 $ErrorActionPreference = 'Stop'
 if ([Environment]::Is64BitOperatingSystem -and -not [Environment]::Is64BitProcess) {   # 32-bit PowerShell: the 64-bit one
     $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"")      # (32-bit would write Wow6432Node)
     if ($NoCopy) { $a += '-NoCopy' }
     if ($Elevated) { $a += '-Elevated' }
+    if ($NoPause) { $a += '-NoPause' }
     & "$env:windir\sysnative\WindowsPowerShell\v1.0\powershell.exe" @a
     exit $LASTEXITCODE
 }
@@ -35,7 +38,9 @@ if (-not $repo -and -not (Test-Path (Join-Path $root $jsonName)) -and (Test-Path
 }
 function LeafOf($p) { try { return [System.IO.Path]::GetFileName($p) } catch { return '' } }   # (odd foreign value names)
 
-function Fail($m) { Write-Host "ERROR: $m" -ForegroundColor Red; if ($Elevated) { Read-Host 'Press Enter' | Out-Null }; exit 1 }
+function Done($code) { if (-not $NoPause) { try { Read-Host 'Press Enter to close' | Out-Null } catch {} }; exit $code }
+function Fail($m) { Write-Host "ERROR: $m" -ForegroundColor Red; Done 1 }
+trap { Fail $_ }                                       # any other error (a file in use, a registry write): shown, not a flash
 
 if (-not $Elevated) {
     # as the user who started it: the game check, the copy, our per-user registration (the elevated process may be another account)
@@ -59,10 +64,16 @@ if (-not $Elevated) {
     $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     if (-not $admin) {
         Write-Host 'Requesting administrator rights (UAC) to write HKLM...'
-        $p = Start-Process powershell -Verb RunAs -Wait -PassThru -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-Elevated')
-        if ($p.ExitCode -ne 0) { Write-Host "elevated install failed (exit $($p.ExitCode))" -ForegroundColor Red; exit $p.ExitCode }
+        $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-Elevated')
+        if ($NoPause) { $a += '-NoPause' }
+        try { $p = Start-Process powershell -Verb RunAs -Wait -PassThru -ArgumentList $a }
+        catch { Fail "no administrator rights (UAC cancelled?): $($_.Exception.Message)" }
+        if ($p.ExitCode -ne 0) {                       # (the elevated window showed why and waited: no second Enter here)
+            Write-Host "the elevated install failed (exit $($p.ExitCode))" -ForegroundColor Red; exit $p.ExitCode
+        }
         & reg query 'HKLM\SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit'
-        exit 0
+        Write-Host 'Installed. Start the game in VR.' -ForegroundColor Green
+        Done 0
     }
 }
 
@@ -95,5 +106,5 @@ foreach ($g in 'Euro Truck Simulator 2', 'American Truck Simulator') {
     New-ItemProperty -Path $pk -Name 'ets2_ats_vr_controls' -PropertyType String -Value $dll -Force | Out-Null
     Write-Host "game input plugin ($g): $dll" -ForegroundColor Green
 }
-if ($Elevated) { Start-Sleep -Seconds 2 }
-exit 0
+if ($Elevated) { Start-Sleep -Seconds 2; exit 0 }
+Done 0

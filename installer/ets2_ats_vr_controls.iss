@@ -74,6 +74,7 @@ Source: "{#BuildDir}\{#JsonName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD_PARTY.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "ets2_ats_vr_controls.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "settings_folder.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#StageDir}\config.ini"; DestDir: "{#DataDir}"; Flags: onlyifdoesntexist uninsneveruninstall
 
 [Icons]
@@ -128,6 +129,27 @@ end;
 function SameName(const A, B: String): Boolean;
 begin
   Result := CompareText(A, B) = 0;
+end;
+
+{ A junction / symlink (FILE_ATTRIBUTE_REPARSE_POINT). Users may modify the settings folder, so they could swap it (or its logs\)
+  for a link to another folder: this admin setup then never writes, sets rights or deletes through it. }
+function IsLink(const Path: String): Boolean;
+var
+  R: TFindRec;
+begin
+  Result := False;
+  if FindFirst(Path, R) then
+  begin
+    Result := (R.Attributes and $400) <> 0;
+    FindClose(R);
+  end;
+end;
+
+{ Deletes Dir and what is in it; a link is only unlinked (its target stays). }
+procedure SafeDelTree(const Dir: String);
+begin
+  if IsLink(Dir) then RemoveDir(Dir)
+  else DelTree(Dir, True, True, True);
 end;
 
 { Removes every OpenXR layer value of our json file name in Root, except Keep ('' = all). }
@@ -219,13 +241,69 @@ begin
   Result := '';
   Exe := RunningGame;                                  { (the game may have been started while the wizard was open) }
   if Exe <> '' then
-    Result := GameRunningMessage(Exe);
+    Result := GameRunningMessage(Exe)
+  else if IsLink(ExpandConstant('{#DataDir}')) then
+    Result := ExpandConstant('{#DataDir}') + ' is a link to another folder, not a folder. Remove it, then try again.';
 end;
 
-procedure CurStepChanged(CurStep: TSetupStep);
+{ An install from the zip / install.ps1 had its config.ini next to its DLL. The setup moves that registration to its own folder, so it
+  brings the settings along: the config.ini next to a registered copy (layer json, else game plugin; the setup's own folder
+  too: a zip unpacked there before -- the DLL then reads only the settings folder). '' = none. }
+function OldConfig: String;
+var
+  Names: TArrayOfString;
+  I: Integer;
+  Dir, Data: String;
 begin
+  Result := '';
+  if RegGetValueNames(HKLM64, '{#LayerKey}', Names) then
+    for I := 0 to GetArrayLength(Names) - 1 do
+      if SameName(ExtractFileName(Names[I]), '{#JsonName}') then
+      begin
+        Dir := ExtractFileDir(Names[I]);
+        if FileExists(Dir + '\config.ini') then
+        begin
+          Result := Dir + '\config.ini';
+          Exit;
+        end;
+      end;
+  SetArrayLength(Names, 2);
+  Names[0] := 'American Truck Simulator';
+  Names[1] := 'Euro Truck Simulator 2';
+  for I := 0 to 1 do
+    if RegQueryStringValue(HKLM64, 'SOFTWARE\SCS Software\' + Names[I] + '\Plugins', '{#PluginValue}', Data) then
+    begin
+      Dir := ExtractFileDir(Data);
+      if FileExists(Dir + '\config.ini') then
+      begin
+        Result := Dir + '\config.ini';
+        Exit;
+      end;
+    end;
+end;
+
+var
+  KeepSettingsFrom: String;                            { ssInstall -> ssPostInstall: an older install's config.ini to bring along }
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  Dst: String;
+  Text: AnsiString;
+begin
+  if CurStep = ssInstall then
+  begin
+    KeepSettingsFrom := '';
+    if not FileExists(ExpandConstant('{#DataDir}\config.ini')) then   { (a setup's own config.ini always wins) }
+      KeepSettingsFrom := OldConfig;
+  end;
   if CurStep = ssPostInstall then
   begin
+    Dst := ExpandConstant('{#DataDir}\config.ini');
+    if (KeepSettingsFrom <> '') and not IsLink(ExpandConstant('{#DataDir}')) and LoadStringFromFile(KeepSettingsFrom, Text) then
+    begin                                              { (written into the file the setup just made: it keeps that file's rights) }
+      if SaveStringToFile(Dst, Text, False) then Log('settings brought over from ' + KeepSettingsFrom)
+      else Log('could not bring the settings over from ' + KeepSettingsFrom);
+    end;
     RemoveLayerValues(HKLM64, ExpandConstant('{app}\{#JsonName}'));
     RemoveAllUsersLayerValues;
     RemovePerUserLayer;
@@ -250,9 +328,9 @@ begin
     begin
       StringChangeEx(Profile, '%SystemDrive%', GetEnv('SystemDrive'), True);
       Dir := Profile + '\AppData\Local\ETS2 ATS VR Controls';
-      if DirExists(Dir) then
+      if DirExists(Dir) and not IsLink(Dir) then
       begin
-        DelTree(Dir + '\logs', True, True, True);
+        SafeDelTree(Dir + '\logs');
         if RemoveDir(Dir) then Log('removed ' + Dir);
       end;
     end;
@@ -282,7 +360,12 @@ begin
   begin
     RemoveUserLogs;
     Dir := ExpandConstant('{#DataDir}');
-    DelTree(Dir + '\logs', True, True, True);
+    if IsLink(Dir) then
+    begin                                              { (a user swapped the folder for a link: unlink it, delete nothing in it) }
+      RemoveDir(Dir);
+      Exit;
+    end;
+    SafeDelTree(Dir + '\logs');
     DeleteFile(Dir + '\config.ini.tmp');
     if FileExists(Dir + '\config.ini') and not UninstallSilent then
       if MsgBox('Also delete your settings (config.ini)?' + #13#10#13#10 + Dir + '\config.ini' + #13#10#13#10 +
